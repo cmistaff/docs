@@ -20,7 +20,9 @@ crestpetsystem/
 │       ├── enterprise/              # Enterprise portal pages
 │       ├── platform/                # Platform admin pages
 │       ├── referral/                # Referral portal pages
-│       └── common/api/openapi/      # Auto-generated API client (Orval)
+│       ├── marcia/                  # Marcia AI assistant interface
+│       └── vendor/                  # Vendor purchase order confirmation
+├── client/src/common/api/openapi/   # Auto-generated API client (Orval)
 ├── server/                          # NestJS 11 backend
 │   └── src/modules/
 │       ├── app/                     # Bootstrap, health checks, filters
@@ -31,7 +33,8 @@ crestpetsystem/
 │           ├── enterprise/          # ~19 modules (analytics, staff, subscriptions, etc.)
 │           ├── platform/            # ~18 modules (tenants, users, feature policies, etc.)
 │           ├── referral/            # ~5 modules (referrals, availability, etc.)
-│           └── shared/              # ~75 modules (auth, payments, services, repositories)
+│           ├── marcia/              # ~5 modules (chatbot, elevenlabs, sms, whatsapp)
+│           └── shared/              # ~78 modules (auth, payments, services, repositories)
 ├── packages/
 │   └── common/                      # Shared package (@repo/common)
 │       └── prisma/schema/           # Multi-file Prisma schema (88 files, ~11,300 lines)
@@ -53,7 +56,7 @@ Each portal maps to a subdomain and serves a distinct user role:
 | Platform | `taylor.localhost:3000` | 18 | Tenants, users, policies |
 | Referral | `referral.localhost:3000` | 5 | Referrals, availability |
 
-The **shared** portal layer (75 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
+The **shared** portal layer (78 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
 
 ## Request Flow
 
@@ -103,7 +106,7 @@ The backend integrates with external services through dedicated modules in `serv
 | **AI** (Anthropic, Mistral) | Health assessments, wellness reports, symptom checking, conversation records |
 | **Stripe** | Payment processing, Connect for clinic payouts, invoicing |
 | **S3** | File storage (documents, images, scans) |
-| **SendGrid / SES** | Transactional email |
+| **AWS SES** | Transactional email (SendGrid webhooks for inbound email processing only) |
 | **Twilio** | SMS notifications and OTP verification |
 | **WhatsApp** | Client communication via Marcia AI assistant |
 | **DocuSign** | Electronic signatures for agreements and consent forms |

@@ -1,0 +1,74 @@
+---
+title: "Insurance Integration"
+description: "Insurance providers, policies, and previous vet details for pet records."
+---
+
+- While adding their pet into the system, we will ask users to add any insurance info they can provide.
+- They can select from a list or add a new insurance provider.
+- We should ask them policy detail as well. Policy Details, Coverage.
+- Maybe the user can upload a policy document as well. That document can give us a lot of important details about policy.
+- Once Marcia have more details about insurance provider, it can fill rest of the info in db.
+- Same with the Policy document, as soon as it receives one, it should fill the updated policy details in the db.
+
+### Models
+
+#### Insurance Provider
+
+```
+interface InsuranceProvider{
+  id: String;
+  name: String;
+  phone?: String;
+  email?: String;
+  fax?: String;
+}
+```
+
+#### Pet → Insurance Provider Mapping
+
+```
+interface PetInsuranceProvider{
+  id: String;
+  petId: String;
+  insuranceProviderId: String
+  infoRetrieved: Boolean // default-> False
+}
+```
+
+#### Policy
+
+```
+interface InsurancePolicy{
+  id: String;
+  policyNumber: String;
+  insuranceProviderId: String;
+  petId: String;
+  totalCoverage: Number;
+  remainingCoverage: Number;
+  deductibleAmount: Number;
+  coverageStartDate: String;
+  coverageEndDate: String; // To Figure out, if the policy is active or not
+  status: String // Active | Inactive -> For Redundancy
+  documentURL?: String // In case we need to reference it again.
+  lastUpdatedAt: String // To figure out if the details are stale.
+  lastUpdatedBy: String // User | AI | System
+}
+```
+
+### Relationships
+Pet → Insurance Provider is a many-to-many relationship.
+
+Pet-> Policy & Insurance Provider → Policy are one-to-many relations.
+
+Policy-> Pet & Policy → Insurance Provider → are one-to-one relations.
+
+### Development
+
+- Merging Policy with PetInsurance Mapping
+- User Either adds or selects an insurance provider.
+- If they select one, we already have `insuranceProviderId`.
+- If they create one, we keep the details with us.
+- we also ask them their policy number, and policy document for uploading, and keep the `viewURL` in there.
+- Then when they finally add the pet, we will create or get the `insuranceProviderId` , and save pet and policy details in `PetInsurancePolicy` Table.
+- Then in case of policy document upload, we ask Marcia AI to get rest of data from document and update policy details asynchronously.
+- After that run the standard flow of Searching & Contacting Insurance for policy information.

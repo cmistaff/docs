@@ -1,0 +1,255 @@
+---
+title: "Form Patterns"
+description: "Form validation, field types, and Zod schema patterns for consistent form design."
+---
+
+# Form Patterns
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Standards for form design, validation, and user experience in the Crest Pet System.
+
+---
+
+## 🛠️ Technology Stack
+
+| Library | Purpose |
+| --- | --- |
+| `react-hook-form` | Form state management |
+| `zod` | Schema validation |
+| `@hookform/resolvers/zod` | Integration layer |
+
+---
+
+## ✅ Validation Patterns
+
+### String Validations
+
+```
+// Required field
+name: z.string().min(1, "Name is required")
+
+// Email
+email: z.string().email("Invalid email address")
+
+// Phone
+phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number")
+
+// URL
+website: z.string().url("Invalid URL").optional()
+```
+
+### Number Validations
+
+```
+// Range
+age: z.number().min(0).max(150)
+
+// Integer only
+quantity: z.number().int("Must be a whole number")
+
+// Positive
+price: z.number().positive("Must be greater than 0")
+```
+
+### Selection Validations
+
+```
+// Enum
+status: z.enum(["active", "inactive", "pending"])
+
+// Boolean required true
+acceptTerms: z.literal(true, {
+  errorMap: () => ({ message: "You must accept the terms" })
+})
+```
+
+### Complex Validations
+
+```
+// Conditional required
+schema.refine(
+  (data) => data.hasInsurance ? !!data.policyNumber : true,
+  { message: "Policy number required", path: ["policyNumber"] }
+)
+
+// Cross-field validation
+schema.refine(
+  (data) => data.password === data.confirmPassword,
+  { message: "Passwords don't match", path: ["confirmPassword"] }
+)
+```
+
+---
+
+## 📝 Field Types
+
+### Text Input
+
+```
+ (
+
+      Name *
+
+
+
+
+
+  )}
+/>
+```
+
+### Textarea
+
+```
+
+```
+
+### Select
+
+```
+
+
+
+
+
+    Option 1
+    Option 2
+
+
+```
+
+### Checkbox
+
+```
+
+
+  Accept terms and conditions
+
+
+```
+
+---
+
+## ❌ Error Handling
+
+### Inline Errors (Default)
+
+Show errors immediately below the field:
+
+```
+
+```
+
+### Submit-Time Errors
+
+For server-side validation errors:
+
+```
+form.setError("email", {
+  type: "server",
+  message: "This email is already registered"
+})
+```
+
+---
+
+## 🏷️ Labels & Indicators
+
+### Required Fields
+
+Add asterisk to required field labels:
+
+```
+Email *
+```
+
+### Optional Fields
+
+Mark optional fields explicitly:
+
+```
+Nickname (optional)
+```
+
+### Character Limits
+
+Show counter for limited fields:
+
+```
+
+  {field.value?.length || 0} / 500
+
+
+```
+
+---
+
+## 📐 Form Layouts
+
+### Single Column (Mobile-First)
+
+Default layout for all forms:
+
+```
+
+  {/* Fields stack vertically */}
+
+```
+
+### Two Column (Desktop)
+
+For forms with many fields:
+
+```
+
+  {/* Fields in grid */}
+
+
+```
+
+### Card-Based
+
+Group related fields:
+
+```
+
+
+    Personal Information
+
+
+    {/* Fields */}
+
+
+```
+
+---
+
+## 🔘 Button Conventions
+
+### Primary Actions
+
+| Action | Label | Variant |
+| --- | --- | --- |
+| Create new | "Add [Item]" | `default` |
+| Save changes | "Save Changes" | `default` |
+| Submit form | "Submit" | `default` |
+
+### Secondary Actions
+
+| Action | Label | Variant |
+| --- | --- | --- |
+| Cancel | "Cancel" | `outline` |
+| Go back | "Back" | `ghost` |
+| Reset | "Clear" | `ghost` |
+
+### Button Placement
+
+```
+
+  Cancel
+  Save Changes
+
+
+```

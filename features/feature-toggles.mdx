@@ -1,0 +1,154 @@
+---
+title: "New Client Flag ,  Three-Layer Feature Toggle"
+description: "Three-layer feature toggle system for new client onboarding and gradual rollout."
+---
+
+**Ticket:** PW-4498
+
+## 1. Problem Statement
+
+The New Client Flag feature is currently **always on** for every clinic with no way to control it:
+
+- **Super Admins (Platform)** cannot enable/disable it per-clinic or globally
+- **Enterprise admins** cannot control it for clinics under their management
+- **Clinic staff** cannot turn off the entire feature for their clinic
+
+## 2. Solution: Three-Layer Toggle with Override Hierarchy
+
+Three levels of control, each with a simple on/off toggle. Higher levels override lower ones.
+
+### Override Priority
+
+```
+Super Admin (Platform) → highest priority, overrides everything
+ ↓
+Enterprise → overrides clinic toggle
+ ↓
+Clinic → lowest priority
+```
+
+### Layer Summary
+
+| Layer | Where | Who | Scope |
+| --- | --- | --- | --- |
+| Super Admin | Platform > Edit Tenant page | Platform admin | Per-clinic toggle on the tenant record |
+| Enterprise | Enterprise > Edit Clinic page (route by clinic ID) | Enterprise admin | Per-clinic toggle for clinics they own |
+| Clinic | Clinic Settings > New Client tab | Clinic staff with SETTINGS write | Self-service toggle for their own clinic |
+
+## 3. Layer 3 - Clinic Toggle
+
+### Schema
+
+`ClinicNewClientSettin.isEnabled` (`Boolean @default(true)`) added to the existing per-clinic settings model.
+
+### Backend Behavior When Disabled
+
+| Area | Behavior |
+| --- | --- |
+| NewClientFlagService.evaluateNewClientFlag() | Early return SKIPPED_FEATURE_DISABLED |
+| PatientService.getPatients() | Forces isNewClient: false, newClientReason: null, ignores filterNewClient |
+| PatientService.getPatient() | Returns isNewClient: false, newClientReason: null |
+| PatientService.editPatient() | Skips flag upsert block silently |
+| mapUserWithNewClientFlag() (appointments) | Returns isNewClient: false, newClientReason: null |
+| ClinicClientFlag data | Preserved (resumes on re-enable) |
+
+### Frontend Behavior When Disabled
+
+| Area | Behavior |
+| --- | --- |
+| Settings page toggle | Visible, inputs below it visually disabled (opacity + pointer-events) |
+| Patient list filter dropdown | "New Clients" / "Existing Clients" options hidden |
+| Patient/appointment badges | Hidden (backend returns isNewClient: false) |
+| Edit patient "New Client" switch | Hidden |
+| Consumer booking (returning window) | Unaffected (independent concern) |
+
+## 4. Layer 1 - Super Admin Toggle
+
+### Approach
+
+Add a toggle to the **Platform > Edit Tenant** page. The toggle writes to `ClinicNewClientSetting.platformEnabled`.
+
+### Backend
+
+- **Controller:** `PUT /platform/tenants/:tenantId` - Add `isNewClientFeatureEnabled` to `UpdateTenantRequestDto`
+- **Service:** Upsert `ClinicNewClientSetting` with platform-level override
+- **Audit log:** `PLATFORM_NEW_CLIENT_SETTING_TOGGLED`
+
+### Frontend
+
+- **Edit Tenant page** (`client/src/app/platform/dashboard/tenants/[id]/edit/` - needs to be created or extended)
+- Toggle component with label "Enable New Client Tracking"
+- Currently the customer list page has an "Edit Tenant" link but no edit page exists yet
+
+## 5. Layer 2 - Enterprise Toggle (TODO)
+
+### Approach
+
+Add a toggle to the **Enterprise > Edit Clinic** page. Currently uses a modal (`clinic-edit-modal.tsx`) - needs to be converted to a full page routed by clinic ID.
+
+### Backend
+
+- **Controller:** `PATCH /enterprise/clinics/:clinicId` - Add `isNewClientFeatureEnabled` to `UpdateClinicRequestDto`
+- **Service:** Upsert `ClinicNewClientSetting` with enterprise-level override
+- **Guard:** Check that enterprise owns the clinic tenant
+- **Audit log:** `ENTERPRISE_NEW_CLIENT_SETTING_TOGGLED`
+
+### Frontend
+
+- Change clinic edit from modal to page: `/enterprise/dashboard/clinics/[clinicId]/edit`
+- Toggle component with label "Enable New Client Tracking"
+- When Super Admin has disabled the feature: show toggle as **disabled** with info icon tooltip: "New client feature is disabled by Super Admin"
+
+## 7. Cascading Disable Rules
+
+### Case 1: Super Admin Disables
+
+| Portal | Toggle State | Behavior |
+| --- | --- | --- |
+| Super Admin | OFF | Toggle is OFF |
+| Enterprise | Disabled + info icon | Tooltip: "New client feature is disabled by Super Admin" |
+| Clinic | Disabled + info icon | Tooltip: "New client feature is disabled by Super Admin" |
+| Client section | Nothing displayed | All new client badges, filters, toggles hidden |
+
+### Case 2: Enterprise Disables
+
+| Portal | Toggle State | Behavior |
+| --- | --- | --- |
+| Super Admin | ON (unaffected) | Toggle remains ON |
+| Enterprise | OFF | Toggle is OFF |
+| Clinic | Disabled + info icon | Tooltip: "New client feature is disabled by Enterprise" |
+| Client section | Nothing displayed | All new client badges, filters, toggles hidden |
+
+### Case 3: Clinic Disables
+
+| Portal | Toggle State | Behavior |
+| --- | --- | --- |
+| Super Admin | ON (unaffected) | Toggle remains ON |
+| Enterprise | ON (unaffected) | Toggle remains ON |
+| Clinic | OFF | Toggle is OFF, settings inputs grayed out |
+| Client section | Nothing displayed | All new client badges, filters, toggles hidden |
+
+## 8. Behavior Matrix: What Changes When Disabled (Any Layer)
+
+| Area | Disabled from Any Layer |
+| --- | --- |
+| Auto-evaluation on appointment completion | Skipped |
+| Patient list "New Client" filter dropdown | Options hidden |
+| "New Client" badge on patients | Hidden (isNewClient: false) |
+| "New Client" badge on appointments | Hidden (isNewClient: false) |
+| Manual toggle on patient profile | Hidden |
+| Existing ClinicClientFlag data | Preserved (resumes on re-enable) |
+| Consumer booking (returning window filter) | Unaffected |
+
+## 9. Decisions
+
+### 9.1 Returning Customer Window
+
+The `returningWindowDays` setting on `ClinicNewClientSetting` feeds into consumer booking filters (`ReturningClientService`). This is **independent** of the new client flag feature toggle.
+
+**Decision:** `returningWindowDays` remains configurable and functional even when the new client flag is disabled. The toggle only affects the flag/badge system, not booking eligibility.
+
+### 9.2 Schema Design for Multi-Layer Override
+
+**Decision:** Option A - three separate Boolean fields (`platformEnabled`, `enterpriseEnabled`, `isEnabled`). Clear, easy to query each layer independently, straightforward re-enable logic.
+

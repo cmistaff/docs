@@ -103,24 +103,29 @@ Users who belong to multiple tenants see a tenant selection screen after authent
 
 ### Role Model
 
-Roles are defined per-tenant, not system-wide. Each tenant can create custom roles with granular permissions:
+Roles are defined per-tenant, not system-wide. Each tenant can create custom roles with granular CRUD permissions:
 
 ```
 TenantRole (per tenant)
   └── TenantRolePermission[]
-        ├── resource: "appointments"  | accessLevel: WRITE
-        ├── resource: "billing"       | accessLevel: READ
-        ├── resource: "inventory"     | accessLevel: ADMIN
-        └── resource: "staff"         | accessLevel: WRITE
+        ├── permission: CLINIC__APPOINTMENTS  | canCreate: true  | canRead: true  | canUpdate: true  | canDelete: false
+        ├── permission: CLINIC__PAYMENTS      | canCreate: false | canRead: true  | canUpdate: false | canDelete: false
+        ├── permission: CLINIC__INVENTORY     | canCreate: true  | canRead: true  | canUpdate: true  | canDelete: true
+        └── permission: CLINIC__STAFF         | canCreate: true  | canRead: true  | canUpdate: true  | canDelete: false
 ```
 
-### Access Levels
+### CRUD Permission Flags
 
-| Level | Description |
-|-------|-------------|
-| `READ` | View data only |
-| `WRITE` | Create, update, and delete data |
-| `ADMIN` | Full control including role management |
+Each `TenantRolePermission` has four independent boolean flags:
+
+| Flag | Description |
+|------|-------------|
+| `canCreate` | Can create new records |
+| `canRead` | Can view/read data |
+| `canUpdate` | Can modify existing records |
+| `canDelete` | Can remove records |
+
+The `Permission` enum uses hierarchical double-underscore naming (e.g., `CLINIC__APPOINTMENTS`, `CLINIC__PAYMENTS`) with approximately 60+ values covering all platform features.
 
 ### Backend Enforcement
 

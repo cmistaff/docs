@@ -1,0 +1,108 @@
+---
+title: "Payment Flow in Dynamic Pricing & Networking System"
+description: "Payment flow architecture for the dynamic pricing and networking system."
+---
+
+## Overview
+
+This document explains how **Stripe payments and subscriptions** are integrated with the **Networking and Dynamic Pricing System**.
+It covers the process of creating networks and plans, subscription handling, payouts, and the current limitations of the implementation.
+
+---
+
+## Modules Involved
+
+- **Clinic**
+- **Consumer**
+- **Enterprise**
+- **Super Admin**
+
+
+---
+
+## Networking & Plans
+
+- Each **enterprise or clinic** can create their own **networks**.
+- Within a network, network owners (clinic/enterprise) can **create subscription plans**.
+- Network owners (clinic/enterprise) can invite other clinics into their network.
+- Invited clinics can add their own **perks** to the plan (e.g., discounts, benefits).
+
+
+---
+
+## Stripe Onboarding Requirement
+
+- Clinics cannot create networks until their **Stripe onboarding** is complete.
+
+
+---
+
+## Plan Creation & Stripe Integration
+
+- When a clinic creates a plan in the **frontend network module**:A corresponding plan is created on **Stripe (main account, not connected accounts)**.
+- Stripe returns a **Plan ID** and **Price ID**.
+- These IDs are saved in the **connected database** along with the plan’s information.
+
+
+---
+
+## Subscription Flow for Consumers
+
+1. Consumers view available plans in the **Network Tab** or **Subscription Module**.
+2. When subscribing:Consumers enter **card details**.
+3. They are subscribed to the plan according to its **billing cycle** (monthly or yearly).
+4. Consumers can cancel their subscription:Cancelation does **not** immediately stop the subscription.
+5. Instead, the subscription continues until the end of the already-paid cycle.
+
+
+---
+
+## Payment Flow
+
+- When a consumer pays for a plan:The payment amount is **plan price + Stripe fees**.
+- Funds are deposited into the **main account**.
+- **95%** of the amount is sent to the **network creator**.
+- **5% platform fee** remains in the main account.
+
+
+---
+
+## Discount Handling
+
+- **Dynamic Discount Handling** is now implemented on the **backend**.
+- Consumers can see the discount:When booking the appointment and on the booked appointment page as well.
+- On the payment checkout page
+- In invoice line items
+
+The **clinic’s transaction page** now also shows how much discount was applied for tracking.
+
+## Current Completion Status
+
+✅ Fully implemented at **Clinic level** and **Consumer level**.
+⚠️ Partial or missing in other areas.
+
+---
+
+## Current Limitations & Missing Features
+
+1. **Enterprise Level**Frontend networking module is complete.
+2. Stripe integration is **not yet implemented**.
+3. **Database & Admin Visibility**No **payment or payout transaction entries** are recorded in the DB.
+4. As a result:Nothing appears in **Super Admin dashboards**.
+5. No **invoice** or **invoice line items** are generated for consumers.
+6. **Currency Handling**No **dynamic currency conversion** implemented during checkout.
+7. Payments are processed in a single fixed currency only.
+8. **Dispute Management**No dispute handling implemented for:Appointment booking payments.
+9. Subscription payments.
+
+
+---
+
+## Summary
+
+- Networking system allows clinics/enterprises to create **plans**, invite other clinics, and add perks.
+- Consumers can **subscribe and cancel** subscriptions, with payments flowing through Stripe.
+- Stripe integration currently ensures plan creation and subscription but is **incomplete at enterprise and admin levels**.
+- Several key features (currency handling, invoices, dispute management) remain to be implemented.
+
+

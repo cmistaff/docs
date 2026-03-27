@@ -1,0 +1,216 @@
+---
+title: "Layout and Spacing"
+description: "Grid systems, breakpoints, responsive patterns, and spacing guidelines."
+---
+
+# Layout & Spacing
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Grid systems, spacing standards, and responsive patterns for the Crest Pet System.
+
+---
+
+## 🏗️ Standard Dashboard Layout
+
+### Structure
+
+| Element | Size | Notes |
+| --- | --- | --- |
+| Header | `h-16` (64px) | Fixed at top |
+| Sidebar (expanded) | `w-72` (288px) | Collapsible |
+| Sidebar (collapsed) | `w-20` (80px) | Icon-only |
+| Main content | `flex-1` | Scrollable |
+| Max content width | `max-w-[1600px]` | Centered |
+
+### Responsive Behavior
+
+| Breakpoint | Sidebar | Header |
+| --- | --- | --- |
+| Mobile (<768px) | Hidden (drawer) | Hamburger menu |
+| Tablet (768-1024px) | Collapsed | Full |
+| Desktop (>1024px) | Expanded | Full |
+
+---
+
+## 📐 Grid Systems
+
+### KPI Cards (Dashboard)
+
+```
+
+  {/* 4 KPI cards */}
+
+
+```
+
+### Two-Column Layout
+
+```
+
+  {/* Two equal columns */}
+
+
+```
+
+### Three-Column Layout
+
+```
+
+  {/* Three columns */}
+
+
+```
+
+### Form Two-Column
+
+```
+
+  {/* Form fields */}
+
+
+```
+
+---
+
+## 📏 Spacing Scale
+
+### Standard Gaps
+
+| Token | Pixels | Usage |
+| --- | --- | --- |
+| `gap-1` | 4px | Tight grouping |
+| `gap-2` | 8px | Related items |
+| `gap-3` | 12px | Form fields |
+| `gap-4` | 16px | Card content |
+| `gap-6` | 24px | Sections |
+| `gap-8` | 32px | Major sections |
+
+### Responsive Spacing
+
+```
+className="gap-4 md:gap-6 lg:gap-8"
+```
+
+---
+
+## 🃏 Card Patterns
+
+### Standard Card
+
+```
+
+
+    Title
+
+
+    {/* Content */}
+
+
+```
+
+### Card Spacing Reference
+
+| Element | Padding |
+| --- | --- |
+| Card outer | `p-4 md:p-6` |
+| CardHeader | `pb-4` |
+| CardContent | `space-y-4` |
+| CardFooter | `pt-4` |
+
+---
+
+## 📄 Page Padding
+
+| Page Type | Padding |
+| --- | --- |
+| Dashboard | `p-4 lg:p-8` |
+| Settings | `p-4 lg:p-6` |
+| Form page | `p-4 lg:p-6` |
+| Modal content | `p-6` |
+
+---
+
+## 🧩 Component Spacing
+
+### Navigation Items
+
+| Element | Height | Padding |
+| --- | --- | --- |
+| Nav item | `h-10` (40px) | `px-3` |
+| Nav item (expanded) | `h-10` | `px-3 py-2` |
+
+### Button Sizes
+
+| Size | Height | Padding |
+| --- | --- | --- |
+| `sm` | `h-9` (36px) | `px-3` |
+| `default` | `h-10` (40px) | `px-4` |
+| `lg` | `h-11` (44px) | `px-8` |
+
+### Form Fields
+
+| Element | Height | Spacing |
+| --- | --- | --- |
+| Input | `h-10` (40px) |  |
+| Label to input |  | `mb-2` |
+| Field to field |  | `space-y-4` |
+
+### List Items
+
+| Type | Padding | Gap |
+| --- | --- | --- |
+| Simple list | `py-2` | `space-y-1` |
+| Card list | `p-4` | `space-y-4` |
+| Table row | `py-3 px-4` |  |
+
+---
+
+## 📊 Table Layouts
+
+### Cell Padding
+
+| Cell Type | Padding |
+| --- | --- |
+| Header | `px-4 py-3` |
+| Body | `px-4 py-3` |
+| Compact | `px-3 py-2` |
+
+---
+
+## 🪟 Modal/Dialog Sizes
+
+| Size | Width | Usage |
+| --- | --- | --- |
+| Small | `max-w-sm` (384px) | Confirmations |
+| Default | `max-w-md` (512px) | Simple forms |
+| Large | `max-w-lg` (672px) | Complex forms |
+| XL | `max-w-xl` (896px) | Data tables |
+
+---
+
+## 📱 Mobile-Specific Patterns
+
+### Touch Targets
+
+Minimum 44x44px (Apple) or 48x48px (Material):
+
+```
+className="min-h-[44px] min-w-[44px]"
+```
+
+### Bottom-Anchored Actions
+
+```
+
+  Save
+
+
+```
+
+### Full-Width Buttons on Mobile
+
+```
+Submit
+```

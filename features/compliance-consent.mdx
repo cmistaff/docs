@@ -1,0 +1,208 @@
+---
+title: "Compliance and Consent Management"
+description: "Super admin compliance, consent management, and legal policy configuration."
+---
+
+## 🧩 Overview
+
+The **Compliance & Consent Management module** ensures that all tenants and users operate within platform-wide legal and regulatory standards (GDPR, HIPAA, CCPA, etc.).
+It centralizes **policy versioning**, **user consents**, and **audit tracking** ,  empowering Super Admins to manage and enforce compliance effectively.
+
+---
+
+## 🎯 Objectives
+
+- Centralize all consent and compliance data.
+- Ensure tenants and users operate under the latest legal terms.
+- Enable Super Admins to enforce or audit compliance status.
+- Provide transparent history and accountability for all consent actions.
+
+---
+
+## 🏗️ System Components
+
+| Component | Description |
+| --- | --- |
+| **Consent Types** | Terms of Service, Privacy Policy, Marketing Consent, Data Sharing, etc. |
+| **Super Admin Dashboard** | Global compliance visibility and document management |
+| **Tenant Dashboard** | Tenant-level compliance summary and reporting |
+| **End User Flow** | Sign-up and login consent management |
+| **Audit Trail** | Immutable logs for all consent actions |
+
+---
+
+## 👑 Super Admin Flow
+
+{expand:title=Step 1 ,  Accessing Compliance Settings}
+
+- Navigate to **Admin Portal → Compliance Tab**
+- View a table of tenants with compliance stats:✅ % Users Compliant
+- ⚠️ Pending Consent Updates
+- 🧾 Last Review Date
+
+📘 *Visual Mock Description:*
+
+> Super Admin opens **Compliance** tab → sees a color-coded dashboard (green for compliant, yellow for pending, red for non-compliant tenants).
+> {expand}
+
+---
+
+{expand:title=Step 2 ,  Managing Policy Documents}
+
+- Upload or update **Terms of Service (ToS)** and **Privacy Policy**.
+- System automatically versions each upload.
+- Option: “Force re-consent on next user login.”
+
+💡 *Example:*
+
+> “ToS v2.1 uploaded ,  all users will be prompted to re-accept.”
+> {expand}
+
+---
+
+{expand:title=Step 3 ,  Reviewing Consents}
+
+- Searchable table for all users and consents:User ID / Email
+- Consent Type
+- Version Accepted
+- Timestamp, IP, Device Info
+- Status (Accepted / Revoked / Pending)
+
+Export compliance logs in **CSV** or **PDF** format.
+{expand}
+
+---
+
+{expand:title=Step 4 ,  Enforcement & Alerts}
+
+- Toggle enforcement policies:✅ Require consent before access
+- ⚠️ Allow temporary guest access
+- 🚫 Block non-compliant tenants entirely
+
+Send automated alerts to Tenant Admins when new policies are uploaded.
+{expand}
+
+---
+
+## 🏢 Tenant Flow
+
+{expand:title=Step 1 ,  Compliance Overview}
+
+- Tenant Admin → **Dashboard → Compliance Tab**
+- Sees:% of compliant users
+- List of pending consents
+- Export option for internal audits
+
+📘 *Visual Mock Description:*
+
+> Tenant sees a progress ring (e.g. 85% compliant). Clicking it shows a table of users missing certain consents.
+> {expand}
+
+---
+
+{expand:title=Step 2 ,  Tenant Notifications}
+
+- When Super Admin updates ToS or Privacy Policy:Tenant Admin receives a notification.
+- Tenant users are prompted for re-acceptance upon next login.
+  {expand}
+
+---
+
+{expand:title=Step 3 ,  Restricted Mode (Non-Compliant Tenants)}
+
+- Tenants missing mandatory consents enter “Restricted Mode”:Can view dashboard
+- Cannot create/edit data until all users comply
+  {expand}
+
+---
+
+## 👤 End User Flow
+
+{expand:title=Step 1 ,  Consent Prompt (Signup/Login)}
+
+- User sees checkboxes during sign-up/login:“I agree to Terms of Service (v2.1)”
+- “I agree to Privacy Policy (v2.1)”
+- Optional: “I consent to marketing communications”
+
+✅ Mandatory consents are required to proceed.
+{expand}
+
+---
+
+{expand:title=Step 2 ,  Consent History}
+
+- Within profile → “Privacy & Consents” section shows:Current accepted policies
+- Option to revoke optional consents
+- Full timestamped history of consent versions
+  {expand}
+
+---
+
+{expand:title=Step 3 ,  Policy Update Handling}
+
+If new ToS/Privacy Policy version released:
+
+User must re-accept before continuing.
+
+Old consent entry is archived with version reference.
+{expand}
+
+---
+
+## 📊 Reporting & Auditing
+
+| Feature | Description |
+| --- | --- |
+| **Export Logs** | Super Admin can export compliance logs by tenant, user, or date range |
+| **Audit Trail** | Immutable event history of all consent actions |
+| **Compliance Reports** | Monthly summaries downloadable in CSV/PDF |
+| **Version History** | Archive of every ToS/Policy version with effective dates |
+
+---
+
+## 🚀 Future Enhancements
+
+Region-specific compliance variants (GDPR, HIPAA, etc.)
+
+API access for 3rd-party reporting integrations
+
+Automated alerts for tenants below compliance threshold
+
+## ❓ Clarifications Needed
+
+**Core Scope** - Should this cover only user consents or also legal compliance (e.g., GDPR, HIPAA)?
+
+**Enforcement** - Should the system block access entirely or just warn users/tenants if non-compliant?
+
+**User Consent Flow** - Should users be able to revoke consents later from their profile settings?
+
+**Metadata Tracking** - Should we store IP address, device info, and timestamp for every consent action?
+
+**Audit Visibility** - Can tenants view their own compliance logs, or is that restricted to Super Admin only?
+
+**Re-Consent Handling** - Should users be required to re-accept terms whenever ToS/Privacy Policy versions update?
+
+**Policy Management** - Should Super Admins manage document versioning from the UI or manually through the database?
+
+**Exports** - Is CSV/PDF export functionality mandatory for compliance audits?
+
+**3rd-Party Tools** - Any plans to integrate external compliance tools like OneTrust, Termly, etc.?
+
+
+Files provided by Michael:
+
+
+name=
+
+
+name=
+
+
+name=
+
+
+name=
+
+
+name=
+![Image: Screenshot 2025-10-12 at 9.04.38 AM (1).png](Screenshot 2025-10-12 at 9.04.38 AM (1).png)

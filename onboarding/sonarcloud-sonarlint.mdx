@@ -1,0 +1,82 @@
+---
+title: "SonarCloud & SonarQube for IDE (SonarLint)"
+description: "Setup guide for SonarCloud CI integration and SonarLint IDE plugin."
+---
+
+## Quick Guide for Developers Using Cursor
+
+This brief guide helps developers use **Cursor IDE** with **SonarCloud** and **SonarQube for IDE (SonarLint)** to maintain secure, clean, and production-ready code.
+
+## 📖 Overview
+
+SonarCloud is the team’s **central code quality platform** that runs analysis in CI/CD and enforces Quality Gates.
+
+SonarLint (SonarQube for IDE) is the **real-time assistant** inside Cursor that detects bugs and security issues while you code.
+
+Using both ensures issues are fixed **before Pull Requests**.
+
+## 🛠 Setup (Quick Steps)
+
+### 1️⃣ Install Extension
+
+- Open Extensions in Cursor (`Ctrl + Shift + X`)
+- Search and install **SonarQube for IDE**
+
+### 2️⃣ Connect to SonarCloud
+
+- Click the Sonar icon in Activity Bar
+- Select **Add SonarCloud Connection**
+- Generate a token from SonarCloud
+- Paste token into Cursor
+- Enter your **Organization Key**
+
+### 3️⃣ Bind Project
+
+- Open Command Palette (`Ctrl + Shift + P`)
+- Run: `SonarLint: Configure Project Binding`
+- Link your local project to the correct SonarCloud project
+
+## 🚀 Daily Developer Workflow
+
+| Action | Outcome |
+| --- | --- |
+| Write or Generate Code | Issues appear instantly in editor |
+| Hover on Issue | View rule, severity, and fix suggestion |
+| Check Problems Tab | See all issues in file |
+| Fix Before Commit | Ensure no critical/blocker issues |
+
+## 🔎 What It Detects
+
+- Bugs
+- Code Smells
+- Security Vulnerabilities
+- Hardcoded secrets
+- SQL Injection risks
+- Null pointer risks
+
+## 📌 Developer Checklist Before Commit
+
+- No **Blocker** issues
+- No **Critical** vulnerabilities
+- No hardcoded credentials
+- Project is properly **Bound**
+- All new code follows team Quality Gate
+
+## 🎯 Why Use It?
+
+- Catch issues early (Shift-Left Security)
+- Keep AI-generated code safe
+- Match team coding standards
+- Reduce PR review time
+- Improve overall code quality
+
+### Summary
+
+| Tool | Purpose |
+| --- | --- |
+| SonarQube for IDE | Real-time code validation |
+| SonarCloud | CI-based quality enforcement |
+| Connected Mode | Sync IDE with server rules |
+
+This ensures your code is **secure, compliant, and review-ready** before pushing.
+

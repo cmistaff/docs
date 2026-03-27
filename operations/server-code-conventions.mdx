@@ -1,0 +1,282 @@
+---
+title: "Server Code Structure and Conventions"
+description: "Architecture guide for the NestJS server covering module structure, request lifecycle, controllers, services, and conventions."
+---
+
+This guide is here to help you understand how we structure, extend, and think about our NestJS server.
+
+---
+
+## 🏛️ Architecture at a Glance
+
+- **Core shape**: Modular NestJS app with strict TypeScript, global guards, global error filter, request validation, and Swagger docs.
+- **Boundaries**:Feature modules (e.g., `auth`, `tenant`, `user`): own routes and business logic.
+- Common modules (e.g., `config`, `prisma`, `email`, `storage`, `schedule`): provide infrastructure/integrations.
+
+**Cross-cutting**:
+
+- Configuration via a centralized service (no direct `process.env` usage).
+- Multi-tenancy established in middleware and enforced via guards.
+- Global exception filter mediates all thrown errors.
+- OpenAPI served in non-production and generated during startup.
+
+
+---
+
+## 🔄 Request Lifecycle (Concrete)
+
+1. **Middleware** (early):
+
+
+- Parses hostname to determine tenant context (type + optional slug).
+- Sets normalized tenant headers and initializes a request-scoped context.
+
+
+1. **Global guards** (in order):
+
+
+- Require tenant type when necessary.
+- JWT auth for protected routes (bypass via `@Public()`).
+- Tenant access rules.
+
+
+1. **Controller**:
+
+
+- Thin layer for routing, validation (DTOs), guards, and delegation.
+
+
+1. **Service**:
+
+
+- Business logic, orchestration of repositories and common modules.
+
+
+1. **Exception filter**:
+
+
+- Passes through known client-visible errors.
+- Masks unknown errors as a generic 500.
+
+
+1. **Swagger**:
+
+
+- Generated at runtime; UI and JSON/YAML available in non-production.
+
+
+---
+
+## 📁 File and Folder Conventions
+
+### 🧩 Module blueprint (recommended)
+
+Each feature module should follow this directory layout to maintain consistency and separate concerns clearly.
+
+```
+feature/
+├── constants/ # Static values, error codes, config keys
+│ └── feature.constants.ts
+│
+├── decorators/ # Custom NestJS decorators
+│ └── feature.decorator.ts
+│
+├── dto/ # Data Transfer Objects (requests & responses)
+│ ├── requests/ # Request DTOs (controler request body type)
+│ │ └── action-request.dto.ts
+│ └── responses/ # Response DTOs (controller request return type)
+│ └── action-response.dto.ts
+│
+├── errors/ # Error definitions, custom error classes
+│ └── feature.errors.ts
+│
+├── guards/ # Route guards (authorization, access control)
+│ └── feature.guard.ts
+│
+├── middlewares/ # Middleware specific to this feature
+│ └── feature.middleware.ts
+│
+├── repository/ # Data access layer (DB queries, ORM repositories)
+│ └── entity.repository.ts
+│
+├── services/ # Business logic layer
+│ └── feature.service.ts
+│
+├── types/ # Shared TS types & interfaces
+│ └── feature.types.ts
+│
+├── utils/ # Utility functions/helpers (if needed)
+│ └── feature.utils.ts
+│
+├── feature.controller.ts # API endpoints (controllers)
+└── feature.module.ts # Module definition (imports, providers, exports)
+```
+note
+This structure is recommended for comprehensive feature modules. Simpler modules may consolidate some directories (e.g., keeping service at the module root level) based on their complexity and scope.
+
+
+This structure is recommended for comprehensive feature modules. Simpler modules may consolidate some directories (e.g., keeping service at the module root level) based on their complexity and scope.
+
+
+---
+
+### 🏷️ Naming Conventions
+
+- **File naming**: Use descriptive, feature-specific names that clearly indicate the module and purpose (e.g., `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`).
+- **Directory naming**: Use descriptive names for feature-specific directories (e.g., `guards/`, `dto/`, `services/`).
+- **Consistency**: All code should follow these naming patterns for better maintainability and discoverability.
+
+
+---
+
+## 🎮 Controllers: Requirements
+
+- Keep controllers **thin**: input extraction, validation, guard application, delegation.
+- Decorate with Swagger:Class Tags (`@ApiTags`) to group endpoints by feature/module.
+- Responses (`@ApiOkResponse`, `@ApiCreatedResponse`, etc.).
+- Request body (`@ApiBody`) if applicable.
+- Params (`@ApiParam`) and queries (`@ApiQuery`) when present.
+
+Explicitly mark public endpoints with a `@Public()` decorator.
+
+Read more at https://docs.nestjs.com/openapi/introduction
+
+### 📝 Swagger: Minimal Route Annotations
+
+- **Class**: Add `@ApiTags('feature')` to group endpoints.
+- **Success response**: Use exactly one primary success decorator per route:`@ApiOkResponse({ type: ActionResponseDto, description: "..." })` for GET/PUT/PATCH
+- `@ApiCreatedResponse({ type: ActionResponseDto, description })` for POST
+
+**Request body**: Add `@ApiBody({ type: ActionRequestDto })` when the route accepts a JSON body.**Params/Query**: Use `@ApiParam` and `@ApiQuery` when route params or query strings exist.**Errors**: Add the most relevant one(s), e.g., `@ApiBadRequestResponse`, `@ApiUnauthorizedResponse`, `@ApiForbiddenResponse`, `@ApiNotFoundResponse`.**Where to view**: Swagger UI at `/swagger` (non-production). JSON/YAML at `/swagger.json` and `/swagger.yaml`. In development, a JSON snapshot is written at startup.
+
+Without proper Swagger decoration, the API client generation will be incomplete or fail entirely.
+
+
+---
+
+## ⚙️ Services: Guidance
+
+- Services own the **business logic** and orchestrate:Repositories (DB reads/writes),
+- Common services (email, SMS, storage, audio, live video, scheduling, jobs),
+- Tenant context (as input, if required).
+
+Keep services stateless where possible; rely on request-scoped context providers only when needed.
+---
+
+## 📋 DTOs and Validation
+
+- Requests and responses are **separate** and **specific** to their routes.
+- Use property-level decorators to make API docs useful (descriptions, examples, constraints).
+- Validation happens via `class-validator`. Keep validation close to DTOs; avoid ad-hoc validation in controllers.
+
+
+---
+
+## 🌐 Multi-Tenancy
+
+- **Tenant detection**:Derived from host/headers, normalized by middleware.
+- Sets standard headers (e.g., host, tenant type, slug).
+- Establishes a request-scoped tenant context.
+
+**Enforcement**:
+
+- Global guards ensure tenant type and access rules are applied consistently.
+- Services use tenant context to scope queries and operations.
+
+**Developer notes**:
+
+- Do not assume tenant presence; handle platform/referral and “no tenant” flows.
+- Keep tenant-specific logic in the tenant layer or repository boundaries.
+
+
+See global middleware in tenant-header.middleware.ts
+
+### 🧵 Request-scoped providers
+
+- **Context carrier**: `DomainContextService` uses Async Local Storage to propagate `tenantType` and optional `tenantSlug` for the duration of the request.
+- **Initialization**: `TenantHeaderMiddleware` parses headers/host and calls `DomainContextService.runWith(context, next)`.
+- **Access**:Data access layers and services that must scope queries should read from `DomainContextService.getOrThrow()`.
+- Prefer a decorator (e.g., `@CurrentTenant`) for controller/service inputs when possible; reserve direct context reads for repositories and guard logic.
+
+**No-tenant flows**: Platform/referral requests may set `tenantSlug = null`. Guards enforce tenant-type requirements where necessary.
+
+Read more about ALS at https://docs.nestjs.com/recipes/async-local-storage
+
+
+---
+
+## 🔑 Authentication
+
+- **Protected** All endpoints rely on a global JWT guard set up in app module.
+- **Public** endpoints must be explicitly marked to bypass auth.
+
+
+See JWT strategy in jwt.strategy.ts
+
+### 🔐 Auth usage in controllers
+
+- Use `@Public()` on routes (or the controller) that must bypass global JWT/tenant guards.
+- Access the authenticated user with `@CurrentUser()`decorator with `RequestUser` interface.
+- Access the request tenant with `@CurrentTenant()`typed with `RequestTenant` interface.
+- Rely on global guards for protected routes to reduce boilerplate.
+
+
+---
+
+## ⚠️ Error Handling Policy
+
+- **Throw**:For expected client-visible failures: use the provided client-reachable error classes with appropriate status codes/messages.
+- For unexpected server issues: throw a plain error (mapped to generic 500).
+
+**Do not throw**:
+
+- NestJS built-in HTTP exceptions (they won't be passed to the client by global exceptions filter).
+
+**Logging**:
+
+- Use NestJS built-in Logger with an appropriate logging level method to log.
+- No need to log errors as-is in services, global exception filter will handle it.
+
+
+See global exception filter in https://github.com/cmistaff/crestpetsystem/blob/main/server/src/app/filters/app.filter.ts
+
+
+---
+
+## ⚙️ Configuration
+
+- **Access**: always via the centralized configuration service. Never read `process.env` directly.
+- **Validation**: all configuration is validated via schemas before app starts.
+
+
+See configuration module in config.module.ts
+
+
+---
+
+## 🗄️ Database and Data Access
+
+- **Prisma service** is the single entry to the database and must NEVER be used directly in business-logic services or controllers.
+- **Repositories** are mandatory for all database interactions - every database operation must go through a dedicated repository.
+- **Repository pattern**: Repositories handle persistence details only and provide a clean abstraction over Prisma ORM.
+- **Business logic** stays in services; repositories should not enforce domain rules.
+- **Data isolation**: Repositories ensure proper tenant context and data scoping.
+
+
+---
+
+## 🤔 What to Ask Yourself
+
+- Is my controller thin and well-documented?
+- Are my DTOs specific and validated?
+- Does my service contain the business logic (not the controller/repository)?
+- Did I respect tenant isolation and auth requirements?
+- Am I using the configuration service and the error policy correctly?
+- Is the module dependency surface minimal and clear?
+
+## Related
+
+- [https://cammaratainc.atlassian.net/wiki/spaces/P/pages/87162898/Querying+the+API+from+Web+application?atlOrigin=eyJpIjoiNGM5YmI1MDcyZjFkNDA4NjlhYTU0ZGMzZTRhZGI0NmQiLCJwIjoiYyJ9](https://cammaratainc.atlassian.net/wiki/spaces/P/pages/87162898/Querying+the+API+from+Web+application?atlOrigin=eyJpIjoiNGM5YmI1MDcyZjFkNDA4NjlhYTU0ZGMzZTRhZGI0NmQiLCJwIjoiYyJ9)
+
+
+

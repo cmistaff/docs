@@ -1,0 +1,1014 @@
+---
+title: "Database Query Logging"
+description: "Database query logging feature for performance monitoring and debugging."
+---
+
+Comprehensive database query logging with configurable verbosity levels.
+
+
+## Overview
+
+The Database Query Logging feature provides comprehensive, structured logging for all Prisma database operations with configurable verbosity levels. This enables:
+
+- **Production monitoring** - Detect slow queries without verbose logging overhead
+- **Development debugging** - Full visibility into queries, parameters, and execution metrics
+- **Performance optimization** - Identify and analyze query bottlenecks
+- **Error tracking** - Automatic logging of database errors and warnings
+
+All logs are structured as single JSON objects for easy aggregation and analysis in monitoring tools (CloudWatch, Datadog, Splunk, etc.).
+
+## Features
+
+### ✅ Configurable Log Levels
+
+- **NONE** - Disable query logging (errors/warnings still logged)
+- **SLOW** - Log only slow queries exceeding threshold (production)
+- **QUERY** - Log all queries with duration and target (development)
+- **PARAMS** - Log queries with parameters (debugging)
+- **FULL** - Log everything including Prisma info events (deep diagnostics)
+
+### ✅ Performance Optimizations
+
+- Event handlers only registered when logging is enabled
+- Zero overhead when `logLevel=NONE`
+- Slow query detection without params overhead
+
+### ✅ Structured Logging
+
+- All logs output as single JSON objects
+- Easy to aggregate and query in monitoring systems
+- Consistent format across all log levels
+
+### ✅ Automatic Error & Warning Logging
+
+- Database errors always logged regardless of log level
+- Warnings always logged for visibility
+- Helps catch connection issues, constraint violations, etc.
+
+### ✅ Slow Query Highlighting
+
+- Configurable threshold via `DB_SLOW_QUERY_THRESHOLD_MS`
+- Slow queries use `logger.warn()` for visibility
+- Always include duration for aggregation
+
+## Configuration
+
+### Environment Variables
+
+Add these to your `.env` file:
+
+```
+# Database query logging level
+# Options: none | slow | query | params | full
+# Default: none
+DB_LOG_LEVEL=slow
+
+# Slow query threshold in milliseconds
+# Queries exceeding this duration are flagged as slow
+# Default: 1000 (1 second)
+DB_SLOW_QUERY_THRESHOLD_MS=1000
+```
+
+### Configuration Schema
+
+The configuration is validated using `class-validator` in `database-config.schema.ts`:
+
+```
+export class DatabaseConfigSchema {
+  @IsString()
+  url: string;
+
+  @IsEnum(DatabaseLogLevel)
+  logLevel: DatabaseLogLevel;
+
+  @IsNumber()
+  @Min(0)
+  slowQueryThresholdMs: number;
+}
+```
+
+### Loading Configuration
+
+Configuration is loaded via `database-config.loader.ts`:
+
+```
+export const loadDatabaseConfig = (): Shape => ({
+  url: process.env.DATABASE_URL,
+  logLevel: process.env.DB_LOG_LEVEL || DatabaseLogLevel.NONE,
+  slowQueryThresholdMs: parseInt(process.env.DB_SLOW_QUERY_THRESHOLD_MS || "1000", 10) || 1000,
+});
+```
+
+**Note**: Uses `||` (logical OR) instead of `??` (nullish coalescing) to handle empty strings properly.
+
+## Log Levels
+
+### NONE (Production Default)
+
+**When to use**: Production when you don't need query visibility.
+
+**What's logged**:
+
+- ❌ No queries
+- ✅ Database errors
+- ✅ Database warnings
+
+**Environment**:
+
+```
+DB_LOG_LEVEL=none
+```
+
+**Output**: No query logs, only errors/warnings.
+
+### SLOW (Production Monitoring)
+
+**When to use**: Production monitoring to detect performance issues.
+
+**What's logged**:
+
+- ✅ Slow queries only (exceeding threshold)
+- ✅ Duration
+- ✅ Target (Prisma model)
+- ✅ isSlowQuery flag
+- ❌ Query parameters (security)
+- ✅ Database errors
+- ✅ Database warnings
+
+**Environment**:
+
+```
+DB_LOG_LEVEL=slow
+DB_SLOW_QUERY_THRESHOLD_MS=1000  # Flag queries > 1 second
+```
+
+**Output**:
+
+```
+{
+  "level": "warn",
+  "context": "DatabaseLoggerService",
+  "message": "SLOW QUERY (>1000ms) - 1523ms",
+  "query": "SELECT * FROM pets WHERE owner_id = $1",
+  "duration": 1523,
+  "target": "quaint::connector::metrics",
+  "isSlowQuery": true,
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+### QUERY (Development)
+
+**When to use**: Local development for general query visibility.
+
+**What's logged**:
+
+- ✅ All queries
+- ✅ Duration
+- ✅ Target (Prisma model)
+- ✅ isSlowQuery flag
+- ❌ Query parameters
+- ✅ Database errors
+- ✅ Database warnings
+
+**Environment**:
+
+```
+DB_LOG_LEVEL=query
+DB_SLOW_QUERY_THRESHOLD_MS=500  # Lower threshold for development
+```
+
+**Output**:
+
+```
+{
+  "level": "log",
+  "context": "DatabaseLoggerService",
+  "message": "QUERY",
+  "query": "SELECT * FROM appointments WHERE tenant_id = $1 AND date = $2",
+  "duration": 45,
+  "target": "quaint::connector::metrics",
+  "isSlowQuery": false,
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+### PARAMS (Debugging)
+
+**When to use**: Debugging specific issues where you need to see parameter values.
+
+**What's logged**:
+
+- ✅ All queries
+- ✅ Duration
+- ✅ Target (Prisma model)
+- ✅ Query parameters
+- ✅ isSlowQuery flag
+- ✅ Database errors
+- ✅ Database warnings
+
+**Environment**:
+
+```
+DB_LOG_LEVEL=params
+```
+
+**Output**:
+
+```
+{
+  "level": "log",
+  "context": "DatabaseLoggerService",
+  "message": "QUERY",
+  "query": "SELECT * FROM appointments WHERE tenant_id = $1 AND date = $2",
+  "duration": 45,
+  "target": "quaint::connector::metrics",
+  "params": "[\"tenant-uuid-123\", \"2025-01-15\"]",
+  "isSlowQuery": false,
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+⚠️ **Security Warning**: Parameters may contain sensitive data (PII, credentials, etc.). Only use in secure development environments.
+
+### FULL (Deep Diagnostics)
+
+**When to use**: Deep debugging of Prisma internals, connection issues, or complex query problems.
+
+**What's logged**:
+
+✅ All queries
+
+✅ Duration
+
+✅ Target (Prisma model)
+
+✅ Query parameters
+
+✅ isSlowQuery flag
+
+✅ Prisma info events (connection pool, engine lifecycle, etc.)
+
+✅ Database errors
+
+✅ Database warnings
+
+**Environment**:
+
+```
+DB_LOG_LEVEL=full
+```
+
+**Output**:
+
+```
+{
+  "level": "log",
+  "context": "DatabaseLoggerService",
+  "message": "DATABASE INFO: Connected to database at localhost:5432",
+  "target": "query_engine::server",
+  "timestamp": "2025-01-15T10:30:44.000Z"
+}
+```
+
+⚠️ **Security Warning**: Same as PARAMS level - only use in secure development environments.
+
+## Log Output Examples
+
+### Normal Query (QUERY level)
+
+```
+{
+  "level": "log",
+  "context": "DatabaseLoggerService",
+  "message": "QUERY",
+  "query": "SELECT * FROM pets WHERE tenant_id = $1",
+  "duration": 12,
+  "target": "quaint::connector::metrics",
+  "isSlowQuery": false,
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+### Slow Query (Any level)
+
+```
+{
+  "level": "warn",
+  "context": "DatabaseLoggerService",
+  "message": "SLOW QUERY (>1000ms) - 2341ms",
+  "query": "SELECT * FROM appointments WHERE clinic_id = $1",
+  "duration": 2341,
+  "target": "quaint::connector::metrics",
+  "isSlowQuery": true,
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+**Note**: Slow queries use `warn` level for better visibility in monitoring systems.
+
+### Database Error
+
+```
+{
+  "level": "error",
+  "context": "DatabaseLoggerService",
+  "message": "DATABASE ERROR: Unique constraint failed on the fields: (`email`)",
+  "target": "User.email",
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+### Database Warning
+
+```
+{
+  "level": "warn",
+  "context": "DatabaseLoggerService",
+  "message": "DATABASE WARNING: Connection pool exhausted, waiting for available connection",
+  "target": "query_engine::connector",
+  "timestamp": "2025-01-15T10:30:45.123Z"
+}
+```
+
+### Prisma Info Event (FULL level only)
+
+```
+{
+  "level": "log",
+  "context": "DatabaseLoggerService",
+  "message": "DATABASE INFO: Starting a postgresql pool with 10 connections",
+  "target": "query_engine::server",
+  "timestamp": "2025-01-15T10:30:44.000Z"
+}
+```
+
+## Architecture
+
+### Components
+
+#### 1. DatabaseLoggerService
+
+**Location**: `server/src/modules/common/prisma/services/database-logger.service.ts`
+
+**Responsibilities**:
+
+Structured query logging based on configured log level
+
+Slow query detection and highlighting
+
+Error and warning logging
+
+Prisma log configuration generation
+
+**Why not **`@Injectable()`**?**
+
+This service is NOT an injectable NestJS service by design. It's instantiated directly in `PrismaService` constructor before calling `super()`, where dependency injection is not available. Prisma's log configuration must be provided when initializing `PrismaClient`.
+
+```
+constructor(protected readonly commonConfigService: CommonConfigService) {
+  const dbLogger = new DatabaseLoggerService({
+    logLevel: commonConfigService.get("database.logLevel"),
+    slowQueryThresholdMs: commonConfigService.get("database.slowQueryThresholdMs"),
+  });
+
+  super({
+    datasources: {
+      db: { url: commonConfigService.get("database.url") },
+    },
+    log: dbLogger.getPrismaLogConfig(),
+    errorFormat: commonConfigService.getIsDevelopment() ? "pretty" : "minimal",
+  });
+
+  this.dbLogger = dbLogger;
+}
+```
+
+#### 2. PrismaService
+
+**Location**: `server/src/modules/common/prisma/prisma.service.ts`
+
+**Responsibilities**:
+
+Prisma client initialization with logging configuration
+
+Event handler registration (query, error, warn, info)
+
+Conditional handler registration for performance
+
+**Performance Optimization**:
+
+```
+async onModuleInit() {
+  // Only register query handler if query logging is enabled (performance optimization)
+  if (this.dbLogger.isQueryLoggingEnabled()) {
+    this.$on("query" as never, (event: Prisma.QueryEvent) => {
+      this.dbLogger.logQuery(event);
+    });
+  }
+
+  // Error and warning handlers always registered
+  this.$on("error" as never, (event: Prisma.LogEvent) => {
+    this.dbLogger.logError(event);
+  });
+
+  this.$on("warn" as never, (event: Prisma.LogEvent) => {
+    this.dbLogger.logWarn(event);
+  });
+
+  // Info handler for FULL level
+  this.$on("info" as never, (event: Prisma.LogEvent) => {
+    this.dbLogger.logInfo(event);
+  });
+
+  await this.$connect();
+}
+```
+
+#### 3. Configuration Files
+
+**Constants**: `server/src/modules/common/config/constants/database-log-level.constants.ts`
+
+```
+export enum DatabaseLogLevel {
+  NONE = "none",
+  SLOW = "slow",
+  QUERY = "query",
+  PARAMS = "params",
+  FULL = "full",
+}
+```
+
+**Schema**: `server/src/modules/common/config/schemas/database-config.schema.ts`
+**Loader**: `server/src/modules/common/config/loader/database-config.loader.ts`
+**Mock**: `server/src/modules/common/config/mock/database-config.mock.ts`
+
+### Data Flow
+
+```
+Environment Variables (.env)
+    ↓
+database-config.loader.ts
+    ↓
+database-config.schema.ts (validation)
+    ↓
+CommonConfigService
+    ↓
+PrismaService constructor
+    ↓
+DatabaseLoggerService instantiation
+    ↓
+Prisma log config generation
+    ↓
+PrismaClient initialization
+    ↓
+Event handler registration (onModuleInit)
+    ↓
+Structured logs → NestJS Logger → Console/CloudWatch
+```
+
+### Log Level Decision Matrix
+
+| Log Level | Query Handler Registered? | Queries Logged | Params Logged | Info Events Logged | Slow Query Detection |
+| --- | --- | --- | --- | --- | --- |
+| NONE | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
+| SLOW | ✅ Yes | ✅ Slow only | ❌ No | ❌ No | ✅ Yes |
+| QUERY | ✅ Yes | ✅ All | ❌ No | ❌ No | ✅ Yes |
+| PARAMS | ✅ Yes | ✅ All | ✅ Yes | ❌ No | ✅ Yes |
+| FULL | ✅ Yes | ✅ All | ✅ Yes | ✅ Yes | ✅ Yes |
+
+**Note**: Errors and warnings are ALWAYS logged regardless of log level.
+
+## Best Practices
+
+### Production Environments
+
+#### ✅ Recommended: SLOW or NONE
+
+```
+# Monitor slow queries without overhead
+DB_LOG_LEVEL=slow
+DB_SLOW_QUERY_THRESHOLD_MS=1000
+```
+
+**Why?**
+
+Low overhead (only slow queries logged)
+
+Detect performance regressions
+
+No sensitive parameter exposure
+
+Errors/warnings still captured
+
+#### ❌ Not Recommended: QUERY, PARAMS, FULL
+
+**Why?**
+
+High log volume = increased costs (CloudWatch, Datadog)
+
+Performance overhead from logging every query
+
+PARAMS/FULL expose sensitive data in logs
+
+Can fill disk space quickly
+
+### Development Environments
+
+#### ✅ Recommended: QUERY or PARAMS
+
+```
+# General development
+DB_LOG_LEVEL=query
+DB_SLOW_QUERY_THRESHOLD_MS=500  # Lower threshold for dev
+
+# Debugging specific issues
+DB_LOG_LEVEL=params
+```
+
+**Why?**
+
+Full visibility into queries
+
+Lower slow query threshold helps catch issues early
+
+PARAMS useful for debugging incorrect queries
+
+### Staging Environments
+
+#### ✅ Recommended: SLOW
+
+```
+DB_LOG_LEVEL=slow
+DB_SLOW_QUERY_THRESHOLD_MS=1000
+```
+
+**Why?**
+
+Production-like monitoring
+
+Catch performance issues before production
+
+Lower overhead than QUERY/PARAMS
+
+### Adjusting Slow Query Threshold
+
+**By Environment**:
+
+| Environment | Recommended Threshold | Rationale |
+| --- | --- | --- |
+| Production | 1000ms (1 second) | Balance between noise and real issues |
+| Staging | 1000ms (1 second) | Match production settings |
+| Development | 500ms (0.5 seconds) | Catch issues earlier |
+| Testing | 200ms (0.2 seconds) | Strict performance requirements |
+
+**By Application Type**:
+
+| Application Type | Recommended Threshold | Rationale |
+| --- | --- | --- |
+| API (p95 < 200ms) | 500ms | 2.5x slower than target |
+| Background Jobs | 5000ms (5 seconds) | Less time-sensitive |
+| Admin Dashboard | 2000ms (2 seconds) | User tolerance higher |
+| Real-time (video) | 100ms | Strict latency requirements |
+
+## Performance Considerations
+
+### Query Handler Registration
+
+Event handlers are **conditionally registered** based on log level:
+
+```
+if (this.dbLogger.isQueryLoggingEnabled()) {
+  this.$on("query" as never, (event: Prisma.QueryEvent) => {
+    this.dbLogger.logQuery(event);
+  });
+}
+```
+
+**Impact**:
+
+`NONE`: No query handler registered → **zero query logging overhead** ✅
+
+`SLOW/QUERY/PARAMS/FULL`: Handler registered → minimal overhead per query (~1-2ms)
+
+### Log Level Overhead
+
+| Log Level | Overhead per Query | Notes |
+| --- | --- | --- |
+| NONE | 0ms | No handlers registered |
+| SLOW | ~1ms | Handler checks threshold, most queries skip logging |
+| QUERY | ~1-2ms | Handler + structured log creation |
+| PARAMS | ~2-3ms | QUERY overhead + parameter serialization |
+| FULL | ~2-3ms | Same as PARAMS + info events (rare) |
+
+### Recommendations
+
+**Use NONE in production** if you have external monitoring (Datadog APM, New Relic, etc.)
+
+**Use SLOW in production** if you rely on CloudWatch for monitoring
+
+**Never use PARAMS/FULL in production** unless actively debugging critical issue
+
+**Rotate to NONE after debugging** to avoid ongoing overhead
+
+## Security
+
+### ⚠️ Security Warnings
+
+#### PARAMS Level - Sensitive Data Exposure
+
+The `PARAMS` log level logs query parameter values, which may include:
+
+**Credentials**: Passwords, API keys, tokens
+
+**PII**: Names, emails, phone numbers, addresses
+
+**PHI**: Medical records, health data (HIPAA concern)
+
+**Multi-tenant data**: Tenant IDs, user IDs
+
+**Financial data**: Credit card info, transaction details
+
+**Example**:
+
+```
+{
+  "params": "[\"user@example.com\", \"$2b$10$encrypted_password_hash\"]"
+}
+```
+
+#### FULL Level - All PARAMS Risks + Prisma Internals
+
+Includes all PARAMS risks plus Prisma engine information:
+
+Database connection strings (may contain credentials in some configs)
+
+Internal IP addresses and ports
+
+Query engine version and configuration
+
+### Safe Usage Guidelines
+
+#### ✅ Safe for Production
+
+| Log Level | Production Safe? | Notes |
+| --- | --- | --- |
+| NONE | ✅ Yes | No query data logged |
+| SLOW | ✅ Yes | No parameters logged |
+| QUERY | ✅ Yes | No parameters logged |
+
+#### ⚠️ Development/Debugging Only
+
+| Log Level | Production Safe? | Notes |
+| --- | --- | --- |
+| PARAMS | ❌ No | Exposes sensitive parameter values |
+| FULL | ❌ No | Exposes parameters + Prisma internals |
+
+#### Secure Development Practices
+
+**Never commit PARAMS/FULL to production configs**
+
+```
+# .env.production
+DB_LOG_LEVEL=slow  # ✅ Safe
+```
+
+**Use PARAMS/FULL temporarily for debugging**
+
+```
+# Terminal session only (not in .env file)
+DB_LOG_LEVEL=params pnpm dev:up
+```
+
+**Sanitize logs before sharing**
+
+Redact email addresses, phone numbers
+
+Mask tenant IDs and user IDs
+
+Remove any credentials or tokens
+
+**Audit log aggregation tools**
+
+Ensure CloudWatch, Datadog have proper access controls
+
+Enable log retention policies
+
+Restrict access to logs with PARAMS data
+
+## Troubleshooting
+
+### Problem: No Query Logs Appearing
+
+**Symptom**: `DB_LOG_LEVEL=query` but no queries in logs.
+
+**Possible Causes**:
+
+**Log level set to NONE**
+
+```
+# Check .env file
+DB_LOG_LEVEL=none  # ← Should be query, slow, params, or full
+```
+
+**Environment variable not loaded**
+
+```
+# Verify config is loaded
+console.log(commonConfigService.get("database.logLevel"));
+```
+
+**Event handler not registered**
+
+Check `PrismaService.onModuleInit()` is being called
+
+Verify `isQueryLoggingEnabled()` returns `true`
+
+**Log level filtered by logging framework**
+
+Check NestJS logger configuration
+
+Verify `LOG_LEVEL` environment variable
+
+**Solution**:
+
+```
+# .env
+DB_LOG_LEVEL=query
+LOG_LEVEL=debug  # Ensure logger not filtering
+```
+
+### Problem: Too Many Logs in Production
+
+**Symptom**: CloudWatch costs increased, disk space filling up.
+
+**Possible Causes**:
+
+**Log level too verbose**
+
+```
+DB_LOG_LEVEL=query  # ← Should be slow or none
+```
+
+**Slow query threshold too low**
+
+```
+DB_SLOW_QUERY_THRESHOLD_MS=100  # ← Too strict for production
+```
+
+**Solution**:
+
+```
+# .env.production
+DB_LOG_LEVEL=slow
+DB_SLOW_QUERY_THRESHOLD_MS=1000  # 1 second threshold
+```
+
+### Problem: Slow Queries Not Flagged
+
+**Symptom**: Queries taking > 1 second but not marked as slow.
+
+**Possible Causes**:
+
+**Threshold too high**
+
+```
+DB_SLOW_QUERY_THRESHOLD_MS=5000  # ← 5 seconds is too permissive
+```
+
+**Log level is NONE**
+
+```
+DB_LOG_LEVEL=none  # ← No queries logged at all
+```
+
+**Query actually faster than you think**
+
+Check `duration` field in logs
+
+Verify against database monitoring tools
+
+**Solution**:
+
+```
+# .env
+DB_LOG_LEVEL=slow
+DB_SLOW_QUERY_THRESHOLD_MS=1000  # Lower threshold
+```
+
+### Problem: Missing duration or target Fields
+
+**Symptom**: Logs missing structured fields for aggregation.
+
+**Possible Causes**:
+
+This should not happen with the current implementation. All log levels (SLOW, QUERY, PARAMS, FULL) include `duration` and `target`.
+
+**Verify**:
+
+```
+// All levels include these fields
+{
+  query: string,
+  duration: number,
+  target: string,
+  isSlowQuery: boolean
+}
+```
+
+If fields are missing, check:
+
+Logger version (should be latest with fix)
+
+Prisma event structure changed (upgrade issue)
+
+### Problem: TypeError: dbLogger.isQueryLoggingEnabled is not a function
+
+**Symptom**: Application crashes on startup.
+
+**Possible Causes**:
+
+**Old version of DatabaseLoggerService**
+
+Missing `isQueryLoggingEnabled()` method
+
+Update to latest version
+
+**Build cache issue**
+
+```
+rm -rf dist/
+pnpm --filter server build
+```
+
+**Solution**:
+
+```
+# Clean rebuild
+rm -rf dist/
+rm -rf node_modules/.cache
+pnpm install
+pnpm --filter server build
+```
+
+### Problem: Errors/Warnings Not Logged at NONE Level
+
+**Symptom**: `DB_LOG_LEVEL=none` but no error logs appear.
+
+**Expected Behavior**: Errors and warnings are **always logged** regardless of log level.
+
+**Possible Causes**:
+
+**Log level filtering by logging framework**
+
+```
+LOG_LEVEL=error  # ← Too strict, should be log or debug
+```
+
+**Logger not configured properly**
+
+Check NestJS logger is enabled
+
+Verify PinoLogger configuration (if used)
+
+**Solution**:
+
+```
+# .env
+DB_LOG_LEVEL=none  # No queries
+LOG_LEVEL=log      # Allow error/warn logs through
+```
+
+### Problem: as never Type Assertions
+
+**Symptom**: Type errors with `this.$on("query" as never, ...)`
+
+**Explanation**: This is intentional. Prisma's TypeScript types don't properly infer event types from log configuration, so we use type assertions to bypass this limitation.
+
+**This is correct**:
+
+```
+this.$on("query" as never, (event: Prisma.QueryEvent) => {
+  this.dbLogger.logQuery(event);
+});
+```
+
+**Alternative** (if types improve in future Prisma versions):
+
+```
+this.$on("query", (event: Prisma.QueryEvent) => {
+  this.dbLogger.logQuery(event);
+});
+```
+
+## Monitoring & Alerting
+
+### CloudWatch Insights Queries
+
+#### Find All Slow Queries
+
+```
+fields @timestamp, query, duration, target
+| filter context = "DatabaseLoggerService" and isSlowQuery = true
+| sort duration desc
+| limit 100
+```
+
+#### Count Queries by Target (Model)
+
+```
+fields target, count(*) as query_count
+| filter context = "DatabaseLoggerService" and level = "log"
+| stats count() by target
+| sort query_count desc
+```
+
+#### Average Query Duration by Hour
+
+```
+fields @timestamp, duration
+| filter context = "DatabaseLoggerService"
+| stats avg(duration) as avg_duration by bin(1h)
+```
+
+#### Find Database Errors
+
+```
+fields @timestamp, message, target
+| filter context = "DatabaseLoggerService" and level = "error"
+| sort @timestamp desc
+```
+
+### Datadog Queries
+
+#### Slow Query Alert
+
+```
+avg(last_5m):avg:database.query.duration{service:crest-pet-api} > 1000
+```
+
+#### Query Count by Model
+
+```
+sum:database.query.count{*} by {target}.as_count()
+```
+
+## Related Documentation
+
+**JIRA Ticket**: [PW-951](https://cammaratainc.atlassian.net/browse/PW-951)
+
+**Prisma Logging Docs**: [https://www.prisma.io/docs/concepts/components/prisma-client/logging](https://www.prisma.io/docs/concepts/components/prisma-client/logging)
+
+**NestJS Logger Docs**: [https://docs.nestjs.com/techniques/logger](https://docs.nestjs.com/techniques/logger)
+
+## Changelog
+
+### January 2025 - Initial Implementation (PW-951)
+
+**Added**:
+
+Five configurable log levels (NONE, SLOW, QUERY, PARAMS, FULL)
+
+Slow query detection with configurable threshold
+
+Structured logging with single JSON objects
+
+Performance optimization (conditional handler registration)
+
+Automatic error and warning logging
+
+Duration and target fields for all query logs
+
+**Security**:
+
+PARAMS/FULL levels documented as development-only
+
+Sensitive data exposure warnings added
+
+Production best practices documented
+
+**Performance**:
+
+Zero overhead when `DB_LOG_LEVEL=none`
+
+~1-3ms overhead per query for other levels
+
+Event handlers conditionally registered
+
+**Files Created**:
+
+`database-logger.service.ts` - Core logging service
+
+`database-log-level.constants.ts` - Log level enum
+
+`database-config.schema.ts` - Configuration validation
+
+`database-config.loader.ts` - Environment variable loading
+
+`DATABASE_LOGGING.md` - This documentation
+
+**Files Modified**:
+
+`prisma.service.ts` - Event handler registration
+
+`database-config.mock.ts` - Test configuration

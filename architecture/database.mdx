@@ -57,7 +57,7 @@ packages/common/prisma/schema/
 ├── whiteboard.prisma         # Whiteboard, WhiteboardTask
 ├── kennel.prisma             # Kennel management
 ├── species.prisma            # Species data
-└── ...                       # 40+ additional domain files
+└── ...                       # 50+ additional domain files
 ```
 
 ## Multi-Tenancy Model
@@ -144,26 +144,34 @@ The auth schema follows Better Auth conventions with Prisma adapter support:
 
 ## Role-Based Access Control
 
-Permissions are managed through dedicated tables rather than hardcoded roles:
+Permissions are managed through dedicated tables with a hierarchical Permission enum and CRUD boolean flags:
 
 ```prisma
 model TenantRole {
-  id          String                 @id @default(uuid())
-  tenantId    String
-  name        String
-  description String?
-  permissions TenantRolePermission[]
-  users       TenantUser[]
+  id              String                 @id @default(uuid())
+  tenantId        String
+  name            String
+  description     String?
+  color           String?                @default("#6366f1")
+  rolePermissions TenantRolePermission[]
+  tenantUser      TenantUser[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 }
 
 model TenantRolePermission {
-  id           String          @id @default(uuid())
+  id           String     @id @default(uuid())
   tenantId     String
   tenantRoleId String
-  resource     String          // e.g., "appointments", "billing"
-  accessLevel  RoleAccessLevel // READ, WRITE, ADMIN
+  permission   Permission // Hierarchical enum (e.g., CLINIC__APPOINTMENTS, CLINIC__PAYMENTS)
+  canCreate    Boolean    @default(false)
+  canRead      Boolean    @default(false)
+  canUpdate    Boolean    @default(false)
+  canDelete    Boolean    @default(false)
 }
 ```
+
+The `Permission` enum contains approximately 60+ hierarchical values using double-underscore naming (e.g., `CLINIC__APPOINTMENTS`, `CLINIC__PAYMENTS`, `CLINIC__INVENTORY`). Each permission has four independent boolean flags for granular CRUD control rather than a single access level.
 
 ## Tenant Settings (Dedicated Tables)
 

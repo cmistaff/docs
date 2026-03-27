@@ -40,19 +40,30 @@ When a PR merges into `prestaging`:
 
 ### Promotion to Staging
 
-Staging deployment is triggered manually:
+Staging deployment is triggered via **workflow_dispatch** (manual GitHub Actions trigger), not PR merges:
 
-1. Create a PR from `prestaging` to `staging`
-2. QA team validates the changes
-3. Merge triggers the same build/deploy pipeline targeting staging infrastructure
+1. Navigate to GitHub Actions and select "Promote PreStaging to Staging"
+2. Click "Run workflow" and fill in release title, Jira tickets, and migration status
+3. The workflow validates that prestaging is ahead of staging, runs lint checks, and performs a `--ff-only` (fast-forward) merge
+4. A push to the `staging` branch triggers automatic deployment to staging infrastructure
 
 ### Promotion to Production
 
-Production deployment requires explicit approval:
+Production deployment also uses **workflow_dispatch** with required approval:
 
-1. Create a PR from `staging` to `main`
-2. Final review and sign-off required
-3. Merge triggers production deployment
+1. Navigate to GitHub Actions and select "Promote Staging to Main"
+2. Click "Run workflow" and fill in release title, Jira tickets, breaking changes, and migration status
+3. The workflow validates staging is ahead of main, runs quality checks, and requires production environment approval
+4. After approval, a fast-forward merge is performed and a release tag is created (`rel-YYYY.MM.DD-HH.MMZ`)
+5. A push to `main` triggers automatic deployment to production
+
+### Hotfix Flow
+
+For critical production or staging bugs, hotfix PRs bypass normal promotion:
+
+- **Staging hotfix**: Create a PR with `StagingHotFix:` prefix targeting `staging` directly
+- **Production hotfix**: Create a PR with `ProdHotFix:` prefix targeting `main` directly
+- After merge, `hotfix-sync.yml` automatically syncs changes back to downstream branches
 
 <Warning>
   **Never deploy to production from the CLI.** All production changes must go through the GitHub Actions pipeline.
@@ -67,15 +78,21 @@ infra/
 ├── environments/
 │   ├── prestaging/    # Prestaging-specific variables
 │   ├── staging/       # Staging-specific variables
-│   └── production/    # Production-specific variables
+│   ├── production/    # Production-specific variables
+│   ├── multiregion/   # Multi-region EKS configurations
+│   └── shared/        # Shared configuration across environments
 ├── modules/
-│   ├── ecs/           # ECS cluster, services, task definitions
-│   ├── rds/           # PostgreSQL configuration
-│   ├── elasticache/   # Redis configuration
-│   ├── alb/           # Load balancer rules
-│   ├── cloudfront/    # CDN configuration
-│   ├── waf/           # Web Application Firewall
-│   └── ...            # VPC, IAM, S3, etc.
+│   ├── ecs/                              # ECS cluster, services, task definitions
+│   ├── eks-multiregion-active-active/    # EKS multi-region deployment
+│   ├── rds/                              # PostgreSQL configuration
+│   ├── redis/                            # ElastiCache Redis configuration
+│   ├── alb/                              # Load balancer rules
+│   ├── cloudfront/                       # CDN configuration
+│   ├── waf/                              # Web Application Firewall
+│   ├── lambda/                           # Serverless functions
+│   ├── bedrock/                          # AWS Bedrock AI integration
+│   ├── bastion/                          # Bastion host for database access
+│   └── ...                               # VPC, IAM, S3, SES, KMS, and 20+ more modules
 └── main.tf            # Root module composition
 ```
 

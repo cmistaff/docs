@@ -5,7 +5,7 @@ description: "AWS infrastructure -- ECS Fargate, RDS, ElastiCache, CloudFront, a
 
 # Infrastructure
 
-CrestPet System runs on AWS with infrastructure managed by Terraform. The production architecture uses ECS Fargate for compute, RDS PostgreSQL for the database, ElastiCache Redis for caching and job queues, and CloudFront for CDN delivery.
+CrestPet System runs on AWS with infrastructure managed by Terraform. The production architecture uses ECS Fargate and EKS (Kubernetes) for compute, RDS PostgreSQL for the database, ElastiCache Redis for caching and job queues, and CloudFront for CDN delivery. EKS provides a multi-region active-active deployment path alongside the primary ECS Fargate setup.
 
 ## Architecture Diagram
 
@@ -48,7 +48,8 @@ CrestPet System runs on AWS with infrastructure managed by Terraform. The produc
 
 | Service | Purpose | Details |
 |---------|---------|---------|
-| **ECS Fargate** | Compute | Serverless containers for Next.js frontend and NestJS backend |
+| **ECS Fargate** | Compute (Primary) | Serverless containers for Next.js frontend and NestJS backend |
+| **EKS** | Compute (Multi-Region) | Kubernetes deployment with HPA for active-active multi-region setup |
 | **RDS PostgreSQL** | Database | Managed PostgreSQL with automated backups and encryption |
 | **ElastiCache Redis** | Cache/Queue | Session storage, caching layer, BullMQ job queues, Socket.IO adapter |
 | **S3** | File Storage | Documents, images, scans, exports, uploaded files |

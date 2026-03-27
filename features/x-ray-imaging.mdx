@@ -1,0 +1,298 @@
+---
+title: "X-Ray Imaging Feature"
+description: "X-ray imaging and DICOM processing feature for veterinary diagnostics."
+---
+
+## Product Spec
+
+A standalone imaging module within the clinic portal. Two primary views:
+
+1. **Imaging Database (Global View)**
+
+
+- All imaging studies across the clinic in one searchable, filterable list
+- Filter by: modality (X-ray, Ultrasound, CT, MRI, Endoscopy), body region, date range, processing status
+- **Unlinked studies flagged** - staff can review orphaned images and associate them to the correct patient + clinical case
+- Used for operational monitoring, quality control, and exception handling
+
+
+1. **Patient Imaging History (Patient Profile Tab)**
+
+
+- New standalone "Imaging" tab in patient detail (10th tab)
+- All imaging studies linked to a specific pet, displayed chronologically
+- Staff can upload directly from here (auto-linked to current pet)
+
+### User Stories
+
+| As a... | I want to... | So that... |
+| --- | --- | --- |
+| Vet tech | Upload DICOM files and see real-time progress per image | I know each image is safely stored and processed |
+| Veterinarian | Browse patient imaging history with quick JPEG previews | I can review prior studies without waiting for large file downloads |
+| Veterinarian | Open a DICOM in diagnostic quality on-demand | I can adjust window/level, zoom, and pan for clinical assessment |
+| Clinic manager | Filter the global imaging database for unlinked studies | I can ensure every image is associated to the right patient |
+| Vet tech | Link an unlinked study to a pet and clinical case | The image appears in the patient's record for future reference |
+
+### Upload Experience
+
+Staff uploads 1+ DICOM files grouped as a "study". The upload can optionally be linked to a pet, clinical case, and appointment at creation - or left unlinked for later association.
+
+**What staff sees during upload:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Upload Imaging Study [Close] │
+│ │
+│ Modality: [X-ray ▾] Body Region: [Thorax ▾] Date: [2026-03-13] │
+│ Patient: [Search pet...] (optional) │
+│ Notes: [Free text...] │
+│ │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ scan_001.dcm (34.2 MB) │ │
+│ │ ● Upload ━━━━━━━━━━━━━━━━ ● Convert ─────────── ○ Complete │ │
+│ │ 68% │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ scan_002.dcm (28.7 MB) │ │
+│ │ ○ Upload ─────────── ○ Convert ─────────── ○ Complete (queued) │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ scan_003.dcm (41.1 MB) │ │
+│ │ ● Upload ━━━━━━━━ ✓ Convert ━━━━━━━━ ✓ Complete ✓ │ │
+│ │ [thumbnail preview] │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│ │
+│ ⚠ Please stay on this page until all uploads complete. │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**3-stage stepper per image:**
+
+- **Upload** - File chunks sent to S3 (10MB each). Shows real percentage. Max 3 files uploading concurrently.
+- **Convert** - Server processes DICOM → extracts metadata, generates JPEG preview (1500px) + thumbnail (200px). Pulsing indicator (no percentage - server-side, duration unknown).
+- **Complete** - Green checkmark. Thumbnail appears inline. Image is ready to view.
+- **Failed** - Red X on the failed stage with error message. Other images continue independently.
+
+
+Staff **must stay on the dialog** until all uploads complete. Attempting to close shows a confirmation prompt.
+
+### Viewing Experience
+
+Three levels of detail, each loaded progressively to optimize performance:
+
+| Level | What loads | When | Avg size per image |
+| --- | --- | --- | --- |
+| Thumbnail | 200px JPEG | Always (list/grid views) | ~30 KB |
+| Preview | 1500px JPEG | On study click (all at once) | ~200 KB |
+| Diagnostic | Original DICOM | On "View DICOM" button click | ~35 MB |
+
+- **List/grid view** - Only thumbnails. Paginated. Fast initial load.
+- **Study detail** - All JPEG previews for the study are **prefetched at once** on page load (small files). Displayed in a grid. Click any image to open a lightbox with arrow-key navigation.
+- **DICOM diagnostic view** - Original file fetched **on-demand only** when staff explicitly clicks "View in DICOM". Rendered in-browser with Cornerstone.js (zoom, pan, window/level adjustment, invert).
+
+### File Handling
+
+| Format | Purpose | Avg Size | When Loaded |
+| --- | --- | --- | --- |
+| DICOM (original) | Diagnostic quality, full metadata | ~35 MB | On-demand only ("View DICOM" button) |
+| JPEG (preview) | Quick in-app viewing, lightbox | ~200 KB | All at once when study opened |
+| JPEG (thumbnail) | Grid/list display | ~30 KB | Always (paginated list) |
+
+All three versions stored in S3 under `imaging/{tenantId}/{studyId}/{imageId}/`. Original uploaded by client, preview + thumbnail generated server-side.
+
+### Unlinked Image Workflow
+
+1. Images arrive via upload (manual) - or in the future via auto-import from PACS
+2. If no pet is associated at upload time → study is marked as **unlinked**
+3. Staff filters global imaging database for "Unlinked only"
+4. Staff reviews each study and either:**Links** to the correct pet + clinical case via search dialog
+5. **Archives** if the image is not needed
+6. Linked studies immediately appear in the patient's Imaging tab
+
+### Key Data Points per Study
+
+| Field | Description |
+| --- | --- |
+| Modality | X-ray, Ultrasound, CT, MRI, Endoscopy, Other |
+| Body region | Head, Neck, Thorax, Abdomen, Pelvis, Forelimb L/R, Hindlimb L/R, Spine, Dental, Full Body, Other |
+| Study date | When imaging was performed (displayed in clinic timezone) |
+| Uploading staff | Who uploaded or ordered the imaging |
+| Linked pet | Pet name + owner - or "Unlinked" badge |
+| Linked clinical case | PatientCase name - or empty |
+| Linked appointment | Optional appointment reference |
+| Status | Uploading, Processing, Ready, Failed, Archived |
+| Image count | Number of images in the study |
+| Notes | Free-text clinical notes |
+| Accession number | For future PACS integration (optional) |
+
+### Permissions
+
+New permission: `CLINIC__IMAGING` under Clinical Care group.
+
+| Action | What it allows |
+| --- | --- |
+| Read | View studies list, thumbnails, JPEG previews, download DICOM |
+| Create | Upload images, create new studies |
+| Update | Link studies to pet/case, edit study metadata (notes, modality, region) |
+| Delete | Archive studies (soft delete) |
+
+Write access (Create + Update) required for upload, link, and metadata edit actions.
+
+### Open Questions
+
+1. Should we support all modalities at launch, or start with X-ray only and expand?
+2. Do we need an audit trail for link/unlink actions beyond standard `updatedAt`?
+3. Who should see unlinked images - all clinic staff with imaging permission, or admin-only?
+4. Should the upload dialog accept non-DICOM files (JPEG/PNG) for clinics that don't use DICOM equipment?
+
+## Technical Spec
+
+### Overview
+
+Standalone imaging module. Separate from the existing `DiagnosticRequest` workflow. Links to both `Pet` and `PatientCase` (both optional for unlinked studies).
+
+### Core Flow
+
+#### Upload Flow
+
+```
+1. UPLOAD 2. CONVERT 3. STORE
+DICOM files → DICOM → JPEG preview → Save JPEG + DICOM to S3
+(large, 35MB+) + thumbnail (server) (async, per-image)
+```
+
+**Step-by-step:**
+
+1. Clinic staff selects 1+ DICOM files in the upload dialog
+2. Client requests presigned URLs from the server (one per file)
+3. Client uploads each file directly to S3 via **multipart upload** (10MB chunks)No max file size limit - multipart handles any size
+4. Max 3 concurrent uploads
+5. User **must stay on the dialog** until all uploads complete
+6. On each file's upload completion, client calls `confirm-upload` endpoint
+7. Server enqueues a BullMQ job per image: download DICOM from S3 → parse metadata with `dcmjs` → generate preview JPEG (1500px) + thumbnail (200px) via `sharp` → upload both to S3
+8. Client polls study status every 3s - thumbnails appear as each image completes
+
+#### Viewing Flow
+
+```
+List/Grid View Study Detail DICOM Diagnostic View
+(thumbnails only) → (all JPEGs prefetched) → (original DICOM on-demand)
+```
+
+1. **Default list/grid** - Only thumbnails fetched (~30KB each). Paginated.
+2. **Click a study** - Navigate to study detail. **All JPEG previews for that study are prefetched at once** (they're small, ~200KB each). Displayed in a grid/lightbox.
+3. **"View in DICOM" button** - Fetches the original DICOM file on-demand (35MB+), renders in-browser using **Cornerstone.js** (supports zoom, pan, window/level adjustment). Only loaded when explicitly requested.
+
+
+**Flows:**
+
+- Imaging uses S3BucketName.CLINIC_DOCUMENTS, no dedicated imaging bucket - it's sharing the clinic documents bucket with an imaging/ key prefix to keep things simple.
+- Supported content types: .dcm, .jpg, .png**Upload Flow (All File Types)**
+
+
+- Client sends file metadata (name, size, contentType) to server
+- Server creates ImagingImage record (status: UPLOADING)
+- Server initiates S3 multipart upload, returns presigned URLs
+- Client uploads chunks directly to S3 (10MB each)
+- Client confirms upload with ETags
+- Server completes multipart upload, updates status to UPLOADED
+- Server enqueues BullMQ processing job
+
+
+**Processing Flow**
+
+**DICOM Images**
+
+1. Download from S3
+2. Parse with dcmjs library
+3. Extract metadata (PatientName, Modality, StudyDate, etc.)
+4. Extract pixel data
+5. Normalize 16-bit → 8-bit grayscale
+6. Apply window/level adjustments
+7. Generate preview (1500px) + thumbnail (200px) via sharp
+8. Upload preview/thumbnail to S3
+9. Save metadata as JSON in DB
+
+
+**JPEG/PNG Images**
+
+1. Download from S3
+2. Resize to preview (1500px) via sharp
+3. Resize to thumbnail (200px) via sharp
+4. Extract basic metadata (width, height, format)
+5. Upload preview/thumbnail to S3
+
+
+**Key Decisions:**
+
+1.Client-Side Direct Upload to S3 using presigned URLs.
+
+Reason:
+
+- DICOM files are 30-50MB+ each, Server would need to buffer entire file in memory, bandwidth becomes bottleneck (all data flows through it twice: client→server→S3)
+- In direct upload Server bandwidth is zero, Zero - client→S3 direct, S3 handles unlimited concurrent, Uses client's full bandwidth, Tenant isolation enforced in S3 key path
+
+
+2.Used dcmjs lib for Parse DICOM metadata
+
+Reason:
+
+- extract raw pixel buffer for image generation, client viewer will use Cornerstone, dcmjs is compatible, runs directly in Node.js, no native compilation
+
+
+3.Used sharp lib for Resizes images (original → preview 1500px, thumbnail 200px)
+
+Reason:
+
+- Converts raw pixel buffer → JPEG
+- Fastest, Production-proven, Streaming architecture  - doesn't load entire image into memory.
+- Parallel processing  - can handle multiple images concurrently
+
+
+**Key points:**
+
+
+**For a 35MB DICOM (4000x4000 16-bit):**
+
+| Stage | Time |
+| --- | --- |
+| S3 download | ~2s |
+| dcmjs parse | ~500ms |
+| 16-bit → 8-bit normalize | ~200ms |
+| sharp preview (1500px) | ~150ms |
+| sharp thumbnail (200px) | ~80ms |
+| S3 upload (2 files) | ~1s |
+| Total | ~4s per image |
+
+
+**Multi-Image Upload (How we handle 5 images at once)**
+
+1. Client sends metadata for all 5 files in one request
+2. Server creates 5 ImagingImage records
+3. Server returns 5 sets of presigned URLs
+4. Client uploads to S3 in parallel (max 3 at a time)
+5. Client confirms each upload individually
+6. Server enqueues 5 separate BullMQ jobs
+
+
+**Parallel Processing (How workers handle jobs)**
+
+- Each image = 1 BullMQ job
+- Multiple workers can run simultaneously
+- Jobs are independent  - Image 2 failing doesn't affect Image 1
+- All workers share same Redis queue
+- Each job carries tenantId  - no cross-tenant leakage
+
+
+**Failure Handling**
+
+- Image fails? → Retry 3 times (5s, 10s, 20s delays)
+- Still fails? → Mark image as FAILED, other images continue
+- Some pass, some fail? → Study status = READY (partial success)
+
+
+- All fail? → Study status = FAILED
+
+## Critical flows (end-to-end)
+![image](Screenshot 2026-03-20 at 10.58.14 AM.png)
+

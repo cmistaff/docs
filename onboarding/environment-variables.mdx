@@ -1,0 +1,326 @@
+---
+title: "Environment Variables Guidance"
+description: "Comprehensive guide to all client and server environment variables used in the Crest Pet System."
+---
+
+After performing static analysis on all files in `client/*`, I was able to determine a good bit of info about our client environment variables. My static analysis script revealed the following:
+
+# Client Environment Variable Usage Report
+
+*Generated: 2026-02-11T18:57:18Z | Branch: dev-dylan/PW-3757*
+
+## Summary
+
+| Metric | Count |
+| --- | --- |
+| Total vars defined | 81 |
+| Used in client/ | 46 |
+| MAYBE used (auto-ingested by SDKs) | 10 |
+| NOT used in client/ | 25 |
+
+## Variables USED in client/ (46)
+
+| # | Variable | Locations (file:line) |
+| --- | --- | --- |
+| 1 | AGENT_API_KEY | client/src/lib/utils/agent-validation.ts:25 |
+| 2 | AWS_ACCESS_KEY_ID | client/src/common/config/index.ts:77 |
+| 3 | AWS_S3_BUCKET_AGENT_CONVERSATION_IMAGES | client/src/common/config/index.ts:82 |
+| 4 | AWS_S3_BUCKET_CLINIC_DOCUMENTS | client/src/common/config/index.ts:92 |
+| 5 | AWS_S3_BUCKET_CONSULTATION_NOTES | client/src/common/config/index.ts:90 |
+| 6 | AWS_S3_BUCKET_MEDIA | client/src/common/config/index.ts:84 |
+| 7 | AWS_S3_BUCKET_POOP_SCANS | client/src/common/config/index.ts:86 |
+| 8 | AWS_S3_BUCKET_TOOTH_SCANS | client/src/common/config/index.ts:85 |
+| 9 | AWS_S3_BUCKET_TREATMENT_PLANS | client/src/common/config/index.ts:91 |
+| 10 | AWS_S3_BUCKET_VET_ASSISTANT_FILES | client/src/common/config/index.ts:87 |
+| 11 | AWS_S3_BUCKET_VIDEO_CONSULTATION_RECORDINGS | client/src/common/config/index.ts:89 |
+| 12 | AWS_S3_REGION | client/src/common/config/index.ts:76 |
+| 13 | AWS_SECRET_ACCESS_KEY | client/src/common/config/index.ts:78 |
+| 14 | BETTER_AUTH_SECRET | client/src/common/config/index.ts:72 |
+| 15 | CI | client/next.config.ts:109, client/next.config.ts:88 |
+| 16 | HOST | client/src/common/api/headers/build.ts:22, client/src/common/api/headers/build.ts:41, client/src/middleware/constants/headers.constants.ts:18, client/src/middleware.ts:121, client/src/middleware/utils/redirect-to-base-domain.util.ts:48 |
+| 17 | MISTRAL_API_KEY | client/src/common/config/index.ts:108, client/src/lib/document-processing/providers/ocr/mistral-ocr.ts:109 |
+| 18 | NEST_URL_SERVER_SIDE | client/src/common/config/index.ts:62 |
+| 19 | NEXT_PUBLIC_APP_ENV | client/src/common/config/index.ts:21 |
+| 20 | NEXT_PUBLIC_APP_VERSION | client/next.config.ts:105, client/src/common/config/index.ts:19 |
+| 21 | NEXT_PUBLIC_AWS_S3_BUCKET_DOCUMENTS | client/src/common/config/index.ts:83 |
+| 22 | NEXT_PUBLIC_CLINIC_DOMAIN | client/src/common/config/index.ts:41 |
+| 23 | NEXT_PUBLIC_CONSUMER_DOMAIN | client/src/common/config/index.ts:40 |
+| 24 | NEXT_PUBLIC_ENTERPRISE_DOMAIN | client/src/common/config/index.ts:42 |
+| 25 | NEXT_PUBLIC_GOOGLE_MAPS_API_KEY | client/src/app/clinic/dashboard/insights/components/maps/map-wrapper.tsx:36, client/src/common/config/index.ts:99, client/src/components/maps/components/google-maps-picker.tsx:57 |
+| 26 | NEXT_PUBLIC_LIVEKIT_URL | client/src/common/config/index.ts:120 |
+| 27 | NEXT_PUBLIC_LOGGER_LEVELS | client/src/common/config/index.ts:37 |
+| 28 | NEXT_PUBLIC_PLATFORM_DOMAIN | client/src/common/config/index.ts:43 |
+| 29 | NEXT_PUBLIC_REFERRAL_DOMAIN | client/src/common/config/index.ts:44 |
+| 30 | NEXT_PUBLIC_REWRITE_PATH | client/src/common/config/index.ts:47 |
+| 31 | NEXT_PUBLIC_REWRITE_URL | client/src/common/config/index.ts:52 |
+| 32 | NEXT_PUBLIC_SENTRY_DSN | client/src/common/config/index.ts:24 |
+| 33 | NEXT_PUBLIC_SOCKET_URL | client/src/common/config/index.ts:58, client/src/common/lib/socket.ts:27 |
+| 34 | NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY | client/src/common/config/index.ts:96, client/src/lib/stripe/config.ts:17, client/src/lib/stripe/config.ts:25 |
+| 35 | NEXT_RUNTIME | client/src/instrumentation.ts:14, client/src/instrumentation.ts:22 |
+| 36 | NODE_ENV | client/next.config.ts:123, client/src/app/clinic/components/landing/utils/scroll-to-element.ts:19, client/src/app/clinic/components/landing/utils/scroll-to-element.ts:27, client/src/app/clinic/components/landing/utils/scroll-to-element.ts:36, client/src/app/clinic/components/landing/utils/scroll-to-element.ts:53, client/src/app/platform/error.tsx:40, client/src/common/config/index.ts:27, client/src/common/config/index.ts:28, client/src/common/config/index.ts:29, client/src/common/config/index.ts:30, client/src/common/config/index.ts:31, client/src/lib/db/prisma.ts:23, client/src/redux/slices/store.tsx:84 |
+| 37 | OPENAI_API_KEY | client/src/common/config/index.ts:105 |
+| 38 | PLATFORM_ADMIN_EMAIL | client/src/scripts/create-platform-admin.ts:21, client/src/scripts/create-platform-admin.ts:29 |
+| 39 | PLATFORM_ADMIN_PASSWORD | client/src/scripts/create-platform-admin.ts:22, client/src/scripts/create-platform-admin.ts:29 |
+| 40 | RESEND_API_KEY | client/src/common/config/index.ts:116 |
+| 41 | RESEND_FROM_EMAIL | client/src/common/config/index.ts:117 |
+| 42 | SENTRY_AUTH_TOKEN | client/next.config.ts:113 |
+| 43 | TOOTHSCAN_API_KEY | client/src/common/config/index.ts:123, client/src/lib/services/tooth-scan.ts:22 |
+| 44 | TWILIO_ACCOUNT_SID | client/src/common/config/index.ts:111 |
+| 45 | TWILIO_AUTH_TOKEN | client/src/common/config/index.ts:112 |
+| 46 | TWILIO_PHONE_NUMBER | client/src/common/config/index.ts:113 |
+
+## Variables MAYBE used in client/ - Auto-Ingested (10)
+
+These vars have **no explicit **`process.env` reference in client code, but are
+**auto-read by installed SDKs** at runtime. Static analysis cannot detect this usage.
+
+| # | Variable | SDK / Package | Notes |
+| --- | --- | --- | --- |
+| 1 | DATABASE_URL | Prisma | Auto-read for database connection string |
+| 2 | DIRECT_URL | Prisma | Auto-read for direct (non-pooled) database connection |
+| 3 | AUTH_TRUST_HOST | Better Auth | Auto-read to trust the host header |
+| 4 | ANTHROPIC_API_KEY | @ai-sdk/anthropic | Auto-read by Anthropic AI SDK |
+| 5 | LIVEKIT_API_KEY | livekit-server-sdk | Auto-read by LiveKit server SDK |
+| 6 | LIVEKIT_API_SECRET | livekit-server-sdk | Auto-read by LiveKit server SDK |
+| 7 | STRIPE_SECRET_KEY | stripe | Auto-read by Stripe Node SDK |
+| 8 | STRIPE_WEBHOOK_SECRET | stripe | Used by Stripe webhook signature verification |
+| 9 | PORT | Next.js | Auto-read for dev server port |
+| 10 | DAILY_API_KEY | @daily-co/daily-js | May be auto-read by http://Daily.co SDK |
+
+## Variables NOT USED in client/ (25)
+
+Defined in `.env` / `.env.example` but **zero usage** in `client/` application code.
+*(Excluded from search: Zod schemas, environment.d.ts, validated-env.ts, .env files)*
+
+| # | Variable |
+| --- | --- |
+| 1 | AWS_S3_BUCKET |
+| 2 | CLINIC_DOMAIN |
+| 3 | CONSUMER_DOMAIN |
+| 4 | CRON_SECRET |
+| 5 | ENTERPRISE_DOMAIN |
+| 6 | LLAMA_CLOUD_API_KEY |
+| 7 | MINDBODY_API_KEY |
+| 8 | MINDBODY_PASSWORD |
+| 9 | MINDBODY_SITE_ID |
+| 10 | MINDBODY_USERNAME |
+| 11 | NEXTAUTH_SECRET |
+| 12 | NEXTAUTH_URL |
+| 13 | NEXT_PUBLIC_HEIDI_API_KEY |
+| 14 | NEXT_PUBLIC_NEST_URL |
+| 15 | PLATFORM_DOMAIN |
+| 16 | POOPSCAN_API_KEY |
+| 17 | QSTASH_CURRENT_SIGNING_KEY |
+| 18 | QSTASH_NEXT_SIGNING_KEY |
+| 19 | QSTASH_TOKEN |
+| 20 | QSTASH_URL |
+| 21 | REFERRAL_DOMAIN |
+| 22 | SMS_AGENT_NUMBER |
+| 23 | TAVUS_API_KEY |
+| 24 | TAVUS_REPLICA_ID |
+| 25 | WEBHOOK_SECRET |
+
+*Search scope: all *`client/**/*.{ts,tsx,js,mjs}` excluding node_modules, .next, schema definitions, and type declarations
+
+For reference, this static analysis was done and generated by the following env-validator script:
+
+
+```bash
+#!/usr/bin/env bash
+# ───────────────────────────────────────────────────────────────
+# PW-3757: Client Environment Variable Usage Analysis
+#
+# Scans client/.env + client/.env.example for all defined vars,
+# then searches client/ for every USAGE of each one - excluding
+# definition sites (schemas, type declarations, .env files).
+#
+# Usage: bash scripts/analyze-client-env-usage.sh
+# Output: Markdown to stdout (pipe to .md file if desired)
+# ───────────────────────────────────────────────────────────────
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CLIENT_DIR="$REPO_ROOT/client"
+
+# ── Collect all env var names ──
+
+collect_vars_from_file() {
+ local file="$1"
+ if [[ -f "$file" ]]; then
+ grep -oP '^[A-Z][A-Z0-9_]+(?==)' "$file" 2>/dev/null || true
+ fi
+}
+
+collect_vars_from_code() {
+ grep -roPh 'process\.env\.([A-Z][A-Z0-9_]+)' "$CLIENT_DIR/src" "$CLIENT_DIR/next.config.ts" \
+ --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' \
+ 2>/dev/null | sed 's/process\.env\.//' | sort -u || true
+}
+
+echo "Scanning for environment variables..." >&2
+
+ALL_VARS=$(
+ {
+ collect_vars_from_file "$CLIENT_DIR/.env"
+ collect_vars_from_file "$CLIENT_DIR/.env.example"
+ collect_vars_from_code
+ } | sort -u
+)
+
+TOTAL=$(echo "$ALL_VARS" | wc -l)
+echo "Found $TOTAL unique env vars. Searching for usages..." >&2
+
+# ── Auto-ingested vars (read by SDKs without explicit process.env in our code) ──
+# These are hardcoded because static analysis can't detect SDK internals.
+
+AUTO_INGESTED_VARS=(
+ "DATABASE_URL:Prisma:Auto-read for database connection string"
+ "DIRECT_URL:Prisma:Auto-read for direct (non-pooled) database connection"
+ "AUTH_TRUST_HOST:Better Auth:Auto-read to trust the host header"
+ "ANTHROPIC_API_KEY:@ai-sdk/anthropic:Auto-read by Anthropic AI SDK"
+ "LIVEKIT_API_KEY:livekit-server-sdk:Auto-read by LiveKit server SDK"
+ "LIVEKIT_API_SECRET:livekit-server-sdk:Auto-read by LiveKit server SDK"
+ "STRIPE_SECRET_KEY:stripe:Auto-read by Stripe Node SDK"
+ "STRIPE_WEBHOOK_SECRET:stripe:Used by Stripe webhook signature verification"
+ "PORT:Next.js:Auto-read for dev server port"
+ "DAILY_API_KEY:@daily-co/daily-js:May be auto-read by Daily.co SDK"
+)
+
+# Build a lookup set of auto-ingested var names
+declare -A AUTO_INGESTED_SET
+for entry in "${AUTO_INGESTED_VARS[@]}"; do
+ varname="${entry%%:*}"
+ AUTO_INGESTED_SET["$varname"]=1
+done
+
+# ── Analyze each var ──
+
+USED_ENTRIES=""
+UNUSED_ENTRIES=""
+USED_COUNT=0
+UNUSED_COUNT=0
+IDX=0
+
+while IFS= read -r VAR; do
+ [[ -z "$VAR" ]] && continue
+ IDX=$((IDX + 1))
+
+ # Search all of client/ with word boundaries, then EXCLUDE definition-only sites:
+ # - node_modules, .next (build artifacts)
+ # - .env, .env.example, .env.* (where vars are defined)
+ # - schemas/ dir (Zod schema declarations)
+ # - environment.d.ts (TS type declarations)
+ # - env.schema.ts (merged schema)
+ # - validated-env.ts (validation bootstrap)
+ HITS=$(
+ grep -rn -P "\b${VAR}\b" "$CLIENT_DIR" \
+ --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' \
+ 2>/dev/null \
+ | grep -v 'node_modules' \
+ | grep -v '\.next/' \
+ | grep -v '/schemas/.*-env\.schema\.ts' \
+ | grep -v 'env\.schema\.ts' \
+ | grep -v 'validated-env\.ts' \
+ | grep -v 'environment\.d\.ts' \
+ || true
+ )
+
+ if [[ -z "$HITS" ]]; then
+ # Skip auto-ingested vars - they get their own section
+ if [[ -z "${AUTO_INGESTED_SET[$VAR]+x}" ]]; then
+ UNUSED_COUNT=$((UNUSED_COUNT + 1))
+ UNUSED_ENTRIES+="| $UNUSED_COUNT | \`$VAR\` |"$'\n'
+ fi
+ else
+ USED_COUNT=$((USED_COUNT + 1))
+
+ # Get unique files with line numbers
+ FILE_LIST=$(
+ echo "$HITS" | while IFS= read -r line; do
+ echo "$line" | sed "s|^$REPO_ROOT/||" | cut -d: -f1-2
+ done | sort -u
+ )
+
+ # Format as backtick-wrapped, comma-separated locations
+ FORMATTED=$(echo "$FILE_LIST" | sed 's/.*$/`&`/' | paste -sd ',' - | sed 's/,/, /g')
+
+ USED_ENTRIES+="| $USED_COUNT | \`$VAR\` | $FORMATTED |"$'\n'
+ fi
+
+ if (( IDX % 20 == 0 )); then
+ echo " Processed $IDX / $TOTAL vars..." >&2
+ fi
+done <<< "$ALL_VARS"
+
+# ── Count auto-ingested vars that are actually defined in .env/.env.example ──
+
+AUTO_INGESTED_ENTRIES=""
+AUTO_INGESTED_COUNT=0
+for entry in "${AUTO_INGESTED_VARS[@]}"; do
+ varname="${entry%%:*}"
+ rest="${entry#*:}"
+ sdk="${rest%%:*}"
+ note="${rest#*:}"
+ if echo "$ALL_VARS" | grep -qx "$varname"; then
+ AUTO_INGESTED_COUNT=$((AUTO_INGESTED_COUNT + 1))
+ AUTO_INGESTED_ENTRIES+="| $AUTO_INGESTED_COUNT | \`$varname\` | $sdk | $note |"$'\n'
+ fi
+done
+
+# ── Output Report ──
+
+echo ""
+echo "# Client Environment Variable Usage Report"
+echo ""
+echo "_Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ) | Branch: $(git rev-parse --abbrev-ref HEAD)_"
+echo ""
+echo "## Summary"
+echo ""
+echo "| Metric | Count |"
+echo "|--------|-------|"
+echo "| Total vars defined | $TOTAL |"
+echo "| **Used in client/** | **$USED_COUNT** |"
+echo "| **MAYBE used (auto-ingested by SDKs)** | **$AUTO_INGESTED_COUNT** |"
+echo "| **NOT used in client/** | **$UNUSED_COUNT** |"
+echo ""
+
+echo "---"
+echo ""
+echo "## Variables USED in client/ ($USED_COUNT)"
+echo ""
+echo "| # | Variable | Locations (file:line) |"
+echo "|---|----------|-----------------------|"
+echo -n "$USED_ENTRIES"
+
+echo ""
+echo "---"
+echo ""
+echo "## Variables MAYBE used in client/ - Auto-Ingested ($AUTO_INGESTED_COUNT)"
+echo ""
+echo "These vars have **no explicit \`process.env\` reference** in client code, but are"
+echo "**auto-read by installed SDKs** at runtime. Static analysis cannot detect this usage."
+echo ""
+echo "| # | Variable | SDK / Package | Notes |"
+echo "|---|----------|---------------|-------|"
+echo -n "$AUTO_INGESTED_ENTRIES"
+
+echo ""
+echo "---"
+echo ""
+echo "## Variables NOT USED in client/ ($UNUSED_COUNT)"
+echo ""
+echo "Defined in \`.env\` / \`.env.example\` but **zero usage** in \`client/\` application code."
+echo "_(Excluded from search: Zod schemas, environment.d.ts, validated-env.ts, .env files)_"
+echo ""
+echo "| # | Variable |"
+echo "|---|----------|"
+echo -n "$UNUSED_ENTRIES"
+
+echo ""
+echo "---"
+echo ""
+echo "_Search scope: all \`client/**/*.{ts,tsx,js,mjs}\` excluding node_modules, .next, schema definitions, and type declarations_"
+
+```
+

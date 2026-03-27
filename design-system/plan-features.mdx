@@ -1,0 +1,119 @@
+---
+title: "Plan Features"
+description: "Feature breakdown by subscription plan tier for the Crest Pet System."
+---
+
+# Plan Features & Feature Gating
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+This document defines all plan-gated features across tenant types and how they affect the UI.
+
+---
+
+## 🎯 Feature Gating Overview
+
+### Concept
+
+Plan features control **what functionality is available** based on a tenant's subscription plan. Unlike permissions (which control WHO can access), plan features control WHETHER a feature exists at all for the tenant.
+
+### Dual Gating
+
+Some features require BOTH:
+
+1. **Permission** - User must have the right role
+2. **Plan Feature** - Tenant must have the feature in their plan
+
+
+---
+
+## 🏥 Clinic Plan Features
+
+| Feature ID | Display Name | Description |
+| --- | --- | --- |
+| NOTES_MANAGEMENT | Notes Management | Clinical notes, SOAP documentation |
+| HEALTH_RECORDS | Health Records | Health document management |
+| STAFF_ANALYTICS | Staff Analytics | Staff performance tracking |
+| NETWORKS | Networks | Clinic network participation |
+| INVENTORY | Inventory | Stock & supply management |
+| MARCIA_INVENTORY_INSIGHTS | Marcia Inventory Insights | AI-powered inventory analytics |
+| VIDEO_CONSULTATIONS | Video Consultations | Telehealth video calls |
+
+### Suggested Plan Tiers
+
+| Feature | Basic | Professional | Enterprise |
+| --- | --- | --- | --- |
+| Notes Management | ❌ | ✅ | ✅ |
+| Health Records | ❌ | ✅ | ✅ |
+| Staff Analytics | ❌ | ❌ | ✅ |
+| Networks | ❌ | ✅ | ✅ |
+| Inventory | ❌ | ✅ | ✅ |
+| Marcia Inventory Insights | ❌ | ❌ | ✅ |
+| Video Consultations | ❌ | ✅ | ✅ |
+
+---
+
+## 👨‍👩‍👧‍👦 Consumer Plan Features
+
+| Feature ID | Display Name | Description |
+| --- | --- | --- |
+| EXTRACTOR | Documents | Medical document upload & extraction |
+| VIDEO_CONSULTATION | Video Consultation | AI video consultations |
+| AI_ANALYSIS | AI Analysis | Poop scan, tooth scan, etc. |
+| SYMPTOM_CHECKER | Symptom Checker | AI-powered symptom analysis |
+| LIVE_VOICE | Live Voice | Real-time voice AI |
+| CARE_GUIDE | Care Guide | Personalized care recommendations |
+| WELLNESS_VIDEO | Wellness Video | AI-generated wellness videos |
+| PETS_LIMIT | Pets Limit | Maximum pets per account |
+
+### Suggested Plan Tiers
+
+| Feature | Free | Premium | Ultimate |
+| --- | --- | --- | --- |
+| Documents (Extractor) | ❌ | ✅ | ✅ |
+| Video Consultation | ❌ | ✅ | ✅ |
+| AI Analysis | ❌ | ✅ | ✅ |
+| Symptom Checker | ❌ | ❌ | ✅ |
+| Live Voice | ❌ | ❌ | ✅ |
+| Care Guide | ❌ | ✅ | ✅ |
+| Wellness Video | ❌ | ✅ | ✅ |
+| Pets Limit | 2 | 5 | Unlimited |
+
+---
+
+## 🏢 Enterprise Plan Features
+
+| Feature ID | Display Name | Description |
+| --- | --- | --- |
+| STAFF_MANAGEMENT | Staff Management | Cross-location staff admin |
+| CLINICS_MANAGEMENT | Clinics Management | Multi-clinic administration |
+| NETWORK_MANAGEMENT | Network Management | Network creation & management |
+| MARCIA_PREDICTIVE_ANALYSIS | Marcia Predictive | AI predictive analytics |
+| CUSTOM_BRANDING | Custom Branding | White-label customization |
+
+---
+
+## 🎨 UI Implementation
+
+### Key Design Principles
+
+1. **Never Hide Completely** - Gated features should be visible but disabled, not hidden. This shows users what's possible and creates upgrade motivation.
+2. **Clear Messaging** - Always provide a tooltip explaining what the feature does, why it's unavailable, and how to get access.
+3. **Graceful Degradation**:Clinic features: Assume enabled (fail-open)
+4. Consumer features: Assume disabled (fail-closed)
+5. **Loading States** - While feature data loads, show navigation items in loading state. Don't flash enabled→disabled.
+
+
+---
+
+## 📊 Feature Summary
+
+| Portal | Total Plan Features | Default Behavior |
+| --- | --- | --- |
+| Clinic | 7 | Defaults to true (enabled) |
+| Consumer | 8 | Defaults to false (disabled) |
+| Enterprise | 5 | Defaults to true (enabled) |
+| Platform | 0 | N/A |
+| Referral | 0 | N/A |
+

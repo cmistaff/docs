@@ -1,0 +1,161 @@
+---
+title: "Payment and Financial Lockdown Flow"
+description: "Complete payment lockdown and financial control flow for appointment billing."
+---
+
+## Actors / Portals
+
+| Actor / Portal | Role |
+| --- | --- |
+| **Consumer Portal** | Initiates payments for services or bookings |
+| **Clinic Portal** | Receives payments, manages local transactions, issues credit memos |
+| **Super Admin Portal** | Monitors platform revenue, collects platform cut, audit access |
+| **Enterprise Portal** | Regional oversight, revenue reporting, compliance |
+
+## Step 1 ,  Payment Initiation
+
+**Consumer pays** for a service via the Consumer Portal.
+
+System records **Transaction #1** in Postgres with:
+
+- Transaction ID
+- Tenant/clinic ID
+- Amount
+- Service type / feature (Extractor, AI Consultation, etc.)
+- Date/time
+
+System calculates:
+
+- Clinic revenue
+- Super Admin cut
+- Enterprise share
+
+Transaction is **visible in Clinic Portal** and logged for audit.
+
+## Step 2 ,  Nightly Submission to Oracle
+
+At the **end of the day** (configurable per tenant/region):
+
+- All transactions posted that day are sent to **Oracle**.
+- Original transactions become **immutable** (cannot be edited).
+
+Postgres marks the transaction as **locked for editing**, but **credit memos** are allowed within the adjustment window.
+
+Locking ensures transactions are valid for **cash reconciliation and reporting**.
+
+## Step 3 ,  28-Day Adjustment Window
+
+| Action | Allowed? | Notes |
+| --- | --- | --- |
+| Edit original transaction | ❌ No | Immutable in Oracle and Postgres |
+| Create credit memo / offset | ✅ Yes | Must reference original Transaction ID |
+| Backdated adjustments | ❌ No | Only additive adjustments allowed |
+| Audit trail updates | ✅ Yes | Capture user, timestamp, reason |
+
+- Additive adjustments appear in Oracle **linked to the original transaction**.
+- Ensures **audit and compliance** while allowing minor corrections.
+
+## Step 4 ,  Post 28-Day Hard Lock
+
+- Transactions are **fully frozen**.
+- No further credits, offsets, or edits allowed.
+- Ensures **monthly or quarterly financial integrity**.
+- Super Admin and Enterprise can **view historical transactions** but cannot modify them.
+
+## Step 5 ,  Profit Sharing / Cut Calculation
+
+For each transaction:
+
+- **Clinic revenue** = total payment - platform cut
+- **Super Admin / Platform cut** = fixed fee or percentage
+- **Enterprise share** = regional allocation (if applicable)
+
+System calculates **real-time balances**, respecting lockdown rules.
+
+Dashboard shows:
+
+- Tenant-specific revenue
+- Platform and enterprise cuts
+- Profitability metrics per feature or service
+
+## Step 6 ,  Portal Behavior Summary
+
+| Portal | Allowed Actions | Lock Behavior |
+| --- | --- | --- |
+| Consumer Portal | Make payments, request refunds (new adjustment) | Cannot edit locked transactions |
+| Clinic Portal | View transactions, issue credit memos | Cannot edit original; adjustments additive |
+| Super Admin Portal | Audit, approve adjustments, monitor revenue/costs | Cannot edit locked transactions |
+| Enterprise Portal | Regional oversight, reporting | Same as Super Admin |
+
+## Step 7 ,  Internal Service / Feature Usage Mapping
+
+- Map internal features to vendor costs:**AI Consultation → OpenAI tokens**
+- **Extractor → Tavus / OpenAI**
+- **Scheduler SMS → Twilio**
+- **Medical uploads → S3 storage/bandwidth**
+
+Enables **feature-level cost & usage dashboard**.
+
+Highlights most-used features, cost-per-feature, and profitability.
+
+## Step 8 ,  Data Logging Requirements (Postgres)
+
+- `transaction_id` (unique)
+- `tenant_id` / `clinic_id`
+- `service / feature type`
+- `amount / units`
+- `unit_cost` (snapshot)
+- `total_cost`
+- `status` (locked, unlocked, credit memo)
+- `reference_transaction_id` (for credit memos)
+- `timestamp`
+- `audit_metadata` (user, reason, action type)
+
+## Step 9 ,  Full Flow Diagram (Text-Based)
+
+```
+Consumer Portal
+     │
+     ▼
+Payment Initiated → Transaction #1 Recorded in Postgres
+     │
+     ▼
+Revenue Split Calculated (Clinic / Super Admin / Enterprise)
+     │
+     ▼ (Nightly)
+Submit Transactions to Oracle → Lock Original Transaction
+     │
+     ▼ (28-Day Window)
+Create Credit Memo / Offset if Adjustment Needed → Linked to Original Transaction
+     │
+     ▼ (After 28 Days)
+Hard Lock → No further edits allowed
+     │
+     ▼
+Dashboard & Reporting:
+- Tenant Revenue
+- Platform / Enterprise Cuts
+- Feature Usage & Profitability
+```
+
+## ✅ Key Rules / Configurations
+
+- Lock cadence **configurable per tenant/region** (daily, weekly, 28-day)
+- Original transactions **immutable** after submission
+- All adjustments **additive, traceable, and auditable**
+- Profit sharing calculations respect locking rules
+- Feature usage tied to vendor costs for cost-analysis dashboards
+
+This flow **covers everything**:
+
+Consumer payments → transaction creation
+
+Locking & Oracle submission
+
+Credit memo / adjustment logic
+
+Regional/tenant configuration
+
+Super Admin & Enterprise oversight
+
+Feature-level usage & cost tracking

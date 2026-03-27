@@ -1,0 +1,192 @@
+---
+title: "Migration Integrity Audit"
+description: "Database migration integrity audit results and remediation steps."
+---
+
+# Migration Integrity Audit Results and Recommendations for SQL Modifications
+
+**Generated:** 2026-03-25 10:43 UTC
+
+Checks whether any migration SQL file was modified **after** it first landed on `prestaging` (i.e. after Prisma already applied it to the DB and recorded the checksum).
+
+## Summary
+
+- **Total migrations checked:** 382
+- **Skipped (not on prestaging):** 0
+- **Violations found:** 5 (2 copyright-only, 2 substantive, 1 fixed)
+
+| # | Migration | Severity | What changed |
+| --- | --- | --- | --- |
+| 1 | `20251222120000_add_tenant_user_pet_limit_override` | Low (copyright only) | `© 2025` → `© 2026` in header |
+| 2 | `20251223121012_add_treatment_sheet_template_id` | Low (copyright only) | `© 2025` → `© 2026` in header |
+| 3 | `20260102134507_add_role_templates` | **High** | Added 4 `AuditLogActionType` enum values |
+| 4 | `20260119160059_add_new_notification_triggers` | ~~High~~ **Fixed** | `WELLNESS_PLAN_REMINDER` removed then **reverted to original** by PW-4593 (PR #3766) |
+| 5 | `20260213000000_create_app_user_for_rls_enforcement` | **High** | Changed hardcoded `postgres` role to dynamic `current_user` |
+
+## Violation Details
+
+### 1. 20251222120000_add_tenant_user_pet_limit_override
+
+**First landed on prestaging:** `6124086e2` (2025-12-31) ,  Merge pull request #1049 from cmistaff/staging
+
+**Modified by:** `2f4892683` (2026-01-01) by Timur ,  PW-1627: Update copyright headers in code to 2026 (#1051)
+
+**Change:** Copyright year `2025` → `2026` in the comment header. No SQL change.
+
+**Risk:** Low. Prisma checksum mismatch exists but no functional difference. The migration SQL will execute identically.
+
+### 2. 20251223121012_add_treatment_sheet_template_id
+
+**First landed on prestaging:** `6124086e2` (2025-12-31) ,  Merge pull request #1049 from cmistaff/staging
+
+**Modified by:** `2f4892683` (2026-01-01) by Timur ,  PW-1627: Update copyright headers in code to 2026 (#1051)
+
+**Change:** Copyright year `2025` → `2026` in the comment header. No SQL change.
+
+**Risk:** Low. Same as above ,  checksum mismatch but no functional impact.
+
+### 3. 20260102134507_add_role_templates
+
+**First landed on prestaging:** `324dc33e2` (2026-01-08) ,  Merge PR #3189 (PW-1003-medical-log)
+
+**Modified by:** `06168b419` (2026-01-13) by ranahamood3 ,  [PW-1029] super admin permission management for tenants assignment (#3185)
+
+**Change:** Added 4 `ALTER TYPE "AuditLogActionType" ADD VALUE` statements:
+
+- `PLATFORM_ROLE_TEMPLATE_CREATED`
+- `PLATFORM_ROLE_TEMPLATE_UPDATED`
+- `PLATFORM_ROLE_TEMPLATE_DELETED`
+- `PLATFORM_ROLE_TEMPLATE_APPLIED`
+
+**Risk: HIGH.** These enum values were injected into a migration that had already been applied. On prestaging, the migration was already recorded as complete ,  Prisma would not re-run it. These 4 enum values were **never applied by this migration** on prestaging. They either:
+
+- Were added by a separate migration (check for duplicates)
+- Were applied manually via raw SQL
+- Were applied by `prisma migrate resolve` + checksum fixup
+- **Were never applied at all** (enum values missing from prestaging DB)
+
+### 4. 20260119160059_add_new_notification_triggers
+
+**First landed on prestaging:** `eacb2c051` (2026-01-22) ,  Merge branch prestaging into PW-1011-anesthesia-sheet
+
+**Modified by:** `fe7e58886` (2026-02-09) by Talha Zahid ,  [PW-3824] Add notification triggers directly to the notification manager on Clinic's side (#3368)
+
+**Change:** Removed the `WELLNESS_PLAN_REMINDER` enum value from the `ALTER TYPE` statements:
+
+```
+-- Add new notification trigger types for medication reminders, recheck reminders, and pet birthdays
+ ALTER TYPE "public"."NotificationTriggerType" ADD VALUE 'MEDICATION_REMINDER';
+ ALTER TYPE "public"."NotificationTriggerType" ADD VALUE 'MEDICATION_REPURCHASE';
+ ALTER TYPE "public"."NotificationTriggerType" ADD VALUE 'RECHECK_REMINDER';
+-ALTER TYPE "public"."NotificationTriggerType" ADD VALUE 'WELLNESS_PLAN_REMINDER';
+ ALTER TYPE "public"."NotificationTriggerType" ADD VALUE 'PET_BIRTHDAY';
+```
+
+**Status: FIXED.** The removal by Talha was reverted by Serhii Sierov in `8e30a0b2c` (2026-03-10) ,  PR #3766 (PW-4593: Fix DB schema drift). The file is now byte-for-byte identical to its original state at first merge. Checksum is restored, no environment drift remains.
+
+### 5. 20260213000000_create_app_user_for_rls_enforcement
+
+**First landed on prestaging:** `2d6145054` (2026-02-22) ,  merge staging
+
+**Modified by:** `3715c8f97` (2026-02-22) by Affan Ali ,  fix role issue rls (#3636)
+
+**Change:** Replaced hardcoded `FOR ROLE postgres` with dynamic `current_user` to support non-postgres superuser names (e.g. `crest_admin` on AWS RDS):
+
+```
+-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+-    GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES TO app_user;
+-...
++DO $$
++BEGIN
++    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT ...', current_user);
++    ...
++END
++$$;
+```
+
+**Risk: HIGH.** The original version (hardcoded `postgres`) was already applied. The fix changes the `ALTER DEFAULT PRIVILEGES` from targeting the `postgres` role to dynamically targeting `current_user`. On prestaging:
+
+- The migration already ran with `FOR ROLE postgres` ,  those default privileges are set
+- The dynamic `current_user` version was never executed, so if the migration user on prestaging is NOT `postgres`, default privileges for that role are missing
+- On fresh environments, only the dynamic version runs, which is correct
+- **Environment drift** between prestaging (hardcoded) and any new environment (dynamic)
+
+## How to Fix a Modified Migration
+
+When a migration file has been modified after it was applied, the correct fix is a **two-step revert + new migration** approach:
+
+### Step 1: Revert the migration file to its original (applied) state
+
+Restore the `migration.sql` to exactly what was applied on prestaging. This makes the file checksum match the `_prisma_migrations` record again.
+
+```
+# Find the commit where the migration first landed on prestaging
+git log origin/prestaging --format='%H %s' --follow --  | tail -1
+
+# Restore the file to that commit's version
+git checkout  --
+```
+
+After this, the file on disk matches what the DB thinks was executed ,  **checksum restored, Prisma is happy**.
+
+### Step 2: Create a new migration for the intended changes
+
+The changes that were incorrectly added to the old migration need to go into a **new, properly sequenced migration**. Use the standard Prisma workflow:
+
+```
+# If the change is a schema change (new column, table, etc.)
+# 1. Update the Prisma schema file(s)
+# 2. Generate a new migration
+pnpm prisma:migration:create
+
+# If the change is non-schema (enum values, grants, functions, etc.)
+# Create a new migration with --create-only, then add the SQL
+pnpm prisma:migration:create
+# Edit the NEW migration file with the needed SQL
+```
+
+### Why this works
+
+- **Prestaging/production:** The old migration was already applied ,  reverting the file just fixes the checksum. The new migration applies the missing changes as a separate, tracked step.
+- **Fresh environments:** The old migration runs with its original SQL, then the new migration applies the additional changes. End state is identical to prestaging.
+- **No drift:** All environments converge to the same final DB state through the same ordered sequence of migrations.
+
+### Reference: PW-4593 (PR #3766)
+
+This is exactly what was done for violation #4 (`WELLNESS_PLAN_REMINDER`). The migration file was reverted to its original state, restoring the checksum. Since the enum value already existed on prestaging (it was in the original migration that was applied), no follow-up migration was needed in that case.
+
+## Recommendations
+
+### Violation #1 and #2 (copyright headers) ,  Low risk
+
+The only change is `© 2025` → `© 2026` in SQL comments. No functional difference but still a checksum mismatch.
+
+**Fix:** Revert both files to their original `© 2025` versions. No new migration needed ,  comment changes don't affect the DB.
+
+### Violation #3 (add_role_templates) ,  High risk
+
+4 `AuditLogActionType` enum values were added to an already-applied migration.
+
+**Fix:**
+
+1. Revert `migration.sql` to the version at first merge (`324dc33e2`) ,  without the enum `ALTER TYPE` statements
+2. Create a new migration (e.g. `pnpm prisma:migration:create add_role_template_audit_log_types`) containing the 4 `ALTER TYPE` statements
+3. Verify on prestaging: if the enum values already exist (applied manually or via another path), the new migration's `ADD VALUE` will fail with "already exists" ,  in that case, use `ADD VALUE IF NOT EXISTS` (PostgreSQL 9.3+) to make it idempotent
+
+### Violation #4 (add_new_notification_triggers) ,  Fixed
+
+**Already fixed** by PW-4593 (PR #3766). File reverted to original ,  no action needed.
+
+### Violation #5 (create_app_user_for_rls_enforcement) ,  High risk
+
+Hardcoded `FOR ROLE postgres` replaced with dynamic `current_user` after apply.
+
+**Fix:**
+
+1. Revert `migration.sql` to the version at first merge (`2d6145054`) ,  with the hardcoded `FOR ROLE postgres`
+2. Create a new migration (e.g. `pnpm prisma:migration:create fix_rls_default_privileges_dynamic_role`) containing the dynamic `current_user` version of the `ALTER DEFAULT PRIVILEGES` statements
+3. The new migration should be idempotent ,  use `DO $$ ... $$` block that grants default privileges for `current_user`, which is safe to re-run even if they already exist
+
+### Process improvement
+
+CI prevention is **already in place** since Feb 24, 2026 (PR #3652). The `lint-prisma.yml` workflow checks for modified, deleted, or renamed migration files on every PR targeting `main`, `staging`, or `prestaging` ,  and fails the build if any are detected. All 5 violations in this audit predate that check. No further CI work needed.

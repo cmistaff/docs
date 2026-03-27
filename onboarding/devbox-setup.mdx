@@ -1,0 +1,243 @@
+---
+title: "Devbox Setup"
+description: "Step-by-step guide for setting up Tailscale VPN, SSH access, and connecting to your cloud development workstation."
+---
+
+# Tailscale Setup and SSH Connection Guide
+
+## Step 1 - Install Tailscale on your laptop
+
+Choose the installation method for your operating system:
+
+### Mac
+
+Install via Homebrew:
+
+```bash
+brew install tailscale
+```
+
+Or download from:
+
+[https://tailscale.com/download/mac](https://tailscale.com/download/mac)
+
+### Windows
+
+Download from:
+
+[https://tailscale.com/download/windows](https://tailscale.com/download/windows)
+
+### Linux
+
+Install using the official install script:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+## Step 2 - Sign in to Tailscale
+
+1. Run the Tailscale login command:
+```bash
+tailscale login
+```
+2. Sign in with your creststaff.com Google account (preferred) or your GitHub account.
+3. If you sign in via GitHub, send a direct message with your GitHub username so your permissions can be updated.
+
+## Step 3 - Set up SSH on your laptop
+
+### Configure SSH for dev hosts
+
+Add the following to `~/.ssh/config` on your laptop (create the file if it does not exist):
+
+```sshconfig
+Host dev-*
+ User ubuntu
+ ForwardAgent yes
+ AddKeysToAgent yes
+ IdentityFile ~/.ssh/id_ed25519
+```
+
+### Generate an SSH key (if you do not have one)
+
+Run:
+
+```bash
+ssh-keygen -t ed25519 -C "your-email@creststaff.com"
+ssh-add ~/.ssh/id_ed25519
+```
+
+### Add your public key to GitHub
+
+1. Open GitHub settings: Settings > SSH and GPG keys > New SSH key.
+2. Paste the output of:
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+## Step 4 - Connect
+
+Use SSH to connect to your development host (replace `yourname` with your actual identifier):
+
+```bash
+ssh ubuntu@dev-yourname
+```
+
+### Optional enhancements and troubleshooting
+
+If `ssh ubuntu@dev-yourname` does not work, you can instead connect using the IP address of your devbox. First, find the IP address by running:
+
+```bash
+tailscale status
+```
+
+Then connect with:
+
+```bash
+ssh ubuntu@
+```
+
+To make this easier for frequent use, you can set up aliases in your ~/.zshrc file:
+
+```bash
+alias devbox="ssh ubuntu@"
+alias dev_ip=""
+# you can use any other name like crest or anything else you like
+```
+
+## Step 5 - Inside the devbox: GitHub auth and Git config
+
+Once connected to the devbox, complete the following setup steps:
+
+1. Authenticate GitHub CLI and set up SSH automatically:
+```bash
+gh auth login
+# Follows prompts: choose GitHub.com, SSH, and device/browser flow
+# This authenticates GitHub CLI, creates an SSH key (if needed), and adds it to your GitHub account
+```
+2. Configure your global Git author details:
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your@email.com"
+```
+
+## Step 6 - Install pnpm
+
+Install pnpm globally using npm:
+
+```bash
+npm install -g pnpm
+```
+
+## Step 7 - Clone the repository and fetch environment secrets
+
+Once your devbox is configured, clone the repository and pull the environment secrets:
+
+```bash
+# Clone the repo
+git clone git@github.com:cmistaff/crestpetsystem.git
+cd crestpetsystem
+
+# Fetch environment secrets - DON'T USE THESE. SEE NOTE BELOW
+aws secretsmanager get-secret-value --secret-id crest-dev/client-env --query SecretString --output text --region ap-south-1 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > client/.env
+aws secretsmanager get-secret-value --secret-id crest-dev/server-env --query SecretString --output text --region ap-south-1 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > server/.env
+```
+note799eba6941e0
+You will have to manually add `.env` variables for `server/.env` , `client/.env` & `packages/common/.env`. AWS secrets are not updated, and hence they don’t work
+
+
+You will have to manually add `.env` variables for `server/.env` , `client/.env` & `packages/common/.env`. AWS secrets are not updated, and hence they don’t work
+
+## Step 8 - Start the app
+
+```bash
+pnpm install
+pnpm dev:local
+```
+
+### Pro tip - Use tmux
+
+Use tmux to manage multiple terminals within a single SSH session. It lets you split your workspace, keep sessions alive, and reconnect without losing work.
+
+## Step 9 - Next steps and tools
+
+### Cursor IDE (Remote SSH)
+
+Use Cursor to connect to your devbox via Remote SSH:
+
+```
+Cursor IDE > Cmd+Shift+P > "Remote-SSH: Connect to Host" > type dev-yourname
+```
+
+### Claude Code
+
+Claude Code is already installed in the devbox.
+
+### What’s pre-installed in the devbox
+
+- Node.js 22 and 20
+- pnpm
+- Docker
+- AWS CLI
+- GitHub CLI
+- Claude Code
+- Chrome (headless)
+- PostgreSQL client
+- Redis client
+- ripgrep
+- fzf
+- tmux
+- Zsh + Oh-My-Zsh + Starship prompt
+- And more common CLI utilities
+
+## Optional: Oh My Zsh enhancements
+
+For a richer shell experience, you can optionally enable additional Oh My Zsh plugins.
+
+### Step 1 - Install plugins
+
+```bash
+# zsh-autosuggestions
+git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+
+# fast-syntax-highlighting
+git clone https://github.com/zdharma-continuum/fast-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/fast-syntax-highlighting
+
+# zsh-autocomplete
+git clone https://github.com/marlonrichert/zsh-autocomplete ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autocomplete
+```
+
+### Step 2 - Configure ~/.zshrc
+
+Add these plugins to your Oh My Zsh plugin list and optional tuning for suggestions and autocomplete:
+
+```bash
+plugins=(
+ git
+ zsh-autosuggestions
+ fast-syntax-highlighting
+ zsh-autocomplete
+)
+```
+
+### Step 3 - Best config snippet for ~/.zshrc
+
+Add to `~/.zshrc` after the source `$ZSH/oh-my-zsh.sh` line
+
+
+```bash
+# --- zsh-autosuggestions ---
+ZSH_AUTOSUGGEST_STRATEGY=(history completion) # try history first, then completion
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20 # don't suggest for very long inputs
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#888888" # subtle gray color for suggestions
+bindkey '^ ' autosuggest-accept # Ctrl+Space to accept suggestion (→ also works)
+
+# --- zsh-autocomplete ---
+# Make Tab behave more traditionally (insert completion instead of opening menu immediately)
+zstyle ':autocomplete:*' min-input 2 # start completing after 2 chars
+zstyle ':autocomplete:*' delay 0.1 # slight delay to avoid lag while typing fast
+zstyle ':autocomplete:tab:*' widget-style menu-select # Tab opens menu selection
+```
+
+
+

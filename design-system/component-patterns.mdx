@@ -1,0 +1,189 @@
+---
+title: "Component Patterns"
+description: "Reusable component patterns and guidelines for the design system."
+---
+
+# Component Patterns
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Guidelines for building UI components in the Crest Pet System.
+
+---
+
+## 🏗️ Component Architecture
+
+### Server vs Client Components
+
+**Default to Server Components** unless you need:
+
+- Event handlers (onClick, onChange)
+- useState, useEffect, or other hooks
+- Browser-only APIs
+- Real-time updates
+
+### File Organization
+
+```
+components/
+├── ui/ # shadcn/ui base components
+├── shared/ # Cross-portal components
+└── [portal]/ # Portal-specific components
+```
+
+---
+
+## 🧩 shadcn/ui Integration
+
+### Standard Usage
+
+All base UI components come from shadcn/ui. Import from `@/components/ui/`:
+
+- Button, Input, Label, Card
+- Dialog, Sheet, Dropdown
+- Table, Tabs, Select
+- Form components
+
+### Customization Pattern
+
+Extend shadcn components with variants:
+
+```typescript
+const buttonVariants = cva(
+ "base-classes",
+ {
+ variants: {
+ variant: { default: "...", destructive: "..." },
+ size: { default: "...", sm: "...", lg: "..." }
+ }
+)
+```
+
+---
+
+## 🎨 Styling Best Practices
+
+### Tailwind with cn() Utility
+
+Always use the `cn()` utility for conditional classes:
+
+```typescript
+import { cn } from "@/lib/utils"
+
+className={cn(
+ "base-classes",
+ isActive && "active-classes",
+ className
+)}
+```
+
+### Class Order
+
+1. Layout (flex, grid, position)
+2. Sizing (w-, h-, p-, m-)
+3. Typography (text-, font-)
+4. Colors (bg-, text-, border-)
+5. Effects (shadow-, opacity-)
+6. States (hover:, focus:, disabled:)
+7. Responsive (sm:, md:, lg:)
+
+
+---
+
+## 📱 Responsive Design
+
+### Mobile-First Approach
+
+Write base styles for mobile, add breakpoint modifiers for larger screens:
+
+```
+className="p-4 md:p-6 lg:p-8"
+className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+```
+
+### Touch Targets
+
+Minimum sizes for interactive elements:
+
+- Buttons: 44x44px (Apple) or 48x48px (Material)
+- Links in navigation: Full row height
+- Form inputs: 44px height minimum
+
+
+---
+
+## ✨ Animation Patterns
+
+### Framer Motion
+
+Use for complex animations:
+
+```typescript
+
+```
+
+### CSS Transitions
+
+Use for simple state changes:
+
+```
+className="transition-colors duration-200"
+className="transition-transform hover:scale-105"
+```
+
+---
+
+## ♿ Accessibility Requirements
+
+### Semantic HTML
+
+- Use correct heading hierarchy (h1 → h2 → h3)
+- Use `<button>` for actions, `<a>` for navigation
+- Use `<nav>`, `<main>`, `<aside>` landmarks
+
+### ARIA
+
+- `aria-label` for icon-only buttons
+- `aria-expanded` for collapsible sections
+- `aria-describedby` for form field descriptions
+
+### Keyboard Navigation
+
+- All interactive elements must be focusable
+- Logical tab order
+- Escape closes modals/dropdowns
+- Enter/Space activates buttons
+
+### Color Contrast
+
+- Normal text: 4.5:1 minimum
+- Large text: 3:1 minimum
+- UI components: 3:1 minimum
+
+
+---
+
+## 🎯 Portal-Specific Patterns
+
+### Clinic Portal
+
+- Dense, information-rich layouts
+- Keyboard shortcuts for power users
+- Split-view patterns for multitasking
+
+### Consumer Portal
+
+- Simple, guided experiences
+- Large touch targets
+- Friendly, reassuring design
+- Mobile-first layouts
+
+### Enterprise Portal
+
+- Dashboard-centric design
+- Data visualization emphasis
+- Drill-down navigation patterns
+- Export/reporting features
+
+

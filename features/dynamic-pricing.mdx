@@ -1,0 +1,244 @@
+---
+title: "Dynamic Pricing"
+description: "Networking and dynamic pricing system for appointment fees and services."
+---
+
+## 1. What Are Networks?
+
+A **network** is a subscription-style program, much like an insurance plan or loyalty club, where veterinary clinics join forces under a common set of rules, pricing and perks. Networks give pet owners more choice (multiple locations) and savings, and give clinics an easy way to share capacity, drive referrals, and stabilize revenue.
+
+### 1.1 Independent Clinic Networks
+
+- **Form Your Own Peer Group**
+  A small “mom-and-pop” practice can invite local clinics (e.g. the two down the street) to create a private network.
+- **Opt Into the Crest House Network**
+  Any clinic can join Crest’s own public network, no invitation required, to tap into a broad base of members.
+
+### 1.2 Enterprise Networks
+
+- **Branded, Multi-Clinic Programs**
+  Large groups (e.g. “Mars UK”) spin up their own networks under a single umbrella. Hundreds or thousands of clinics share membership, pricing rules, and centralized data.
+- **Rule Overrides**
+  Enterprise admins can enforce network-wide policies (e.g. every Mars UK clinic must give at least a 60% discount) that override individual clinic settings.
+
+### 1.3 Why Multiple Network Types?
+
+- **Flexibility for Independents**: Build grassroots peer networks or simply join Crest’s broad offering.
+- **Tiered Marketing**: Enterprises can run “Essentials” vs. “Plus” networks with differing price points and perks.
+- **Regulatory/Data Needs**: Group clinics by region or data-residency requirements while still sharing membership benefits.
+
+---
+
+## 2. Consumer Experience
+
+Everything a pet owner sees and does, step-by-step.
+
+### 2.1 Browse & Join
+
+**Landing Page / “Networks” Section**
+
+- Enter ZIP code or allow geolocation.
+- Map or list view shows nearby networks.
+- Each network card displays:**Name & Logo** (e.g. Crest Network, Mars UK Premium)
+- **Price & Tier** (Free, $5/mo, $30/mo)
+- **Key Perks** (e.g. “Up to 70% off,” “Unlimited tele-health calls,” “Priority weekend slots”)
+
+**Filter & Sort**
+
+- Filter by price range, distance, or perk type.
+- Sort by lowest fee, best discount, or closest location.
+
+**Review Details**
+
+- Click into a network to see:Full list of member clinics (with addresses/photos)
+- Tier comparison table (what’s included at each level)
+- Member reviews and average ratings
+
+**Subscribe**
+
+- Click **“Join Network”** under your desired tier.
+- Enter payment details (processed via our secure escrow service).
+- Confirmation screen shows next steps and membership start date.
+
+### 2.2 Book with Dynamic Savings
+
+**Search for an Appointment**
+
+- In **“Book Appointment”**, choose your pet, service type, and preferred dates.
+
+**Availability Check**
+
+- System queries:**Your Primary Clinic** (if defined)
+- **All Clinics in Your Networks** (including peer, enterprise, Crest)
+- **Optional: Partner Clinics** you’ve marked as favorites
+
+**Pricing Breakdown**
+
+- For each available slot, you see:**Clinic Name & Location**
+- **Base Price** (e.g. £100)
+- **Utilization %** (e.g. 15% booked)
+- **Discount** (e.g. 70% off)
+- **Final Price** (e.g. £30)
+
+**Select & Confirm**
+
+Pick your preferred slot & price.
+
+Review summary: pet info, service, date/time, clinic, price.
+
+Click **“Confirm Booking”** → receive email/text confirmation.
+
+### 2.3 Manage Memberships
+
+**“My Subscriptions” Dashboard**
+
+See active networks, tiers, next billing date.
+
+**Actions**:
+
+**Upgrade/Downgrade** tier level
+
+**Pause** (skip one billing cycle)
+
+**Cancel** (access remains until period end)
+
+Billing history and refund policy link.
+
+---
+
+## 3. Clinic & Enterprise Setup
+
+### 3.1 Clinic Portal
+
+#### A. Create or Join Networks
+
+**“Networks” Tab**
+
+**Create New**: enter network name, logo, description, and set your own tiers (e.g. Basic: $10/mo, Premium: $25/mo).
+
+**Join Existing**: see invites or search public networks; click **“Request to Join”** or **“Join”** for Crest house network.
+
+#### B. Configure Tiers & Perks
+
+For each tier:
+
+**Monthly Fee**
+
+**Discount Rates** (min/max)
+
+**Included Services** (free tele-health, waived booking fees, etc.)
+
+**Member Limits** (max number of active subscribers, if desired)
+
+#### C. Multi-Clinic Availability & Referral
+
+**Scheduling Board**
+
+Toggle **“Show Partner Clinics”** to see combined calendars.
+
+Drag & drop rescheduling across clinics when needed.
+
+**Referral Widget**
+
+If you cannot accommodate a request, click **“Refer Patient”** → shows all network clinics with open slots.
+
+Send referral link directly via SMS/email, or transfer the appointment record with one click.
+
+### 3.2 Enterprise Portal
+
+#### A. Network Governance
+
+**Global Settings**
+
+Define unlimited networks under your banner.
+
+For each network, set default tiers, discount minimums, and blackout dates (e.g. no discounts on holidays).
+
+**Bulk Updates**
+
+Change pricing rules or perks for hundreds of clinics in a single action, rollout happens instantly.
+
+#### B. Cross-Enterprise Partnerships
+
+**Collaborate** with other corporate groups to form co-branded networks.
+
+Share capacity among partner enterprises, with customizable revenue-sharing terms.
+
+#### C. Tenant & Data Segregation
+
+**Data Isolation** ensures clinics in different legal entities or countries keep their data siloed.
+
+Yet, membership participation and booking flows remain seamless across all allowed networks.
+
+---
+
+## 4. Dynamic Pricing & Scheduling
+
+### 4.1 How They Work Together
+
+**Discount %** is driven mainly by *real-time utilization* and *membership tier*.
+
+**Minimum Discount Floors:** Clinics/enterprises set a floor (e.g., never below 50% of retail).
+
+**Utilization Steps:** Example ,  20% utilization = up to 80% discount; 50% utilization = 50% discount.
+
+**Network Overrides:** Enterprise admins can enforce global discount rules across all their clinics.
+
+#### Scheduler Core
+
+Central engine that:
+
+**Discovers Open Slots** across any combination of clinics (single, peer network, enterprise, or Crest).
+
+**Applies Access Rules** (e.g. some networks only allow weekend bookings).
+
+#### Dynamic Pricing Engine
+
+Formula:
+
+Discount % = f(Utilization Rate, Membership Tier, Network Rules, Staffing Factor, Time Urgency, Service Inclusion Flags)
+
+**Service Inclusion Flags** = binary toggles determining if that service participates in discounts/perks.
+
+For each available slot:
+
+**Fetch Base Price** from clinic’s standard fee schedule.
+
+**Check Service Inclusion** - if excluded, no discount applied.
+
+**Measure Real-Time Utilization** (booked ÷ total slots).
+
+**Apply Membership Tier Modifiers**
+
+Multipliers/caps tied to tier are configurable per clinic or enterprise.
+
+Example: “Gold” in Clinic A = +10% boost; “Gold” in Clinic B = higher utilization discount ceiling.
+
+**Apply Network Rules**
+
+Can override local settings.
+
+Ability to create exceptions for specific services, days, or member groups.
+
+**Apply Staffing Factor**
+
+Discounts can vary by department/service based on staffing levels.
+
+Example: under-staffed surgery team = reduced/no discount; over-staffed wellness team = higher discount.
+
+**Apply Time/Urgency Windows**
+
+Configurable globally or locally; can stack with other discount factors (e.g., “Last 2 hours before slot” adds extra discount)
+
+---
+
+## 5. Perks & Policies (Configurable)
+
+Michael defined perks as:
+
+> **Perk = Discount % + Included Free Services**
+> Example: “Pay £300/month → up to 80% off + annual vaccines + 1 wellness visit + 3 free consults.”
+
+Tiers determine both the discount ceiling and the set of included services.
+
+Enterprises can configure perks per tier or lock them globally.

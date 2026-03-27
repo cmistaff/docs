@@ -1,0 +1,194 @@
+---
+title: "State Patterns"
+description: "State management patterns and guidelines for frontend development."
+---
+
+# State Patterns
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Guidelines for handling loading, empty, error, and success states across the Crest Pet System.
+
+---
+
+## 🔄 Four Core States
+
+Every data-driven view should handle these states:
+
+| State | When | User Experience |
+| --- | --- | --- |
+| Loading | Data is being fetched | Show skeleton/spinner |
+| Empty | No data exists | Show helpful empty state |
+| Error | Request failed | Show error with retry option |
+| Success | Data loaded | Show actual content |
+
+---
+
+## ⏳ Loading States
+
+### Skeleton Pattern
+
+Use skeletons that match the shape of the content being loaded:
+
+```tsx
+
+ {/* Title */}
+ {/* Description line 1 */}
+ {/* Description line 2 */}
+
+```
+
+### When to Use Skeletons vs Spinners
+
+| Scenario | Use |
+| --- | --- |
+| Page/section loading | Skeleton |
+| Button action in progress | Spinner inside button |
+| Modal loading | Centered spinner |
+| Infinite scroll | Skeleton rows |
+| Quick operations (<300ms) | Nothing (avoid flash) |
+
+---
+
+## 📭 Empty States
+
+### Structure
+
+Every empty state should have:
+
+1. **Icon** - Visual indicator (48-64px)
+2. **Title** - What's missing
+3. **Description** - Why and what to do
+4. **Action** - Primary CTA button
+
+### Empty State Variants
+
+#### Basic Empty (No Data Yet)
+
+```tsx
+}
+ title="No patients yet"
+ description="Add your first patient to get started."
+ action={Add Patient}
+/>
+```
+
+#### Filtered Empty (No Results)
+
+```tsx
+}
+ title="No results found"
+ description="Try adjusting your search or filters."
+ action={Clear Filters}
+/>
+```
+
+#### Premium Gated
+
+```tsx
+}
+ title="Premium Feature"
+ description="Upgrade your plan to access this feature."
+ action={View Plans}
+/>
+```
+
+#### Permission Denied
+
+```tsx
+}
+ title="Access Restricted"
+ description="You don't have permission to view this content."
+/>
+```
+
+---
+
+## ❌ Error States
+
+### Toast Notifications
+
+Use for non-blocking errors:
+
+```tsx
+toast.error("Failed to save changes", {
+ description: "Please try again or contact support.",
+ action: {
+ label: "Retry",
+ onClick: () => retry()
+ }
+})
+```
+
+### Inline Errors
+
+Use for form validation:
+
+```tsx
+
+ {error.message}
+
+```
+
+### Full Page Errors
+
+Use for fatal errors:
+
+```tsx
+Try Again}
+/>
+```
+
+### HTTP Status Handling
+
+| Code | Title | Action |
+| --- | --- | --- |
+| 400 | Invalid Request | Show validation errors |
+| 401 | Session Expired | Redirect to login |
+| 403 | Access Denied | Show permission message |
+| 404 | Not Found | Show 404 page |
+| 500 | Server Error | Show retry option |
+
+---
+
+## ✅ Success States
+
+### Toast for Actions
+
+```tsx
+toast.success("Patient added successfully")
+```
+
+### Inline Confirmation
+
+```tsx
+
+
+ Changes saved successfully.
+
+```
+
+---
+
+## 🎯 Portal-Specific Styling
+
+### Clinic Portal
+
+- Compact empty states
+- Quick-action focused
+- Minimal decoration
+
+### Consumer Portal
+
+- Friendly illustrations
+- Encouraging language
+- Larger touch targets
+
+### Enterprise Portal
+
+- Professional iconography
+- Data-focused messaging
+- Dashboard integration
+
+

@@ -1,0 +1,129 @@
+---
+title: "ECS to EKS Migration Strategy"
+description: "Multi-region ECS to EKS migration strategy for production workloads."
+---
+
+**Phase 1: Discovery & Inventory**
+
+**Goal:** Create a detailed map of existing assets to ensure nothing breaks during the move. We are translating "ECS dialects" into "Kubernetes dialects."
+
+- **Service Mapping**
+
+- **Workload Type:** Document every ECS Service.
+
+- **REPLICA** strategy $\rightarrow$ Maps to **Kubernetes Deployment**.
+- **DAEMON** strategy $\rightarrow$ Maps to **Kubernetes DaemonSet**.
+
+- **Resource sizing:** Note CPU/Memory reservations to define K8s Requests/Limits.
+
+- **Configuration Management**
+
+- **Environment Variables:** Audit all variables.
+
+- *Non-sensitive:* Keep as plain text in YAML ConfigMaps.
+- *Sensitive:* Must move to **Kubernetes Secrets** or be fetched dynamically using the **External Secrets Operator** (integrating with AWS Secrets Manager).
+
+- **IAM Roles (Crucial Step)**
+
+- **The Challenge:** ECS Task Roles do not work natively in EKS.
+- **The Solution:** Map every ECS Task Role to an **IRSA (IAM Roles for Service Accounts)** policy. This associates an AWS IAM role with a specific Kubernetes Service Account.
+
+- **Networking & Health**
+
+**Protocols:** Record specific ports and protocols (gRPC vs HTTP).
+
+**Probes:** Translate ECS Health Checks (Interval, Retries, StartPeriod) into K8s probes:
+
+*Liveness Probe:* Restart if the container is dead.
+
+*Readiness Probe:* Do not send traffic until the app is ready.
+
+**Metadata:** Check for dependencies on EC2 Instance Metadata. Strict K8s network policies or the move to Fargate/EKS might block this access.
+
+### Phase 2: Target Architecture Decisions
+
+**Goal:** Define the blueprints of the "new house" before moving the furniture.
+
+**Ingress Strategy (AWS Load Balancer Controller)**
+
+**Tool:** Use the AWS Load Balancer Controller to manage ALBs via Kubernetes Ingress resources.
+
+**Decision (Traffic Mode):**
+
+*Instance Mode:* Traffic goes to NodePort $\rightarrow$ KubeProxy $\rightarrow$ Pod.
+
+*IP Mode (Recommended):* Traffic goes from ALB $\rightarrow$ Directly to Pod IP.
+
+**Why IP Mode?** It bypasses kube-proxy replacement chains, reducing latency and complexity.
+
+**Multi-Region Strategy**
+
+### Phase 3: Manual Setup & Validation (The "Golden Image" Approach)
+
+**Goal:** Manually build the infrastructure in the AWS Console first. This creates a working prototype to prove the architecture works before worrying about code syntax.
+
+#### 1. Resource Creation (Console)
+
+Manually launch the compute layer (EKS Node Groups) based on Phase 2 decisions.
+
+**Security Groups:** Manually configure rules (e.g., Allow 80/443 from ALB, Allow 22 for bastion).
+
+**Networking:** Set up Load Balancers and Target Groups via the AWS UI.
+
+**Databases:** configure RDS endpoints and ensure security groups allow access from the new compute layer.
+
+#### 2. Application Deployment & Testing
+
+**Deploy:** SSH into instances or use kubectl to manually deploy the application/jar files.
+
+**Logs:** Check application logs immediately to verify startup without errors.
+
+**Connectivity:** Verify that the Load Balancer DNS successfully routes traffic to the instances.
+
+#### 3. Configuration Auditing (Critical)
+
+**Capture Success:** Once the manual setup works, document exactly *why* it works:
+
+Which specific Subnets were used?
+
+What are the exact Security Group IDs and rules?
+
+Which IAM policies were actually required (vs what you thought was required)?
+
+**Benefit:** If Terraform fails in Phase 4, you know it is a *syntax/code* issue, not a *networking/architectural* issue because you have already proven the architecture works manually.
+
+### Phase 4: Infrastructure as Code (Terraform Implementation)
+
+**Goal:** Replicate the working Phase 3 setup using Terraform to achieve automation, repeatability, and state management.
+
+#### 1. Write the Terraform Code
+
+Create structure: [main.tf](http://main.tf), [http://variables.tf](http://variables.tf) , [provider.tf](http://provider.tf).
+
+Write resource blocks that strictly mirror your manual setup from Phase 3.
+
+*Tip:* You can use tools like **Terraformer** to export your manual resources into code to get a head start, or write from scratch while referencing the AWS Console settings.
+
+#### 2. Import or Recreate
+
+**Option A (Import):** Use terraform import to bring the Phase 3 resources into the state file.
+
+**Option B (Recreate - Recommended):**
+
+Leave the manual Phase 3 resources running as a "reference stack."
+
+Run terraform apply to create a parallel, identical stack.
+
+Once the Terraform stack is verified, destroy the manual Phase 3 resources.
+
+#### 3. The terraform plan Validation
+
+Run terraform plan.
+
+Scrutinize the output to ensure it intends to build exactly what you validated in Phase 3.
+
+#### 4. Final Switchover
+
+Once the Terraform stack is up and green, update DNS (Route53) to point to the new Terraform-managed Load Balancer.
+
+**Cleanup:** Destroy the manually created resources from Phase 3 to avoid double billing.

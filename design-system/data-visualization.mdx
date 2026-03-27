@@ -1,0 +1,178 @@
+---
+title: "Data Visualization"
+description: "Chart types, color palettes, and Recharts patterns for data visualization."
+---
+
+# Data Visualization
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Standards for charts, graphs, and data display in the Crest Pet System.
+
+---
+
+## 📚 Chart Library
+
+**Primary:** Recharts (React wrapper for D3)
+
+```
+import {
+  LineChart, BarChart, PieChart, AreaChart,
+  Line, Bar, Pie, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend
+} from "recharts"
+```
+
+---
+
+## 📊 Chart Type Selection
+
+| Data Type | Chart Type | Use Case |
+| --- | --- | --- |
+| Comparison | Bar Chart | Compare values across categories |
+| Composition | Pie/Donut | Show parts of a whole |
+| Trend | Line Chart | Show change over time |
+| Volume | Area Chart | Show cumulative values |
+| Distribution | Histogram | Show frequency distribution |
+
+---
+
+## 🎨 Color Palette
+
+### Standard Chart Colors
+
+From `CHART_COLORS` array:
+
+| Index | Color | Hex |
+| --- | --- | --- |
+| 0 | Blue | `#3b82f6` |
+| 1 | Green | `#22c55e` |
+| 2 | Purple | `#a855f7` |
+| 3 | Orange | `#f97316` |
+| 4 | Pink | `#ec4899` |
+| 5 | Cyan | `#06b6d4` |
+| 6 | Yellow | `#eab308` |
+| 7 | Red | `#ef4444` |
+| 8 | Indigo | `#6366f1` |
+| 9 | Teal | `#14b8a6` |
+
+### Semantic Colors
+
+| Meaning | Color | Usage |
+| --- | --- | --- |
+| Revenue/Profit | Green | Positive financial |
+| Costs/Losses | Red | Negative financial |
+| Primary/Neutral | Blue | Default data |
+| Warnings | Amber | Attention areas |
+
+---
+
+## 📐 Chart Dimensions
+
+| Context | Height |
+| --- | --- |
+| Dashboard card | `300px` |
+| Full-width section | `400px` |
+| Mini sparkline | `60-80px` |
+
+---
+
+## 🏷️ Axis Formatting
+
+### Number Formats
+
+| Type | Format | Example |
+| --- | --- | --- |
+| Currency | `$1.5k` | Large values abbreviated |
+| Percentage | `85%` | With % symbol |
+| Plain | `1,234` | With commas |
+| Date | `Jan`, `Feb` | Abbreviated months |
+
+### Grid Lines
+
+```
+
+```
+
+---
+
+## 💬 Tooltips
+
+### Standard Pattern
+
+```
+}
+  formatter={(value) => formatCurrency(value)}
+/>
+```
+
+### Tooltip Indicators
+
+| Type | Usage |
+| --- | --- |
+| `dot` | Point data |
+| `line` | Line charts |
+| `dashed` | Reference lines |
+
+---
+
+## 📋 Legends
+
+### Placement
+
+| Position | Usage |
+| --- | --- |
+| Bottom | Default |
+| Top | When bottom labels exist |
+| Right | Wide charts only |
+
+---
+
+## 🥧 Pie Chart Guidelines
+
+### Best Practices
+
+- Maximum 6-8 segments
+- Minimum 5% per segment (combine smaller into "Other")
+- Always include percentages
+- Use consistent ordering (largest to smallest)
+
+### Donut vs Pie
+
+| Type | Usage |
+| --- | --- |
+| Pie | Simple composition |
+| Donut | When showing total in center |
+
+---
+
+## 🔢 Number Formatting Utilities
+
+```
+// Currency with abbreviation
+formatCurrency(1500000) // "$1.5M"
+
+// Plain number with commas
+formatNumber(1234567) // "1,234,567"
+
+// Compact notation
+formatCompact(1500) // "1.5K"
+```
+
+---
+
+## ♿ Accessibility
+
+### Requirements
+
+- Never rely on color alone
+- Include patterns or labels
+- Provide data table alternative
+- Screen reader support
+
+### Implementation
+
+```
+
+```
