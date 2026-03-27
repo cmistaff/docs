@@ -28,13 +28,15 @@ Using both ensures issues are fixed **before Pull Requests**.
 - Select **Add SonarCloud Connection**
 - Generate a token from SonarCloud
 - Paste token into Cursor
-- Enter your **Organization Key**
+- Enter your **Organization Key**: `cmistaff`
 
 ### 3️⃣ Bind Project
 
 - Open Command Palette (`Ctrl + Shift + P`)
 - Run: `SonarLint: Configure Project Binding`
-- Link your local project to the correct SonarCloud project
+- Link your local project to the correct SonarCloud project using project key: `cmistaff_crestpetsystem`
+
+**Important:** When querying SonarCloud in the browser or API, always use `branch=prestaging`. The `main` branch data is stale and shows incorrect scores.
 
 ## 🚀 Daily Developer Workflow
 

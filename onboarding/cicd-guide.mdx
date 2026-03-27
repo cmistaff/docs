@@ -543,7 +543,10 @@ If no ticket is found, the system:
 | --- | --- | --- | --- |
 | run-unit-tests.yml | Unit tests | 20 min | PR to prestaging |
 | run-int-tests.yml | Integration tests | 30 min | PR to prestaging |
-| run-e2e-tests.yml | End-to-end tests | 45 min | PR to prestaging |
+| playwright-tests.yml | Playwright UI E2E tests | 45 min | PR to prestaging (client/ changes) |
+| server-e2e-tests.yml | Server E2E tests | 45 min | Push to prestaging/staging/main |
+
+Note: `run-e2e-tests.yml` does not exist. The actual E2E workflows are `playwright-tests.yml` and `server-e2e-tests.yml`.
 
 ### AI Code Review
 
@@ -790,6 +793,10 @@ git fetch origin --prune
 | ☁️ AWS Issues | Contact DevOps team |
 
 ## Appendix: Workflow Files
+
+<Warning>
+**Incomplete:** This appendix lists only a subset of workflow files. At least 16 additional workflows exist in the repository including `auto-merge-prestaging.yml`, `check-max-lines.yml`, `codeql.yml`, `deploy-eks.yml`, `dev-db-seeding.yml`, `devin-pr-test.yml`, `dismiss-bot-reviews.yml`, `playwright-tests.yml`, `security.yml`, `server-e2e-tests.yml`, `sonarcloud-pr-analysis.yml`, `sonarcloud-long-lived-branch-analysis.yml`, and others. See `.github/workflows/` in the repository for the complete list.
+</Warning>
 
 | File | Purpose |
 | --- | --- |

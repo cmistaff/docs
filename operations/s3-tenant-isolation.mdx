@@ -41,7 +41,11 @@ Crest Pet System is a **multi-tenant SaaS platform**. The core security invarian
 
 ## Current State Analysis
 
-### S3 Buckets (11 total)
+### S3 Buckets (14 total)
+
+<Note>
+**Updated March 2026:** Terraform now defines 14 buckets. Three were added since the original audit: `dental_charts` (dental chart/imaging), `ai_notes` (AI-generated notes), and `email_pdfs` (email PDF generation). The original audit listed 11.
+</Note>
 
 | Bucket Enum | Purpose | Shared? |
 | --- | --- | --- |

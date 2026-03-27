@@ -43,7 +43,7 @@ brew install jq
 aws --version # Should show: aws-cli/2.x.x
 session-manager-plugin # Should show version info
 node --version # Should show: v22.x.x or higher
-pnpm --version # Should show: 8.x.x or higher
+pnpm --version # Should show: 10.x.x or higher
 jq --version # Should show: jq-1.x
 ```
 
@@ -191,10 +191,10 @@ sso_account_id = 908027379030
 sso_role_name = AppDeployer-Staging
 region = us-east-1
 
-[profile crest-prestaging-secrets]
+[profile crest-staging-secrets]
 sso_session = crest
 sso_account_id = 908027379030
-sso_role_name = SecretsManager-Prestaging
+sso_role_name = SecretsManager-Staging
 region = us-east-1
 
 # -----------------------------------------------------------------------------

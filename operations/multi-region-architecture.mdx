@@ -3,6 +3,10 @@ title: "Multi-Region Architecture Strategy"
 description: "Multi-region deployment strategy for active-active architecture across AWS regions."
 ---
 
+<Warning>
+Status: **Planned / R&D** -- Production currently runs **single-region on ECS Fargate in us-east-1**. The EKS multi-region module exists as Terraform code in the infra repo (`modules/eks-multiregion-active-active/`) but is NOT deployed to production. This document describes the target architecture, not current state.
+</Warning>
+
 **Regions:**
 
 - Asia Pacific (Singapore)

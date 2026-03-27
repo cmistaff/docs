@@ -3,6 +3,10 @@ title: "Environment Variables Guidance"
 description: "Comprehensive guide to all client and server environment variables used in the Crest Pet System."
 ---
 
+<Warning>
+**Client-side only.** This document covers only client-side environment variables. The server has 106+ additional environment variables (see `server/.env.example` for the full list). Server env vars are not documented here.
+</Warning>
+
 After performing static analysis on all files in `client/*`, I was able to determine a good bit of info about our client environment variables. My static analysis script revealed the following:
 
 # Client Environment Variable Usage Report
