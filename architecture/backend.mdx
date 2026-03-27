@@ -55,8 +55,8 @@ server/src/modules/
     ├── enterprise/         # 19 modules
     ├── platform/           # 18 modules
     ├── referral/           # 5 modules
-    ├── marcia/             # 5 modules (chatbot, elevenlabs, sms, whatsapp)
-    └── shared/             # ~78 cross-portal modules
+    ├── marcia/             # 5 modules (chatbot, elevenlabs, sms, whatsapp) -- ElevenLabs lives here, not under common/third-party/
+    └── shared/             # ~76 cross-portal modules
 ```
 
 ## Controller-Service-Repository Pattern
@@ -140,7 +140,7 @@ Multi-tenant security is enforced at every layer:
 Controller (@CurrentTenant) → Service (tenantId param) → Repository (where: { tenantId })
 ```
 
-Client-provided `tenantId` values are never trusted. The tenant is always resolved from the authenticated session context, except for platform admin endpoints protected by `PlatformAdminGuard`.
+Client-provided `tenantId` values are never trusted. The tenant is always resolved from the authenticated session context, except for platform admin endpoints protected by `RequireTenantTypeGuard` and `TenantAccessGuard` (in `server/src/modules/portals/shared/domain/guards/`).
 
 ## DTOs and Validation
 

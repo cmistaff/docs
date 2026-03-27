@@ -152,11 +152,19 @@ async list(tenantId: string) {
 The frontend uses permission hooks and HOCs to conditionally render UI elements and protect routes:
 
 ```typescript
-// Hook-based
-const canEdit = useHasWriteAccess("appointments");
+import { useHasPermission } from "@/hooks/useHasPermission";
+import { useHasWriteAccess } from "@/hooks/useHasWriteAccess";
+import { withPermission } from "@/lib/hoc/withPermission";
+import { Permission, PermissionAction } from "@prisma/client";
 
-// HOC-based route protection
-export default withPermission("billing.view")(BillingPage);
+// Hook-based (typed enum objects, not strings)
+const canViewAppointments = useHasPermission([
+  { permission: Permission.CLINIC__APPOINTMENTS, actions: [PermissionAction.READ] },
+]);
+const canEdit = useHasWriteAccess(Permission.CLINIC__APPOINTMENTS);
+
+// HOC-based route protection (two arguments, not curried)
+export default withPermission(BillingPage, Permission.CLINIC__PAYMENTS);
 ```
 
 ## Security Decorators
