@@ -1,0 +1,869 @@
+---
+title: "Appointment Auto-Confirm Payment Flow"
+description: "Automatic appointment confirmation and payment flow for the scheduling system."
+---
+
+{/*
+  (c) 2026 Crest Advisory Group LLC. All rights reserved.
+  PROPRIETARY AND CONFIDENTIAL
+*/}
+
+# Auto-Confirm Procedures & Payment Flow Enhancement
+
+> **Status**: Planning / Brainstorming
+> **Created**: January 10, 2026
+> **Last Updated**: January 10, 2026
+> **Author**: Engineering Team
+> **JIRA**: TBD
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#executive-summary)
+2. [Problem Statement](#problem-statement)
+3. [Goals & Success Metrics](#goals--success-metrics)
+4. [User Stories](#user-stories)
+5. [Proposed Solution](#proposed-solution)
+6. [Technical Design](#technical-design)
+7. [Schema Changes](#schema-changes)
+8. [API Changes](#api-changes)
+9. [Flow Diagrams](#flow-diagrams)
+10. [Edge Cases](#edge-cases)
+11. [UI/UX Considerations](#uiux-considerations)
+12. [Migration Strategy](#migration-strategy)
+13. [Open Questions](#open-questions)
+14. [Implementation Phases](#implementation-phases)
+
+---
+
+## Executive Summary
+
+This document outlines a feature enhancement to allow **automatic confirmation of appointment procedures** based on payment conditions, while providing clinics with granular control over payment timing and confirmation rules.
+
+### Key Capabilities
+
+- **Auto-confirm procedures** based on: instant booking, full payment, partial payment, or deposit
+- **Flexible payment timing**: immediate at booking, after confirmation, on-site only, or post-service
+- **Clinic-level soft lock settings**: configurable hold duration for unpaid bookings
+- **Backward compatible**: existing behavior preserved as default
+
+---
+
+## Problem Statement
+
+### Current State
+
+```
+Consumer Books -> AppointmentStep(status=PENDING)
+                        |
+         Clinic CONFIRMS manually
+                        |
+        AppointmentStep(status=CONFIRMED)
+                        |
+         Consumer CAN NOW pay
+                        |
+        AppointmentStep(paymentStatus=PAID)
+```
+
+**The Blocking Code** (`server/src/modules/portals/shared/payments/services/core-payment.service.ts`):
+
+```typescript
+appointmentSteps: {
+  where: {
+    serviceStepId: { in: serviceStepIds },
+    paymentStatus: AppointmentStepPaymentStatus.UNPAID,
+    status: AppointmentStatus.CONFIRMED,  // <-- BLOCKER
+  },
+}
+```
+
+### The Chicken-and-Egg Problem
+
+1. Payment **requires** `CONFIRMED` status
+2. Auto-confirm based on payment **cannot happen** because payment requires confirmation first
+3. This circular dependency prevents pay-to-confirm workflows
+
+### Business Impact
+
+- Clinics cannot offer "pay now to secure your spot" booking flows
+- No option for instant confirmation of low-risk procedures
+- Limited flexibility for different procedure types (free, deposit-based, full-payment)
+- Consumer experience friction: must wait for manual clinic confirmation
+
+---
+
+## Goals & Success Metrics
+
+### Primary Goals
+
+| Goal | Description |
+|------|-------------|
+| **G1** | Enable auto-confirmation of procedures based on configurable payment conditions |
+| **G2** | Allow payment before clinic confirmation for specific procedure types |
+| **G3** | Provide clinics granular control over payment timing and confirmation rules |
+| **G4** | Maintain backward compatibility with existing booking flows |
+
+### Success Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Consumer booking-to-confirmation time | 50% reduction | Average time from booking to CONFIRMED status |
+| Payment conversion at booking | 30% increase | % of bookings with immediate payment |
+| Clinic adoption rate | 40% | % of clinics using auto-confirm features |
+| No-show rate for auto-confirmed | < 10% | % of auto-confirmed appointments with NO_SHOW |
+
+---
+
+## User Stories
+
+### Consumer Stories
+
+| ID | Story | Priority |
+|----|-------|----------|
+| **US-C1** | As a consumer, I want to pay immediately when booking so my appointment is instantly confirmed | P0 |
+| **US-C2** | As a consumer, I want to see a clear "Pay Now to Confirm" option during booking | P0 |
+| **US-C3** | As a consumer, I want to receive a reminder before my booking hold expires | P1 |
+| **US-C4** | As a consumer, I want to know if my appointment requires payment before confirmation | P1 |
+
+### Clinic Stories
+
+| ID | Story | Priority |
+|----|-------|----------|
+| **US-CL1** | As a clinic admin, I want to configure procedures to auto-confirm on full payment | P0 |
+| **US-CL2** | As a clinic admin, I want to offer some procedures as "instant confirm" without payment | P0 |
+| **US-CL3** | As a clinic admin, I want to set how long unpaid bookings hold a time slot | P0 |
+| **US-CL4** | As a clinic admin, I want some procedures to only accept on-site payment | P1 |
+| **US-CL5** | As a clinic admin, I want to auto-confirm when a deposit is paid | P1 |
+| **US-CL6** | As a clinic admin, I want to auto-confirm when X% of the price is paid | P2 |
+| **US-CL7** | As a clinic admin, I want to see which appointments are pending payment vs pending confirmation | P1 |
+
+---
+
+## Proposed Solution
+
+### Core Concept: Decouple Payment Enablement from Confirmation
+
+Instead of coupling payment to `CONFIRMED` status, introduce:
+
+1. **`PaymentTiming`** - When is payment enabled/allowed?
+2. **`AutoConfirmRule`** - When should auto-confirmation trigger?
+3. **`isPaymentEnabled`** - Instance-level flag on AppointmentStep
+4. **Clinic-level soft lock settings** - How long to hold unpaid slots?
+
+### Solution Overview
+
+```
++-------------------------------------------------------------+
+|                    CONFIGURATION LAYER                        |
+|  (ServiceStep - Procedure Template)                          |
++-------------------------------------------------------------+
+|  paymentTiming: IMMEDIATE | AFTER_CONFIRM | ON_SITE | POST  |
+|  autoConfirmRule: MANUAL | INSTANT | ON_FULL | ON_PARTIAL    |
+|  autoConfirmThreshold: number (for partial payment %)        |
++-------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|                    INSTANCE LAYER                             |
+|  (AppointmentStep - Booked Instance)                         |
++-------------------------------------------------------------+
+|  isPaymentEnabled: boolean                                   |
+|  paymentEnabledAt: DateTime                                  |
+|  confirmedBy: 'manual' | 'auto_instant' | 'auto_payment'    |
++-------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|                    CLINIC SETTINGS                            |
+|  (ClinicBookingSettings - Tenant Level)                      |
++-------------------------------------------------------------+
+|  softLockDurationMinutes: number                             |
+|  autoCancelOnSoftLockExpiry: boolean                         |
+|  sendReminderBeforeExpiry: boolean                           |
++-------------------------------------------------------------+
+```
+
+---
+
+## Technical Design
+
+### New Enums
+
+```prisma
+// Payment timing - when is online payment allowed?
+enum PaymentTiming {
+  IMMEDIATE_AT_BOOKING    // Payment enabled right when consumer books
+  AFTER_CONFIRMATION      // Current behavior - wait for clinic to confirm (DEFAULT)
+  ON_SITE_ONLY            // No online payment - clinic collects in person
+  POST_SERVICE            // Pay after the service is rendered
+}
+
+// Auto-confirmation rules - when should system auto-confirm?
+enum AutoConfirmRule {
+  MANUAL                  // Current behavior - clinic confirms manually (DEFAULT)
+  INSTANT                 // Auto-confirm immediately upon booking
+  ON_FULL_PAYMENT         // Auto-confirm when 100% paid
+  ON_PARTIAL_PAYMENT      // Auto-confirm when X% paid (uses autoConfirmThreshold)
+  ON_DEPOSIT              // Auto-confirm when deposit paid
+}
+```
+
+### Configuration Matrix
+
+| PaymentTiming | AutoConfirmRule | Behavior |
+|---------------|-----------------|----------|
+| `AFTER_CONFIRMATION` | `MANUAL` | **Current default** - clinic confirms, then consumer pays |
+| `IMMEDIATE_AT_BOOKING` | `ON_FULL_PAYMENT` | Pay-to-confirm: full payment required |
+| `IMMEDIATE_AT_BOOKING` | `ON_DEPOSIT` | Pay-to-confirm: deposit required |
+| `IMMEDIATE_AT_BOOKING` | `ON_PARTIAL_PAYMENT` | Pay-to-confirm: X% required |
+| `ON_SITE_ONLY` | `INSTANT` | Free/trusted procedures - instant confirm, pay at clinic |
+| `ON_SITE_ONLY` | `MANUAL` | Clinic confirms, payment collected on-site |
+| `POST_SERVICE` | `MANUAL` | Pay after appointment (invoicing flow) |
+
+---
+
+## Schema Changes
+
+### 1. ServiceStep Model (Procedure Configuration)
+
+**File**: `packages/common/prisma/schema/services.prisma`
+
+```prisma
+model ServiceStep {
+  // ... existing fields ...
+
+  // EXISTING (for reference)
+  paymentRule                  PaymentRule @default(FULL_UPFRONT)
+  depositAmount                Float?
+  depositPercentage            Float?
+  consumersCanBook             Boolean     @default(false)
+
+  // NEW: Payment Enablement Control
+  paymentTiming                PaymentTiming   @default(AFTER_CONFIRMATION)
+
+  // NEW: Auto-Confirmation Rules
+  autoConfirmRule              AutoConfirmRule @default(MANUAL)
+  autoConfirmThreshold         Float?          // Required % for ON_PARTIAL_PAYMENT (e.g., 50.0 = 50%)
+}
+```
+
+### 2. AppointmentStep Model (Booked Instance)
+
+**File**: `packages/common/prisma/schema/appointments.prisma`
+
+```prisma
+model AppointmentStep {
+  // ... existing fields ...
+
+  // EXISTING (for reference)
+  status                    AppointmentStatus            @default(PENDING)
+  paymentStatus             AppointmentStepPaymentStatus @default(UNPAID)
+  isSoftLock                Boolean                      @default(false)
+  softLockTill              DateTime?
+
+  // NEW: Payment Enablement Tracking
+  isPaymentEnabled          Boolean   @default(false)
+  paymentEnabledAt          DateTime?
+  paymentEnabledBy          String?   // 'system', 'consumer_request', 'clinic_staff', or staffId
+
+  // NEW: Confirmation Source Tracking
+  confirmedBy               String?   // 'manual', 'auto_instant', 'auto_payment', null
+  confirmedAt               DateTime?
+
+  @@index([isPaymentEnabled])
+  @@index([confirmedBy])
+}
+```
+
+### 3. Clinic Booking Settings (Tenant Level)
+
+**Option A**: Add to existing `Tenant.settings` JSON field
+
+```typescript
+interface TenantSettings {
+  // ... existing settings ...
+
+  // NEW: Booking Settings
+  booking?: {
+    softLockEnabled: boolean;              // Default: true
+    softLockDurationMinutes: number;       // Default: 30
+    autoCancelOnSoftLockExpiry: boolean;   // Default: true
+    sendReminderBeforeExpiry: boolean;     // Default: true
+    reminderMinutesBeforeExpiry: number;   // Default: 15
+    gracePeriodMinutes: number;            // Default: 0
+  };
+}
+```
+
+**Option B**: Dedicated Settings Table (Recommended for type safety)
+
+**File**: `packages/common/prisma/schema/tenant.prisma`
+
+```prisma
+model ClinicBookingSettings {
+  id                          String   @id @default(uuid())
+  tenantId                    String   @unique
+
+  // Soft Lock Configuration
+  softLockEnabled             Boolean  @default(true)
+  softLockDurationMinutes     Int      @default(30)
+
+  // Auto-Cancellation
+  autoCancelOnSoftLockExpiry  Boolean  @default(true)
+  gracePeriodMinutes          Int      @default(0)
+
+  // Reminders
+  sendReminderBeforeExpiry    Boolean  @default(true)
+  reminderMinutesBeforeExpiry Int      @default(15)
+
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+```
+
+### 4. New Enums
+
+**File**: `packages/common/prisma/schema/services.prisma` (or new enums file)
+
+```prisma
+enum PaymentTiming {
+  IMMEDIATE_AT_BOOKING
+  AFTER_CONFIRMATION
+  ON_SITE_ONLY
+  POST_SERVICE
+}
+
+enum AutoConfirmRule {
+  MANUAL
+  INSTANT
+  ON_FULL_PAYMENT
+  ON_PARTIAL_PAYMENT
+  ON_DEPOSIT
+}
+```
+
+---
+
+## API Changes
+
+### 1. ServiceStep Endpoints (Clinic Portal)
+
+#### Update Create/Update DTOs
+
+**File**: `server/src/modules/portals/clinic/service-steps/dto/requests/create-service-step-request.dto.ts`
+
+```typescript
+export class CreateServiceStepRequestDto {
+  // ... existing fields ...
+
+  @ApiProperty({
+    description: "When online payment is allowed",
+    enum: PaymentTiming,
+    example: PaymentTiming.AFTER_CONFIRMATION,
+  })
+  @IsEnum(PaymentTiming)
+  @IsOptional()
+  paymentTiming?: PaymentTiming;
+
+  @ApiProperty({
+    description: "Auto-confirmation rule",
+    enum: AutoConfirmRule,
+    example: AutoConfirmRule.MANUAL,
+  })
+  @IsEnum(AutoConfirmRule)
+  @IsOptional()
+  autoConfirmRule?: AutoConfirmRule;
+
+  @ApiPropertyNullableAndOptional({ type: Number })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  autoConfirmThreshold?: number | null;
+}
+```
+
+### 2. Payment Endpoints (Consumer Portal)
+
+#### Modify Payment Intent Creation
+
+**File**: `server/src/modules/portals/shared/payments/services/core-payment.service.ts`
+
+```typescript
+async createPaymentIntentForAppointment(...) {
+  const appointment = await this.appointmentRepository.findUnique({
+    where: { id: appointmentId, userId },
+    include: {
+      appointmentSteps: {
+        where: {
+          serviceStepId: { in: serviceStepIds },
+          paymentStatus: AppointmentStepPaymentStatus.UNPAID,
+          // CHANGED: Remove CONFIRMED requirement, add payment enablement check
+          isPaymentEnabled: true,
+        },
+        include: { serviceStep: true },
+      },
+      tenant: true,
+      patientReferral: true,
+    },
+  });
+
+  if (appointment.appointmentSteps.length === 0) {
+    throw new ClientNotFoundError(
+      "No unpaid appointment steps with payment enabled found. " +
+      "Payment may require clinic confirmation first."
+    );
+  }
+
+  // ... rest of payment logic
+}
+```
+
+### 3. Booking Endpoints (Consumer Portal)
+
+#### Modify Booking Response
+
+**File**: `server/src/modules/portals/consumer/appointment/dto/responses/book-consumer-appointment-response.dto.ts`
+
+```typescript
+export class BookConsumerAppointmentResponseDto {
+  // ... existing fields ...
+
+  @ApiProperty({ description: "Whether payment is currently enabled" })
+  isPaymentEnabled: boolean;
+
+  @ApiProperty({ description: "When the soft lock expires", nullable: true })
+  softLockExpiresAt: Date | null;
+
+  @ApiProperty({ description: "Next action required from consumer" })
+  nextAction: 'PAY_NOW' | 'WAIT_FOR_CONFIRMATION' | 'APPOINTMENT_CONFIRMED' | 'PAY_ON_SITE';
+
+  @ApiPropertyOptional({ description: "Amount required to auto-confirm (if applicable)" })
+  amountToConfirm?: number;
+}
+```
+
+### 4. New Clinic Settings Endpoints
+
+**File**: `server/src/modules/portals/clinic/settings/booking/booking-settings.controller.ts`
+
+```typescript
+@ApiController("clinic/settings/booking")
+@RequireClinicTenant()
+export class BookingSettingsController {
+
+  @Get()
+  @ApiOperation({ summary: "Get clinic booking settings" })
+  async getBookingSettings(
+    @CurrentTenant("id") tenantId: string
+  ): Promise<ClinicBookingSettingsDto> { ... }
+
+  @Patch()
+  @ApiOperation({ summary: "Update clinic booking settings" })
+  async updateBookingSettings(
+    @CurrentTenant("id") tenantId: string,
+    @Body() dto: UpdateBookingSettingsDto
+  ): Promise<ClinicBookingSettingsDto> { ... }
+}
+```
+
+---
+
+## Flow Diagrams
+
+### Flow 1: Instant Auto-Confirm (Free/Trusted Procedures)
+
+```
+ServiceStep Config:
+  autoConfirmRule = INSTANT
+  paymentTiming = ON_SITE_ONLY
+
++--------------+     +----------------------+     +---------------------+
+|   Consumer   |---->|   Book Appointment   |---->|  AppointmentStep    |
+|   Books      |     |                      |     |  Created            |
++--------------+     +----------------------+     +----------+----------+
+                                                             |
+                                                             v
+                                                  +---------------------+
+                                                  |  AUTO-CONFIRM       |
+                                                  |  status=CONFIRMED   |
+                                                  |  confirmedBy=       |
+                                                  |    'auto_instant'   |
+                                                  |  isPaymentEnabled=  |
+                                                  |    false            |
+                                                  +----------+----------+
+                                                             |
+                                                             v
+                                                  +---------------------+
+                                                  |  Clinic collects    |
+                                                  |  payment on-site    |
+                                                  +---------------------+
+```
+
+### Flow 2: Pay-to-Confirm (Full Payment)
+
+```
+ServiceStep Config:
+  autoConfirmRule = ON_FULL_PAYMENT
+  paymentTiming = IMMEDIATE_AT_BOOKING
+
+ClinicSettings:
+  softLockDurationMinutes = 30
+
++--------------+     +----------------------+     +---------------------+
+|   Consumer   |---->|   Book Appointment   |---->|  AppointmentStep    |
+|   Books      |     |                      |     |  status=PENDING     |
++--------------+     +----------------------+     |  isPaymentEnabled=  |
+                                                  |    true             |
+                                                  |  softLockTill=      |
+                                                  |    now + 30min      |
+                                                  +----------+----------+
+                                                             |
+                    +----------------------------+-----------+----------+
+                    |                            |                      |
+                    v                            v                      v
+         +---------------------+      +---------------------+  +---------------------+
+         |  Consumer pays      |      |  Consumer doesn't   |  |  Soft lock expires  |
+         |  full amount        |      |  pay within window  |  |  (30 min)           |
+         +----------+----------+      +----------+----------+  +----------+----------+
+                    |                            |                        |
+                    v                            |                        v
+         +---------------------+                 |           +---------------------+
+         |  AUTO-CONFIRM       |                 |           |  AUTO-CANCEL        |
+         |  status=CONFIRMED   |                 |           |  status=CANCELLED   |
+         |  confirmedBy=       |                 |           |  Release slot       |
+         |    'auto_payment'   |                 |           |  Notify consumer    |
+         |  paymentStatus=PAID |                 |           +---------------------+
+         +---------------------+                 |
+                                                 v
+                                      +---------------------+
+                                      |  Send reminder at   |
+                                      |  15 min mark        |
+                                      +---------------------+
+```
+
+### Flow 3: Current Behavior (Manual Confirm)
+
+```
+ServiceStep Config:
+  autoConfirmRule = MANUAL
+  paymentTiming = AFTER_CONFIRMATION
+
++--------------+     +----------------------+     +---------------------+
+|   Consumer   |---->|   Book Appointment   |---->|  AppointmentStep    |
+|   Books      |     |                      |     |  status=PENDING     |
++--------------+     +----------------------+     |  isPaymentEnabled=  |
+                                                  |    false            |
+                                                  +----------+----------+
+                                                             |
+                                                             v
+                                                  +---------------------+
+                                                  |  Clinic reviews     |
+                                                  |  and CONFIRMS       |
+                                                  +----------+----------+
+                                                             |
+                                                             v
+                                                  +---------------------+
+                                                  |  status=CONFIRMED   |
+                                                  |  isPaymentEnabled=  |
+                                                  |    true             |
+                                                  |  confirmedBy=       |
+                                                  |    'manual'         |
+                                                  +----------+----------+
+                                                             |
+                                                             v
+                                                  +---------------------+
+                                                  |  Consumer can now   |
+                                                  |  pay online         |
+                                                  +---------------------+
+```
+
+### Flow 4: Partial Payment / Deposit Confirmation
+
+```
+ServiceStep Config:
+  autoConfirmRule = ON_PARTIAL_PAYMENT
+  autoConfirmThreshold = 50
+  paymentTiming = IMMEDIATE_AT_BOOKING
+
++--------------+     +----------------------+     +---------------------+
+|   Consumer   |---->|   Book Appointment   |---->|  AppointmentStep    |
+|   Books      |     |   Price: $200        |     |  status=PENDING     |
++--------------+     +----------------------+     |  isPaymentEnabled=  |
+                                                  |    true             |
+                                                  +----------+----------+
+                                                             |
+                    +----------------------------------------+----------------------------------------+
+                    |                                                                                 |
+                    v                                                                                 v
+         +---------------------+                                                           +---------------------+
+         |  Consumer pays $100 |                                                           |  Consumer pays $50  |
+         |  (50% = threshold)  |                                                           |  (25% < threshold)  |
+         +----------+----------+                                                           +----------+----------+
+                    |                                                                                 |
+                    v                                                                                 v
+         +---------------------+                                                           +---------------------+
+         |  AUTO-CONFIRM       |                                                           |  Still PENDING      |
+         |  status=CONFIRMED   |                                                           |  paymentStatus=     |
+         |  paymentStatus=     |                                                           |    PARTIALLY_PAID   |
+         |    PARTIALLY_PAID   |                                                           |  Waiting for more   |
+         |  Remaining: $100    |                                                           |  payment or expiry  |
+         +---------------------+                                                           +---------------------+
+```
+
+---
+
+## Edge Cases
+
+| # | Scenario | Expected Behavior |
+|---|----------|-------------------|
+| 1 | Consumer pays partially, below threshold, soft lock expires | Auto-cancel if enabled; partial payment refunded or held as credit |
+| 2 | Consumer pays after soft lock expires (not cancelled) | Payment accepted, auto-confirm rules still apply |
+| 3 | Consumer pays after appointment auto-cancelled | Error: "Appointment no longer available, please rebook" |
+| 4 | Clinic manually confirms before consumer pays (pay-to-confirm) | Override auto-confirm; status=CONFIRMED, consumer can still pay |
+| 5 | Consumer cancels during soft lock with partial payment | Normal cancellation; refund per cancellation policy |
+| 6 | Multiple steps with different auto-confirm rules | Each step evaluated independently |
+| 7 | Free procedure ($0 price) | Auto-set paymentStatus=PAID, apply autoConfirmRule |
+| 8 | Network/referral appointment | Apply clinic's autoConfirmRule; commission still tracked |
+| 9 | Soft lock expires during active payment (card processing) | Grace period applies; extend lock during payment attempt |
+| 10 | Consumer pays exactly threshold amount | Confirm (threshold is minimum, not exclusive) |
+
+---
+
+## UI/UX Considerations
+
+### Consumer Booking Flow
+
+#### Scenario: Pay-to-Confirm Enabled
+
+```
++----------------------------------------------------------------+
+| Appointment Slot Reserved                                       |
++----------------------------------------------------------------+
+|                                                                  |
+|  Your slot is held for 30 minutes.                              |
+|  Pay now to confirm your appointment.                           |
+|                                                                  |
+|  +----------------------------------------------------------+  |
+|  | Time remaining: 28:45                                     |  |
+|  +----------------------------------------------------------+  |
+|                                                                  |
+|  Wellness Exam - Fluffy                                         |
+|  Monday, Jan 15 at 10:00 AM                                    |
+|  $150.00                                                        |
+|                                                                  |
+|  +----------------------------------------------------------+  |
+|  |            [ Pay $150 to Confirm ]                        |  |
+|  +----------------------------------------------------------+  |
+|                                                                  |
+|  Warning: If payment is not completed, your slot will be        |
+|  released and available for others to book.                     |
+|                                                                  |
++----------------------------------------------------------------+
+```
+
+#### Scenario: Instant Confirm (Pay On-Site)
+
+```
++----------------------------------------------------------------+
+| Appointment Confirmed!                                          |
++----------------------------------------------------------------+
+|                                                                  |
+|  Your appointment has been confirmed.                           |
+|  Payment will be collected at the clinic.                       |
+|                                                                  |
+|  Wellness Exam - Fluffy                                         |
+|  Monday, Jan 15 at 10:00 AM                                    |
+|  Happy Paws Veterinary Clinic                                   |
+|  $150.00 (pay at clinic)                                        |
+|                                                                  |
+|  [ Add to Calendar ]  [ View Details ]                          |
+|                                                                  |
++----------------------------------------------------------------+
+```
+
+### Clinic Procedure Configuration
+
+```
++----------------------------------------------------------------+
+| Procedure Settings: Wellness Exam                               |
++----------------------------------------------------------------+
+|                                                                  |
+| PAYMENT TIMING                                                   |
+| When can consumers pay online?                                   |
+|                                                                  |
+| ( ) After clinic confirmation (default)                         |
+| (*) Allow payment immediately at booking                        |
+| ( ) On-site only (no online payment)                            |
+| ( ) After service (invoice later)                               |
+|                                                                  |
+| ---------------------------------------------------------------  |
+|                                                                  |
+| AUTO-CONFIRMATION                                                |
+| When should appointments be automatically confirmed?             |
+|                                                                  |
+| ( ) Manual confirmation required (default)                       |
+| ( ) Confirm immediately on booking                              |
+| (*) Confirm when fully paid                                     |
+| ( ) Confirm when deposit paid                                   |
+| ( ) Confirm when [____]% paid                                   |
+|                                                                  |
+| ---------------------------------------------------------------  |
+|                                                                  |
+| Info: Current combo: Consumers can pay at booking.              |
+|   Appointment confirms when full payment received.              |
+|                                                                  |
+|                                     [ Cancel ]  [ Save ]         |
++----------------------------------------------------------------+
+```
+
+### Clinic Global Settings
+
+```
++----------------------------------------------------------------+
+| Booking Settings                                                |
++----------------------------------------------------------------+
+|                                                                  |
+| SLOT HOLD DURATION                                               |
+| How long to hold a slot for unpaid bookings?                    |
+|                                                                  |
+| Hold slots for: [ 30 v ] minutes                                |
+|                                                                  |
+| Quick presets: [15m] [30m] [1h] [2h] [24h]                      |
+|                                                                  |
+| [x] Auto-cancel bookings when hold expires                     |
+| [x] Send reminder 15 minutes before hold expires               |
+|                                                                  |
+| ---------------------------------------------------------------  |
+|                                                                  |
+| GRACE PERIOD                                                     |
+| Extra time if consumer is mid-payment when hold expires         |
+|                                                                  |
+| Grace period: [ 5 v ] minutes                                   |
+|                                                                  |
+|                                     [ Cancel ]  [ Save ]         |
++----------------------------------------------------------------+
+```
+
+---
+
+## Migration Strategy
+
+### Phase 1: Schema Migration (Non-Breaking)
+
+1. Add new columns with defaults matching current behavior:
+   - `ServiceStep.paymentTiming` = `AFTER_CONFIRMATION`
+   - `ServiceStep.autoConfirmRule` = `MANUAL`
+   - `AppointmentStep.isPaymentEnabled` = `false`
+   - `AppointmentStep.confirmedBy` = `null`
+
+2. Create `ClinicBookingSettings` table with sensible defaults
+
+3. **Data migration**: For existing CONFIRMED appointments:
+   ```sql
+   UPDATE "AppointmentStep"
+   SET "isPaymentEnabled" = true,
+       "confirmedBy" = 'manual'
+   WHERE "status" = 'CONFIRMED';
+   ```
+
+### Phase 2: Backend Logic Updates
+
+1. Update `CorePaymentService` to check `isPaymentEnabled` instead of `CONFIRMED`
+2. Add auto-confirm logic to `PaymentCompletionService`
+3. Add booking flow logic to set `isPaymentEnabled` based on `ServiceStep.paymentTiming`
+4. Implement soft lock expiry BullMQ jobs
+
+### Phase 3: API & Frontend Updates
+
+1. Update ServiceStep DTOs and endpoints
+2. Add ClinicBookingSettings endpoints
+3. Update consumer booking flow UI
+4. Update clinic procedure configuration UI
+5. Update clinic settings UI
+
+### Phase 4: Rollout
+
+1. Feature flag for gradual rollout
+2. Enable for beta clinics first
+3. Monitor metrics
+4. Full rollout
+
+---
+
+## Open Questions
+
+| # | Question | Options | Decision |
+|---|----------|---------|----------|
+| 1 | Should `ClinicBookingSettings` be a separate table or JSON in `Tenant.settings`? | A) Separate table (type-safe) B) JSON field (flexible) | **TBD** - Recommend A |
+| 2 | What happens to partial payments if appointment auto-cancels? | A) Auto-refund B) Hold as credit C) Configurable | **TBD** |
+| 3 | Should clinics be able to override auto-confirm per booking? | A) Yes B) No | **TBD** |
+| 4 | How to handle multiple payment attempts during grace period? | A) Extend grace each attempt B) Fixed grace | **TBD** |
+| 5 | Should soft lock countdown be visible to clinic staff? | A) Yes, in dashboard B) No | **TBD** - Recommend A |
+| 6 | Notification templates for new scenarios? | Need to define | **TBD** |
+| 7 | Should `POST_SERVICE` payment timing create an invoice automatically? | A) Yes B) No, manual | **TBD** |
+
+---
+
+## Implementation Phases
+
+### Phase 1: Foundation (Sprint 1-2)
+- [ ] Schema migrations (new enums, new columns)
+- [ ] Create `ClinicBookingSettings` model and repository
+- [ ] Update `ServiceStep` model with new fields
+- [ ] Update `AppointmentStep` model with new fields
+- [ ] Backend: Basic auto-confirm logic for `INSTANT` rule
+- [ ] Backend: `isPaymentEnabled` flag logic
+
+### Phase 2: Payment Flow (Sprint 3-4)
+- [ ] Update `CorePaymentService` to use `isPaymentEnabled`
+- [ ] Implement `ON_FULL_PAYMENT` auto-confirm
+- [ ] Implement `ON_DEPOSIT` auto-confirm
+- [ ] Implement `ON_PARTIAL_PAYMENT` auto-confirm
+- [ ] Soft lock expiry BullMQ job
+- [ ] Soft lock reminder notification
+
+### Phase 3: Clinic Configuration (Sprint 5)
+- [ ] Clinic settings API endpoints
+- [ ] ServiceStep API updates
+- [ ] Clinic portal: Procedure configuration UI
+- [ ] Clinic portal: Global booking settings UI
+
+### Phase 4: Consumer Experience (Sprint 6)
+- [ ] Consumer portal: Pay-to-confirm booking flow
+- [ ] Consumer portal: Soft lock countdown UI
+- [ ] Consumer notifications (reminder, expiry)
+- [ ] Mobile-responsive updates
+
+### Phase 5: Polish & Rollout (Sprint 7)
+- [ ] Feature flag implementation
+- [ ] Beta testing with select clinics
+- [ ] Monitoring dashboards
+- [ ] Documentation updates
+- [ ] Full rollout
+
+---
+
+## Related Documentation
+
+- Appointment Booking Flow (FEATURES.md - appointment-system)
+- Payment System (FEATURES.md - payment-models)
+- Clinic Portal Settings (ui-ux/CLINIC-SETTINGS.md)
+- Consumer Booking UX (ui-ux/CONSUMER-BOOKING.md)
+
+---
+
+## Revision History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-01-10 | Engineering | Initial draft from brainstorming session |
+
+---
+
+*This document is a living artifact and will be updated as the feature evolves through design and implementation.*

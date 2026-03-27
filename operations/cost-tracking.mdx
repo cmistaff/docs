@@ -1,0 +1,191 @@
+---
+title: "AWS Multi-Tenant Cost Tracking"
+description: "AWS cost tracking and allocation for multi-tenant infrastructure."
+---
+
+## Purpose
+
+This document explains how to track per-tenant resource usage and cost for the CrestPet System, a multi-tenant SaaS application on AWS.
+
+- Frontend: Next.js (tenant resolved via subdomain)
+- Backend: NestJS
+- Cloud: AWS
+
+Tenant information is sent from the frontend using the header: `X-Tenant-Host`
+
+## Tenant Identification
+
+- The frontend extracts the tenant from the subdomain.
+- Example: `crest.prestaging.pet` → tenantId = `crest`
+- The backend receives this via `X-Tenant-Host` header.
+- Middleware should attach `tenantId` to the request context for consistent tracking.
+
+## Logging per Tenant
+
+- Backend logs should include tenantId:
+- ```
+  console.log(JSON.stringify({
+  tenantId, path: req.url, method: req.method, timestamp: Date.now()
+  }));
+  ```
+- Logs go to CloudWatch Logs.
+- Query per tenant using CloudWatch Logs Insights:
+- ```
+  fields @timestamp, tenantId, path
+  | filter tenantId = "crest"
+  | sort @timestamp desc
+  ```
+
+## Metrics per Tenant
+
+- CloudWatch custom metrics can be emitted per tenant:
+- ```
+  MetricName: RequestCount
+  Dimension: TenantId = crest
+  ```
+- Use these metrics to create dashboards and aggregate usage.
+
+## Usage Aggregation
+
+Sum metrics per tenant:
+
+| **Tenant** | **Requests** | **Errors** | **Avg Latency** |
+| --- | --- | --- | --- |
+| crest | 200,000 | 120 | 180ms |
+| aurora | 50,000 | 35 | 210ms |
+
+Use CloudWatch Dashboards or Athena (if logs are exported to S3) to query historical usage.
+
+## Cost Calculation
+
+- Allocate shared infrastructure cost proportionally:
+- ```
+  TenantCost = (TenantRequests / TotalRequests) * TotalAWSInfraCost
+  ```
+- Example:
+- ```
+  Tenant 'crest' → 200,000 / 250,000 = 80%
+  Tenant Cost = 80% * $500 = $400
+  ```
+
+## CloudWatch API Access for Tenant Usage
+
+### Why CloudWatch APIs Are Needed
+
+- Retrieve per-tenant usage metrics (metrics include TenantId).
+- Aggregate usage over time for dashboards and reports.
+- Use usage data to calculate estimated cost per tenant.
+
+### CloudWatch APIs Used
+
+#### GetMetricData (Primary API)
+
+Used to fetch aggregated metrics such as request count, error count, and average latency per tenant.
+
+- Namespace: CrestPet/Tenants
+- MetricName: RequestCount, ErrorCount, Latency
+- Dimension: TenantId
+
+The backend queries this API on a schedule (cron or Lambda) and stores results in the application database.
+
+#### ListMetrics (Discovery API)
+
+- Discover active tenants emitting metrics.
+- Validate available metric dimensions.
+
+#### CloudWatch Logs Insights APIs (Optional)
+
+- StartQuery, GetQueryResults for debugging, auditing, incident investigations.
+- Not recommended for real-time dashboards due to cost and latency.
+
+### What CloudWatch APIs Cannot Do
+
+- Cannot provide cost per tenant or split AWS bills by tenant.
+- Cannot calculate billing directly; cost attribution must be done in the application.
+
+### Cost Calculation Strategy
+
+CrestPet calculates tenant cost using usage ratios:
+
+```
+TenantCost = (TenantUsage / TotalUsage) × TotalAWSInfraCost
+```
+
+TotalAWSInfraCost can be manually configured or retrieved via AWS Cost Explorer (admin-only).
+
+### Security and Access Control
+
+CloudWatch APIs are called only from the backend; the frontend never accesses AWS directly.
+
+IAM permissions required:
+
+```
+cloudwatch:GetMetricData
+cloudwatch:ListMetrics
+```
+
+### Recommended Data Flow
+
+Application emits tenant-based metrics.
+
+Backend scheduled job queries CloudWatch APIs.
+
+Aggregated usage stored in CrestPet database.
+
+Dashboard APIs serve tenant usage and estimated cost.
+
+## Data Flow Overview (ASCII Diagram)
+
+```
+User Browser
+    |
+    v
+Next.js Frontend
+(tenant from subdomain)
+    |
+    |  X-Tenant-Host: crest.prestaging.pet
+    v
+NestJS Backend
+    |
+    |-- Log tenant activity (CloudWatch Logs)
+    |
+    |-- Emit metrics
+    |     Namespace: CrestPet/Tenants
+    |     Dimension: TenantId=crest
+    |
+    v
+CloudWatch Metrics
+    |
+    |  (scheduled job)
+    v
+NestJS Cron / Lambda
+    |
+    |-- Call GetMetricData API
+    |-- Aggregate per tenant
+    v
+CrestPet Database
+(tenant_usage_daily)
+    |
+    v
+Dashboard API
+    |
+    v
+Next.js Dashboard UI
+(usage & estimated cost)
+```
+
+## Recommended Stack
+
+Tenant middleware reading `X-Tenant-Host`
+
+Structured JSON logging with tenantId
+
+CloudWatch custom metrics with TenantId dimension
+
+CloudWatch Metrics API (GetMetricData)
+
+Application database for usage aggregation
+
+Cost allocation logic in backend
+
+This setup enables accurate per-tenant usage tracking and estimated cost visibility in the CrestPet System.

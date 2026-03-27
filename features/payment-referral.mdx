@@ -1,0 +1,129 @@
+---
+title: "Payment Flow - Referral System"
+description: "Payment processing flow for appointments booked via the referral system."
+---
+
+## Overview
+
+This document explains the **Stripe payment integration and flow** for appointments created through the **Referral System**.
+There are **two types of referrals**:
+
+**Third-Party Clinic → Crest Clinic**
+
+**Clinic-to-Clinic (both under Crest)**
+
+---
+
+## 1. Third-Party Clinic → Crest Clinic
+
+### Referral Portal & Onboarding
+
+- Third-party clinics register on the **Referral Portal**.
+- On first login, they see a **banner/tile** prompting them to connect their **Stripe account**.
+- Referrals cannot be made until **Stripe onboarding** is completed.
+- Once onboarding is complete, the clinic is redirected back to the **dashboard** and can now make referrals.
+
+---
+
+### Referral Creation
+
+The referrer fills out a **Referral Form** containing:
+
+- Pet Owner Information
+- Pet Information
+- Service Name
+
+#### Service Selection
+
+- Based on the service, the system shows **clinics offering that service**.
+- The referrer selects a clinic → then selects an **available time slot**.
+- The referrer can also view the **commission percentage** they will earn for that service.
+
+---
+
+### Backend Processing
+
+System checks if the **pet owner already exists** in the platform.
+
+- If not, a **new user** is created based on the referral information.
+
+The **pet owner receives an email** with a button.
+
+- Clicking it redirects them to the **Consumer Portal**.
+- They set a password and verify their phone number.
+- After verification, they are logged in.
+
+On login, the **pet owner is already part of the Consumer Portal tenant**.
+
+- Their **pet profile** is automatically created using the referral form details.
+
+---
+
+### Clinic Side
+
+- In the **Referral Module**, the clinic sees the referral.
+- The clinic can **Accept** or **Reject** the referral:Reject → The flow ends.
+- Accept → An **appointment is created** for the referred pet owner at the chosen slot.The appointment is immediately in **Confirmed** state.
+
+The pet owner receives an **SMS confirmation**.
+
+The appointment also appears in the **Consumer Portal Appointment Module**.
+
+---
+
+### Payment Flow
+
+- The pet owner must pay for the appointment using **Stripe**.
+- On Stripe:**Consumer is charged:** Service Fee + Stripe Fee.
+- **Stripe deducts its processing fee.**
+- From the **Service Fee**:Referral Commission is deducted.
+- Platform Fee is deducted.
+- Remaining amount goes to the **Crest Clinic**.
+
+#### Example Calculation
+
+- Service Fee = 100%
+- Commission = 25%
+- Platform Fee = 5% (deducted from clinic’s share)
+- Clinic receives = 70%
+
+---
+
+## 2. Clinic-to-Clinic Referral (Both Under Crest)
+
+### Referral Creation
+
+- From the **Appointment Module**, a clinic can refer a patient directly to another Crest clinic.
+- The referral form and flow are the same as the **Third-Party Clinic referral system**.
+
+---
+
+### Pet Owner & Pet Profile
+
+When the referral is created:
+
+The **pet owner** and **pet profile** are automatically added to the **target clinic tenant** and its **Consumer Portal**.
+
+---
+
+### Remaining Flow
+
+The rest of the flow (clinic acceptance, appointment creation, payment processing, and fund distribution) is the **same as Third-Party referrals**.
+
+---
+
+## Summary
+
+**Third-party referrals** require Stripe onboarding before referrals can be created.
+
+**Referrals generate appointments** automatically when accepted by the target clinic.
+
+**Pet owners are onboarded automatically**, including email verification, password setup, and pet profile creation.
+
+**Stripe handles payments** with clear fund distribution:
+
+Commission + Platform Fee deducted.
+
+Remaining amount paid to the Crest clinic.
+
+**Clinic-to-clinic referrals** follow the same process, except both clinics are already under Crest.

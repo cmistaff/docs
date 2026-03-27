@@ -1,0 +1,471 @@
+---
+title: "Autonomous Development System"
+description: "Infrastructure design for the autonomous AI development system at crestbrain.com."
+---
+
+# Autonomous Development System - Infrastructure Design
+
+**Related JIRA Epic:** [PW-1486](https://cammaratainc.atlassian.net/browse/PW-1486)
+**Infrastructure Task:** [PW-1494](https://cammaratainc.atlassian.net/browse/PW-1494)
+**Status:** Draft
+**Last Updated:** December 2024
+
+---
+
+## Overview
+
+This document defines the AWS infrastructure architecture for the Autonomous Development System, which enables developers to trigger AI-powered coding workflows from any device (iPad, iPhone, terminal, JIRA) with full E2E execution.
+
+The architecture separates concerns into two distinct components:
+
+- **Brain Box** -- Control plane for orchestration, governance, and task routing
+- **Agent Boxes** -- Execution plane for builds, tests, and code generation
+
+---
+
+## Architecture Diagram
+
+```
++-----------------------------------------------------------------------------+
+|                              TRIGGERS                                        |
+|   +----------+  +----------+  +----------+  +----------+                   |
+|   |  JIRA    |  |  GitHub  |  |   CLI    |  |  Mobile  |                   |
+|   | Webhook  |  | Webhook  |  |   Tool   |  |   PWA    |                   |
+|   +----+-----+  +----+-----+  +----+-----+  +----+-----+                   |
+|        +--------------+-----------+--------------+                          |
+|                       v            v                                        |
++------------------------+------------+----------------------------------------+
+                         |            |
+                         v            v
++-----------------------------------------------------------------------------+
+|                           AWS VPC (10.0.0.0/16)                             |
+|                                                                              |
+|  +---------------------------------------------------------------------+   |
+|  |                    Public Subnet (10.0.1.0/24)                       |   |
+|  |  +-----------------+                                                 |   |
+|  |  |  ALB (HTTPS)    |<---- Webhook traffic                           |   |
+|  |  +--------+--------+                                                 |   |
+|  |           |                                                          |   |
+|  |  +--------+--------+                                                 |   |
+|  |  |   NAT Gateway   |---> GitHub, Claude API, npm                    |   |
+|  |  +-----------------+                                                 |   |
+|  +---------------------------------------------------------------------+   |
+|                      |                                                      |
+|  +---------------------------------------------------------------------+   |
+|  |                   Private Subnet (10.0.2.0/24)                       |   |
+|  |                                                                      |   |
+|  |  +--------------------------------------------------------------+   |   |
+|  |  |                      BRAIN BOX                                |   |   |
+|  |  |                    EC2 m7i.large                              |   |   |
+|  |  |                                                               |   |   |
+|  |  |  - FastAPI webhook receiver                                   |   |   |
+|  |  |  - Task scheduler & policy engine                             |   |   |
+|  |  |  - MCP controller                                             |   |   |
+|  |  |  - Logging & audit services                                   |   |   |
+|  |  +--------------------------+-----------------------------------+   |   |
+|  |                             |                                        |   |
+|  |              +--------------+-------------+                          |   |
+|  |              v              v              v                          |   |
+|  |  +-----------------+ +-----------+ +-----------------+               |   |
+|  |  |    Redis        | |   RDS     | |       S3        |               |   |
+|  |  |  (ElastiCache)  | | Postgres  | |  Logs/Artifacts |               |   |
+|  |  |   Task Queue    | |   State   | |                 |               |   |
+|  |  +-----------------+ +-----------+ +-----------------+               |   |
+|  |                                                                      |   |
+|  +---------------------------------------------------------------------+   |
+|                      |                                                      |
+|  +---------------------------------------------------------------------+   |
+|  |                   Private Subnet (10.0.3.0/24)                       |   |
+|  |                        AGENT EXECUTION                               |   |
+|  |                                                                      |   |
+|  |  +----------------+  +----------------+  +----------------+          |   |
+|  |  |  AGENT BOX 1   |  |  AGENT BOX 2   |  |  AGENT BOX N   |          |   |
+|  |  | EC2 m7i.xlarge |  | EC2 m7i.xlarge |  | EC2 m7i.xlarge |          |   |
+|  |  |                |  |                |  |                |          |   |
+|  |  | - Docker       |  | - Docker       |  | - Docker       |          |   |
+|  |  | - Playwright   |  | - Playwright   |  | - Playwright   |          |   |
+|  |  | - Node/Python  |  | - Node/Python  |  | - Node/Python  |          |   |
+|  |  | - Claude Agent |  | - Claude Agent |  | - Claude Agent |          |   |
+|  |  +----------------+  +----------------+  +----------------+          |   |
+|  |                                                                      |   |
+|  +---------------------------------------------------------------------+   |
+|                                                                              |
++-----------------------------------------------------------------------------+
+```
+
+---
+
+## Brain Box Specification
+
+**Purpose:** Control, orchestration, and governance only. No heavy compute.
+
+### Instance Configuration
+
+| Property | Value | Notes |
+|----------|-------|-------|
+| Instance Type | EC2 m7i.large | 2 vCPU, 8 GB RAM baseline |
+| Upgrade Path | m7i.xlarge | If queue depth exceeds thresholds |
+| Storage | 100 GB gp3 | No high IOPS required |
+| OS | Ubuntu 22.04 LTS | |
+| Availability | Single AZ | Multi-AZ optional for HA |
+
+### Access & Security
+
+| Property | Configuration |
+|----------|---------------|
+| SSH | **Disabled** |
+| Inbound Ports | **None** |
+| Access Method | AWS SSM Session Manager only |
+| IAM Role | Read/write: repos, logs, artifacts, task queues |
+
+### Software Stack
+
+- Docker
+- MCP Controller (Model Context Protocol)
+- Task scheduler and policy engine
+- Logging and audit services (CloudWatch agent)
+- FastAPI application
+
+### Responsibilities
+
+| Function | Description |
+|----------|-------------|
+| Task Assignment | Routes incoming tickets to available agents |
+| Permission Enforcement | Validates scope, blocks unauthorized actions |
+| MCP Traffic Routing | Proxies tool calls between agents and services |
+| Action Approval | Applies policy rules before execution |
+| State Management | Tracks job progress in PostgreSQL |
+
+---
+
+## Agent Box Specification
+
+**Purpose:** Execution and heavy workloads. Scales horizontally.
+
+### Instance Configuration
+
+| Property | Value | Notes |
+|----------|-------|-------|
+| Instance Type | EC2 m7i.xlarge | 4 vCPU, 16 GB RAM |
+| Upgrade Path | m7i.2xlarge | For multiple agents per host |
+| Storage | 300-500 GB gp3 | Docker cache, Playwright artifacts, builds |
+| OS | Ubuntu 22.04 LTS | |
+| Scaling | Horizontal | Add more boxes, not bigger Brain |
+
+### Access & Security
+
+| Property | Configuration |
+|----------|---------------|
+| SSH | **Disabled** |
+| Inbound Ports | **None** |
+| Access Method | AWS SSM Session Manager only |
+| IAM Role | Scoped to assigned repos and artifact upload |
+| Branch Access | `auto-dev/*` branches only (not main) |
+
+### Software Stack
+
+- Docker + BuildKit
+- Playwright with browsers preinstalled (Chromium, Firefox, WebKit)
+- Node.js 20 LTS
+- Python 3.11
+- Language runtimes as needed
+- Agent runtime and task listener
+
+### Responsibilities
+
+| Function | Description |
+|----------|-------------|
+| Code Implementation | Execute Claude-powered coding tasks |
+| Build Execution | Run npm/yarn builds, compile assets |
+| Test Execution | Run Jest, Playwright, pytest suites |
+| PR Creation | Push to feature branches, open draft PRs |
+| Result Reporting | Report status back to Brain via Redis |
+
+---
+
+## Supporting Services
+
+### Task Queue (Redis)
+
+| Property | Value |
+|----------|-------|
+| Service | ElastiCache Redis |
+| Instance | cache.t3.small |
+| Purpose | Job queue, pub/sub, session state |
+| Persistence | AOF enabled for durability |
+| Cost | ~$25/month |
+
+**Why Redis over SQS?**
+
+- Agents can inspect queue state
+- Pub/sub for real-time status updates
+- Brain restart doesn't lose in-flight jobs
+
+### State Database (PostgreSQL)
+
+| Property | Value |
+|----------|-------|
+| Service | RDS PostgreSQL 15 |
+| Instance | db.t3.micro (upgradeable) |
+| Storage | 20 GB gp3 |
+| Purpose | Job history, audit logs, configuration |
+| Backup | Daily automated snapshots |
+| Cost | ~$15/month |
+
+### Artifact Storage (S3)
+
+| Property | Value |
+|----------|-------|
+| Bucket | `crest-autodev-artifacts` |
+| Purpose | Build logs, test reports, Playwright traces |
+| Lifecycle | 30-day expiration for traces, 90-day for logs |
+| Cost | ~$5/month |
+
+---
+
+## Network Design
+
+### VPC Configuration
+
+| CIDR | Subnet | Purpose |
+|------|--------|---------|
+| 10.0.0.0/16 | VPC | Main network |
+| 10.0.1.0/24 | Public | ALB, NAT Gateway |
+| 10.0.2.0/24 | Private | Brain Box, Redis, RDS |
+| 10.0.3.0/24 | Private | Agent Boxes |
+
+### Security Groups
+
+**Brain Box SG:**
+
+- Inbound: ALB on port 8000 only
+- Outbound: Redis, RDS, S3, NAT Gateway
+
+**Agent Box SG:**
+
+- Inbound: None
+- Outbound: Redis, S3, NAT Gateway (GitHub, Claude API, npm)
+
+**Redis SG:**
+
+- Inbound: Brain Box, Agent Boxes on port 6379
+
+**RDS SG:**
+
+- Inbound: Brain Box on port 5432
+
+### Outbound Access (via NAT Gateway)
+
+Agents need outbound access to:
+
+- `github.com` -- Clone repos, push branches
+- `api.anthropic.com` -- Claude API calls
+- `registry.npmjs.org` -- Package installation
+- `pypi.org` -- Python packages
+
+---
+
+## Cost Estimate
+
+| Component | Specification | Monthly Cost |
+|-----------|---------------|--------------|
+| Brain Box | m7i.large (on-demand) | $70 |
+| Agent Box x2 | m7i.xlarge (on-demand) | $280 |
+| Redis | cache.t3.small | $25 |
+| RDS PostgreSQL | db.t3.micro | $15 |
+| NAT Gateway | Per-AZ + data transfer | $35 |
+| S3 | ~50 GB artifacts | $5 |
+| ALB | Application Load Balancer | $20 |
+| **Total** | | **~$450/month** |
+
+### Cost Optimization Opportunities
+
+| Strategy | Savings | Trade-off |
+|----------|---------|-----------|
+| Reserved Instances (1yr) | ~30% | Commitment |
+| Spot Instances for Agents | ~60% | Interruption risk |
+| Scale Agents to zero overnight | ~40% | Cold start latency |
+| Single NAT Gateway | ~$30/mo | Single AZ dependency |
+
+---
+
+## IAM Roles
+
+### Brain Box Role
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession",
+        "ssm:TerminateSession"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::crest-autodev-artifacts",
+        "arn:aws:s3:::crest-autodev-artifacts/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "elasticache:DescribeCacheClusters"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+### Agent Box Role
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::crest-autodev-artifacts/agents/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter"
+      ],
+      "Resource": "arn:aws:ssm:*:*:parameter/autodev/*"
+    }
+  ]
+}
+```
+
+---
+
+## Maintenance Tasks
+
+### Docker Cleanup (Agent Boxes)
+
+Run daily via cron:
+
+```bash
+#!/bin/bash
+# /etc/cron.daily/docker-cleanup
+
+# Remove images older than 7 days
+docker image prune -a --filter "until=168h" -f
+
+# Remove Playwright traces older than 24 hours
+find /var/playwright-traces -type f -mtime +1 -delete
+
+# Remove build artifacts older than 3 days
+find /var/agent-builds -type d -mtime +3 -exec rm -rf {} +
+```
+
+### Log Rotation
+
+CloudWatch agent configured with:
+
+- 7-day retention for debug logs
+- 30-day retention for audit logs
+- 90-day retention for job history
+
+---
+
+## Scaling Strategy
+
+| Trigger | Action |
+|---------|--------|
+| Queue depth > 10 jobs | Add Agent Box |
+| Queue depth < 3 jobs for 30min | Remove Agent Box |
+| Agent CPU > 80% sustained | Consider m7i.2xlarge |
+| Brain CPU > 70% sustained | Upgrade to m7i.xlarge |
+
+**Key principle:** Scale Agents first, Brain last. The Brain should remain lightweight.
+
+---
+
+## Deployment Pipeline
+
+### Infrastructure as Code
+
+All infrastructure defined in Terraform:
+
+```
+infrastructure/
++-- main.tf
++-- variables.tf
++-- outputs.tf
++-- modules/
+|   +-- brain-box/
+|   +-- agent-box/
+|   +-- networking/
+|   +-- data-stores/
++-- environments/
+    +-- staging/
+    +-- production/
+```
+
+### CI/CD
+
+| Component | Deployment Method |
+|-----------|-------------------|
+| Brain Box | GitHub Actions -> ECR -> ECS rolling update |
+| Agent AMI | Packer build -> Launch Template update |
+| Infrastructure | Terraform Cloud with approval gates |
+
+---
+
+## Monitoring & Alerts
+
+### CloudWatch Dashboards
+
+- **Brain Health:** API latency, queue depth, error rate
+- **Agent Utilization:** CPU, memory, disk, active jobs
+- **Job Metrics:** Success rate, duration, failure reasons
+
+### Alerts
+
+| Metric | Threshold | Action |
+|--------|-----------|--------|
+| Brain API 5xx rate | > 1% | PagerDuty |
+| Queue depth | > 20 | Slack warning |
+| Agent disk usage | > 80% | Auto-cleanup trigger |
+| Job failure rate | > 10% | Slack + investigate |
+
+---
+
+## Security Considerations
+
+1. **No SSH access** -- All access via SSM Session Manager with CloudTrail logging
+2. **Branch restrictions** -- Agents can only push to `auto-dev/*` branches
+3. **Secret management** -- API keys stored in SSM Parameter Store, not environment variables
+4. **Network isolation** -- Agents have no inbound ports, egress limited to allowlist
+5. **Audit trail** -- All job executions logged with full request/response capture
+
+---
+
+## Next Steps
+
+*Document ends here in original Confluence page.*

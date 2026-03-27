@@ -1,0 +1,1104 @@
+---
+title: "Engineering Onboarding Handbook"
+description: "Complete onboarding guide covering communication, tooling, devbox setup, development standards, CI/CD, and code review processes for the Crest Pet System engineering team."
+---
+
+Project Onboarding Video: [https://www.loom.com/share/0a6b6ce2ee2640468f01c65a4d0f5c66](https://www.loom.com/share/0a6b6ce2ee2640468f01c65a4d0f5c66)
+
+Welcome to the team. This document outlines the core processes, communication standards, tools, and development protocols you will follow as part of the Crest Pet System project.
+
+Please go through this entire guide. It serves as a long term reference for how we work.
+
+---
+
+# Project Context
+
+### The Platform
+
+**Crest** is a veterinary technology platform, and **Marcia** is our AI-native solution that transforms how vets manage clinics and how pet owners manage their pets' care. We're building a multi-tenant platform designed to serve veterinary organizations globally.
+
+### Our First Client: Mars Veterinary Health (MVH)
+
+**Mars Veterinary Health** is our first client - one of the world's largest veterinary care providers with **4,000+ clinics globally** across brands including Linnaeus, AniCura, VCA, Banfield, and more.
+
+**What We're Building:**
+
+- **For Vets:** AI-powered practice management system - smart scheduling, automated SOAP notes, clinical decision support, inventory management, analytics
+- **For Consumers:** One-stop platform for pet ownership - booking, health records, AI vet assistant, product recommendations, reminders
+
+
+**Current Focus:**
+
+- Pilot testing in **Singapore with 19 clinics** (Live Feb 2026)
+- Building MCP integrations to connect legacy systems, communication tools, and retailers
+
+
+**Why This Matters:**
+The goal is **~40% greater operational efficiency** for veterinary teams and a seamless, unified experience for pet owners. Starting with a client at this scale means we're building enterprise-grade from day one.
+
+👉 **Full Project Context: Mars Veterinary Health** - Deep dive on MVH ecosystem, innovation projects, MCP architecture, and 6-6-6 framework
+
+---
+
+# 1. Communication
+
+Our primary communication channel is **Slack**. All coordination, daily updates, PR discussions, and team conversations happen there. Use Slack actively and keep things clear and timely.
+
+#### Daily Standup
+
+- Time: **10 AM EST**
+- Platform: **Zoom**
+- Keep your updates short and focused on progress, blockers, and plans.
+
+#### Zoom Meeting Requirements
+
+- **Camera on** is required for all Zoom meetings
+- Do not record meetings with your own note takers - Zoom notes are provided to your @creststaff.com Zoom account by our project note takers
+
+## Important Slack Channels
+
+We use dedicated channels for different types of conversations, so always communicate in the appropriate channel with the right stakeholders. Keep related discussions inside threads, not scattered across the channel. Use DMs only when you need to ask someone a direct, specific question. All decisions must be made in public channels, not in DMs.
+
+### #daily-update
+
+This channel is dedicated to end-of-day progress updates. Every developer must post an update before signing off. This keeps the entire team aligned on progress, blockers, and upcoming work.
+
+**Update Format**
+
+1. Tasks you worked on today
+2. Tasks completed today
+3. Plans for tomorrow
+4. **PR links** for all draft or ready-for-review work
+
+
+Consistent daily updates help keep the entire team aligned. Also, don't forget to
+
+**Daily Requirements**
+
+- **Create a Draft PR** as soon as you start any ticket (targeting pre-staging).
+- **Commit and push** your work before signing off every day, even if incomplete.
+
+### #crest-loom-reviews
+
+When you complete your assigned task, record a detailed Loom video of the feature or changes before moving your Draft PR to Ready for Review. The video should walk through all paths and edge cases. Share it in the channel and tag Michael. Once Michael reviews the Loom and has no change requests, you can move your Draft PR to Ready for Review.
+
+### #crestpet-review
+
+This channel manages our code review workflow.
+
+- Each day, **two reviewers** are assigned to review the PRs:**Primary Reviewer** and **Secondary Reviewer**(details available in the pinned message of the channel).
+- When your work is complete:Make sure you have written unit/integration/e2e tests before making it ready for review, otherwise the PR will be rejected
+- Share a detailed Loom video of your work in the **#crest-loom-reviews** channel.The walkthrough should clearly cover all paths, edge cases, and important scenarios so reviewers fully understand the change.
+- Once your loom is approved from Michael, Mark your PR as **Ready for Review**
+- Resolve any AI-generated comments
+- Share the PR in this channel with a short note
+- Tag the reviewers for that day
+- Every communication regarding that review should be done in the same thread
+
+**Two approvals** are required before a PR can be merged into the **pre-staging** branch**For reviewers:**
+
+- In crestpet review channel they have to give the 👀 icon when the reviewer has started looking at it and the ✅ icon when they have completed review.
+
+### #crest-meetings
+
+Use this channel to announce internal meetings.
+
+Every meeting message must include:
+
+- Meeting participants
+- Meeting time
+- Agenda
+- Expected output or decisions
+
+
+This helps us keep meetings sharp, efficient, and meaningful.
+
+### #crestpet-onboarding
+
+This channel contains essential onboarding information, including:
+
+- Mandatory environment variables (should be updated here also when changed)
+- Setup instructions
+- Access links and references
+- Database dumps (in the Files tab)
+
+
+All new developers must review the content in this channel.
+
+### #project-crestpetsystem
+
+Our main general discussion channel for Crest Pet System development updates, announcements, and cross-team conversations.
+
+### #bug-reports
+
+Use this channel to report any bugs you find.
+
+Include screenshots, clear steps to reproduce, and tag the relevant module owner so the issue can be handled quickly.
+
+---
+
+# 2. Tool Access
+
+**Important: Account & Login Requirements**
+
+- **Always use your @creststaff.com email address** for all logins and tooling
+- Login credentials will be sent to your email on file and/or WhatsApp, or provided by your staffing contact or recruiter the day before your start date
+- **Activate tooling access links promptly** - they expire and must be completed as soon as possible
+- **Do not use personal accounts** - we will provide you access to accounts on all required tooling
+
+
+Make sure you have access to the following tools. If anything is missing, notify your team lead. Some tooling is only provided based on request - if you didn't receive access to a tool you need, contact **Michael Cammarata**. If you need access to a tool that isn't listed, also contact **Michael Cammarata** for approval.
+
+| Tool | Company Email |
+| --- | --- |
+| Loom | |
+| Cursor | |
+| Slack | |
+| GitHub Repositories | |
+| Jira | |
+| Confluence | |
+| Twilio | |
+| AWS | |
+| Claude Code | |
+| ElevenLabs | |
+| Tavus | |
+| Hubstaff | |
+| Zoom | |
+| Google Voice | |
+| Stripe (if needed) | |
+| QStash | |
+| Ngrok | |
+| SonarCloud | |
+
+These tools cover development, communication, automation, testing, and operations.
+
+---
+
+## EC2 Dev Boxes (Cloud Development Environment)
+
+We provide cloud-based EC2 development workstations for team members who need powerful, standardized development environments. These are accessed via **Tailscale VPN** and provide a consistent setup with all required tools pre-installed.
+
+### What You Get
+
+- **Instance Type:** m6i.4xlarge (16 vCPU, 64GB RAM)
+- **Storage:** 150GB SSD
+- **OS:** Ubuntu 22.04 LTS
+- **Region:** ap-south-1 (Mumbai) for Asia/South Asia devs, us-east-2 (Ohio) for US devs, eu-central-1 (Frankfurt) for Europe devs
+- **Access:** Tailscale SSH (no public IP, fully private)
+
+### Pre-Installed Tools
+
+| Category | Tools |
+| --- | --- |
+| Languages & Runtimes | Node.js 22 (via nvm), Bun, uv |
+| Package Managers | npm, pnpm |
+| AI Development | Claude Code (via official installer), Cursor CLI, Cursor Agent CLI |
+| Containers | Docker (with postgres, redis, node images pre-pulled) |
+| CLI Tools | AWS CLI v2, GitHub CLI, Tailscale, ngrok, sonar-scanner |
+| Editors | Neovim |
+| Shell | Zsh + Oh-My-Zsh, Starship prompt |
+| Utilities | tmux, htop, btop, ripgrep, fzf, jq, fastfetch, chafa, chezmoi |
+
+### Connecting to Your Dev Box
+
+1. **Install Tailscale** on your local machine: [https://tailscale.com/download](https://tailscale.com/download)
+2. **Accept your Tailscale invite** - you'll receive an invite link via email or Slack. Click the link to join our network.
+3. **Log in to Tailscale** - you can authenticate with:**Google** using your `@creststaff.com` or `@cmistaff.com` email
+4. **GitHub** using your GitHub account
+5. **Important: If you sign in via GitHub**, let IT know your GitHub username so they can update your access permissions. GitHub logins appear as `your-github-username@github` which needs to be added to your ACL.**If you see "cannot join another tenant"** when trying to sign in with Google, your email may already be associated with another Tailscale account. In this case, provide your **GitHub username** to **Michael Cammarata** so he can set up access via GitHub login instead.
+6. **SSH to your dev box:**
+
+
+```bash
+ssh ubuntu@dev-yourname
+```
+
+Replace `yourname` with your assigned dev box name (e.g., `dev-michael`, `dev-affan`, `dev-serhii`).
+
+### Using Cursor with Your Dev Box
+
+1. Open Cursor on your local machine
+2. Use the **Remote - SSH** extension
+3. Connect to `ubuntu@dev-yourname`
+4. Your dev box will appear as a remote workspace
+
+### Using Claude Code on Your Dev Box
+
+Claude Code is pre-installed via the official installer. To authenticate:
+
+```bash
+claude
+```
+
+Follow the OAuth prompts to log in with your Anthropic account.
+
+### Restoring Your Config (After Instance Rebuild)
+
+If your dev box is rebuilt or you need to restore your configs, use the `crest-restore` helper:
+
+```bash
+crest-restore
+```
+
+This interactive script helps you:
+
+- Set up GitHub CLI authentication
+- Generate SSH keys
+- Configure Git (name/email)
+- Initialize chezmoi dotfiles (if you use them)
+
+
+For dotfiles sync, you can also run:
+
+```bash
+chezmoi init --apply cmistaff/dotfiles
+```
+
+### Fetching Secrets for CrestPetSystem
+
+Your dev box has IAM permissions to fetch secrets from AWS Secrets Manager:
+
+```bash
+# Get server environment variables
+aws secretsmanager get-secret-value \
+ --secret-id crest-dev/server-env \
+ --region us-east-2 \
+ --query SecretString --output text > server/.env
+
+# Get client environment variables
+aws secretsmanager get-secret-value \
+ --secret-id crest-dev/client-env \
+ --region us-east-2 \
+ --query SecretString --output text > client/.env
+```
+
+### Auto-Updates
+
+Your dev box automatically updates system packages and AI tools (Claude Code, Cursor CLI) daily at 4 AM UTC.
+
+### Auto-Hibernate
+
+Auto-hibernate is currently disabled. Dev boxes remain running but may be stopped manually by IT to save costs. Your session state is preserved - when you start the instance again, everything resumes where you left off.
+
+### Getting a Dev Box
+
+If you need a dev box and don't have one assigned, contact **Michael Cammarata**. Dev boxes are currently available for:
+
+- Core team leads
+- Developers working on performance-intensive tasks
+- Developers who need a standardized cloud environment
+
+### Troubleshooting
+
+**Can't SSH to your dev box?**
+
+1. Check Tailscale is running: `tailscale status`
+2. Ping the instance: `tailscale ping dev-yourname`
+3. If you get **"tailnet policy does not permit you to SSH to this node"**, your SSH ACL may be missing. Contact IT (Michael Cammarata) to add your identity to the SSH ACL.
+4. If you signed in via GitHub, make sure IT has added your `github-username@github` identity to BOTH regular ACLs AND SSH ACLs.
+
+
+**Instance not responding?**
+
+- It may be hibernated. Contact IT to start it, or check AWS Console if you have access.
+
+### For Admins: Adding a New Developer to Tailscale
+
+When adding a new developer, you must configure **TWO separate ACL sections**:
+
+1. `acls` section - Regular network/port access
+2. `ssh` section - Tailscale SSH access (REQUIRED for `ssh ubuntu@dev-name`)
+
+
+**Without both**, users get: `tailnet policy does not permit you to SSH to this node`
+
+Always add ALL possible login identities for each user:
+
+- `username@creststaff.com` (Google login)
+- `username@cmistaff.com` (Google login)
+- `github-username@github` (GitHub login)
+
+### Best Practices
+
+- **Commit and push your work regularly** - dev boxes can be rebuilt if needed
+- **Don't store secrets in plain text files** - use the AWS Secrets Manager commands above
+- **Use tmux for long-running processes** - keeps sessions alive if your SSH disconnects
+- **Check disk space periodically** - run `df -h /` to monitor usage
+- **Back up your configs with chezmoi** - so you can quickly restore after any rebuild
+
+
+---
+
+### Cursor Access
+
+Cursor is now linked to your @creststaff.com email address via SAML. To join our team on Cursor, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)) - no invite required.
+
+### Atlassian Access (Loom, Jira, Confluence)
+
+Atlassian tools are linked to your @creststaff.com email address via SAML. To access Loom, Jira, and Confluence, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)) - no invite required.
+
+**Note:** Some Jira project boards may require special invites. If you're not seeing a certain project board, contact **Hassaan Elahi** to request access.
+
+### Claude Code (Anthropic Teams)
+
+Claude Code is linked to your @creststaff.com email address. To access our Anthropic organization, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)). Access is managed via claude.ai Organization Settings - contact Michael Cammarata if you don't have access.
+
+### Ngrok Access (Localhost Webhook Testing)
+
+Ngrok is used for **localhost webhook testing** - it allows you to expose your local development server to the internet so you can receive webhooks from third-party services (Stripe, Twilio, etc.) during local development.
+
+Ngrok is pre-installed on all dev boxes with a per-developer auth token already configured. No additional setup is needed. If you need to use ngrok on your local machine, contact Michael Cammarata for your auth token.
+
+### nip.io (Local Subdomain Testing)
+
+[nip.io](https://nip.io) is a wildcard DNS service for local development - it allows you to use subdomains that resolve to localhost without any configuration. **No account required**, it just works.
+
+**How it works:** Any subdomain followed by an IP address resolves to that IP.
+
+**Examples:**
+
+- `clinic.127.0.0.1.nip.io` → resolves to `127.0.0.1`
+- `consumer.127.0.0.1.nip.io` → resolves to `127.0.0.1`
+- `anything.192.168.1.100.nip.io` → resolves to `192.168.1.100`
+
+
+**When to use:** This is useful when testing multi-tenant features locally where different subdomains need to point to your local server, or when testing subdomain-based routing without modifying your hosts file.
+
+### GitHub Access
+
+**⚠️ Important:** Your GitHub account **must** be created with and linked to your **@creststaff.com email address only**. GitHub accounts using personal emails or any other domain will be terminated.
+
+**First Day Access:**
+
+- On your first day while you're getting set up, your GitHub access will be **read-only**
+- This gives you time to clone repos, explore the codebase, and complete your environment setup
+- Once you're ready to start submitting PRs, contact **Serhii** to request **write access**
+
+### Google Voice (Required for Calls & Texts)
+
+Access Google Voice at [voice.google.com](https://voice.google.com) using your @creststaff.com account.
+
+**⚠️ Important:** Use **only your Google Voice number** for all work-related calls and text messages. Do not use your personal phone number for any project communications.
+
+If you don't have access to Google Voice, contact **Michael Cammarata** to request it.
+
+### Hubstaff Time Tracking (Required)
+
+**Every developer must have Hubstaff installed on their computer.** This is a mandatory requirement for all team members.
+
+**Setup:**
+
+1. Activate your Hubstaff account using the invite sent to your email
+2. **Download and install the Hubstaff Desktop App** - you must use the desktop version, not the web interface
+3. Log in to the desktop app with your activated account
+
+
+**First Day - Getting Started:**
+
+- In Hubstaff, select the **CrestPetSystem** project
+- Assign yourself to the **"Onboarding"** task under CrestPetSystem (or create it if it doesn't exist)
+- This allows you to track time while you're setting up your environment and going through documentation
+
+
+**Task Naming Convention:**
+
+- Once you begin working on Jira tickets, update your Hubstaff task to match the ticket number: **PW-<number>** (e.g., `PW-1258`)
+- This is required so we can accurately assign hours to specific Jira tickets
+- When switching tickets, always update your Hubstaff task to reflect the new PW ticket number
+
+
+**Daily Requirement:**
+
+- Start Hubstaff at the beginning of your workday before doing any other work
+- Track all your hours and tasks through Hubstaff throughout the day
+- Ensure the application is running and tracking during all work hours
+- Stop tracking only when you are done for the day
+
+
+**Verifying Hubstaff is Running:**
+
+You can double-check that Hubstaff is properly tracking by watching the **#dev-crest-jira-updates** channel in Slack. When you start and stop tracking, you'll see automated messages like:
+
+> **HubstaffAPP** 8:07 AM
+> @yourname started working on CrestPetSystem - PW-1258: Change the Staff availability UI
+
+> **HubstaffAPP** 8:28 AM
+> @yourname stopped working
+
+If you don't see these messages when you start/stop, check that your desktop app is running correctly.
+
+Hubstaff helps us maintain accurate time tracking and task visibility across the team. If you have any issues with Hubstaff installation or tracking, contact your team lead immediately.
+
+**Time Off Requests:**
+
+If you need to take time off, **submit your request through Hubstaff** so the team is aware you will not be working. This ensures proper coverage and planning.
+
+**Working Hours Changes:**
+
+If you need to change your working hours, **contact Michael Cammarata** to update your schedule. This is important so the team knows when you are available and when to contact you.
+
+### AWS Access:
+
+- For AWS Access, contact Serhii
+
+### Other Tools Access:
+
+- You should have access to all the other tools with your @creststaff.com email
+
+### AI Development Tools & Project Rules
+
+We use AI-assisted development tools with project-specific rules and configurations to ensure consistent code quality, patterns, and infrastructure safety across the codebase.
+
+**Important:** If you make any changes that affect project rules or agent configurations, you must notify **Affan Ali** and **Michael Cammarata** to approve your PR before merging. Do not modify AI tool rules or configurations without approval.
+
+---
+
+## crestpetsystem Repository
+
+#### Cursor Rules
+
+Cursor uses MDC (Markdown Configuration) rules to guide AI assistance. Rules are organized by scope:
+
+**Global Rules:**
+
+- `.cursorrules` - Legacy global rules
+- `.cursor/rules/` - Critical rules, database migrations, development workflow, sub-agent orchestration
+
+
+**Frontend Rules** (`client/.cursor/rules/`):
+
+- Next.js 15 patterns, React Query, Redux, OpenAPI integration, type safety, code organization
+
+
+**Backend Rules** (`server/.cursor/rules/`):
+
+- NestJS controller structure, database access (repository pattern), DTO organization, error handling, module conventions, testing conventions
+
+#### Recommended Cursor Command: Deslop
+
+**Install this command in Cursor - it's super helpful!**
+
+Click the link below to add the "deslop" command to your Cursor installation. This command helps clean up AI-generated code by checking for common issues like unnecessary comments, redundant error handling, over-engineering, and poor naming.
+
+👉 [**Install Deslop Command**](https://cursor.com/link/command?name=deslop&text=%23+Remove+AI+code+slop%0A%0ACheck+if+there+is+any+%22slop%22+%28common+AI+patterns+that+are+bad+or+annoying%29+in+the+selected+code.+Things+to+watch+out+for%3A%0A%0A1.+Unnecessary+comments+explaining+obvious+code%0A2.+Redundant+%60try%2Fcatch%60+blocks+that+just+re-throw+errors%0A3.+Over-engineered+solutions+for+simple+problems%0A4.+Excessive+type+assertions+or+%60as%60+casts%0A5.+Verbose+null+checks+when+optional+chaining+would+work%0A6.+Unnecessary+async%2Fawait+wrapping%0A7.+Console.log+statements+left+in+production+code%0A8.+Generic+variable+names+like+%60data%60%2C+%60result%60%2C+%60temp%60%0A9.+Unnecessarily+defensive+coding+%28checking+things+that+can%27t+be+null%29%0A10.+Magic+numbers+without+explanation%0A11.+Empty+catch+blocks+or+generic+error+handling%0A12.+Duplicated+logic+that+could+be+extracted%0A13.+Props+drilling+through+multiple+components%0A14.+%60any%60+type+usage+in+TypeScript%0A15.+Meaningless+function+names+like+%60handleClick2%60%0A%0AIf+you+find+any+issues%2C+fix+them.+Don%27t+comment+on+things+that+are+fine+-+only+make+changes+if+there%27s+actually+a+problem.%0A%0AEnd+the+response+at+the+end+with+only+a+1-3+sentence+summary+of+what+you+changed)
+
+**What it does:**
+
+- Removes unnecessary comments explaining obvious code
+- Cleans up redundant try/catch blocks
+- Fixes over-engineered solutions
+- Removes excessive type assertions
+- Replaces verbose null checks with optional chaining
+- Removes console.log statements
+- Fixes generic variable names like `data`, `result`, `temp`
+- Removes `any` type usage in TypeScript
+- And more...
+
+
+**How to use:** Select code in Cursor, then run the `deslop` command to clean it up.
+
+#### Claude Code Rules
+
+**Rule Locations:**
+
+- `CLAUDE.md` - Main project overview and critical rules
+- `AGENTS.md` - Subagent documentation and usage guide
+- `client/claude.md` - Frontend patterns guide
+- `server/claude.md` - Backend patterns guide
+- `packages/common/claude.md` - Shared code guide
+- `infra/claude.md` - Infrastructure guide
+
+#### Claude Code Subagents (.claude/agents/)
+
+We have 12 specialized Claude Code agents for different tasks:
+
+| Agent | Purpose |
+| --- | --- |
+| crest-code-reviewer | Comprehensive code review for patterns compliance |
+| security-reviewer | Authentication, authorization, data protection |
+| multi-tenant-security-auditor | Tenant isolation, explicit tenantId verification |
+| crest-debugger | Root cause analysis, stack traces, debugging |
+| api-contract-validator | Swagger decorators, DTOs, OpenAPI compliance |
+| database-expert | Schema design, migrations, query optimization |
+| devops-specialist | AWS, Docker, CI/CD, deployment |
+| ui-component-architect | React/Next.js components, design system |
+| performance-optimizer | Performance analysis, Web Vitals |
+| code-refactorer | Code structure, DRY, pattern compliance |
+| pattern-auditor | Documentation drift detection |
+| architect | System design, technology decisions |
+
+**Automatic Agent Selection** (configured in `.cursor/rules/sub-agent-orchestration.md`):
+
+- `client/src/components/**/*` → ui-component-architect
+- `server/src/*/controllers/**/*.ts` → api-contract-validator
+- `server/src/*/services/**/*.ts` → multi-tenant-security-auditor
+- `packages/common/prisma/**/*` → database-expert
+- `.github/workflows/**/*` → devops-specialist
+
+
+---
+
+## infra Repository
+
+#### Cursor Rules (.cursor/rules/)
+
+| Rule File | Purpose |
+| --- | --- |
+| critical.mdc | Safety rules - NO irreversible actions, production deploys via GitHub Actions only |
+| bastion.mdc | Bastion connection rules, port mappings for database access |
+| bastion-iam.mdc | IAM roles & policies for bastion access |
+| bastion-scripts.mdc | Script usage patterns for bastion automation |
+
+**⚠️ Critical Safety Rules:**
+
+- **NEVER** run `terraform apply` or `terraform destroy` for **production** from command line
+- Production deploys **ONLY** via GitHub Actions workflow
+- Always run `terraform plan` first and review destroy operations
+- **NEVER** remove `lifecycle { prevent_destroy = true }` from protected resources
+
+
+**Protected Resources** (NEVER delete):
+
+- RDS PostgreSQL instances
+- ElastiCache Redis clusters
+- S3 buckets
+- AWS Secrets Manager secrets
+- KMS keys
+- ACM certificates
+- VPC & subnets
+
+#### Claude Code Rules
+
+- `CLAUDE.md` - Main infrastructure guide (module structure, essential commands, architecture overview)
+- No subagents configured for infra repository
+
+#### Database Access Documentation
+
+For detailed instructions on connecting to RDS PostgreSQL and ElastiCache Redis via the bastion host, see: RDS & ElastiCache Connection via Bastion Host
+
+This guide covers:
+
+- Setting up AWS SSM Session Manager
+- Port forwarding for each environment (prestaging, staging, production)
+- Connecting with database clients
+- Troubleshooting common connection issues
+
+
+---
+
+## Kiro CLI (Deprecated)
+
+*This section is no longer maintained and may be removed in future updates.*
+
+Kiro is an AI-powered CLI tool for development assistance. If you previously used Amazon Q Developer CLI, you can migrate to Kiro.
+
+**Installation:**
+
+```
+curl -fsSL https://cli.kiro.dev/install | bash
+```
+
+**Migration Guide:**
+
+If you're transitioning from Amazon Q Developer CLI, see the migration guide: [Upgrading from Amazon Q Developer CLI](https://kiro.dev/docs/cli/migrating-from-q/)
+
+#### Recommended Experiments (Enable These)
+
+After installing Kiro, run `/experiment` to enable these recommended features. Use arrow keys + Enter to toggle features on/off.
+
+| Experiment | What It Does | Why Enable It |
+| --- | --- | --- |
+| Checkpointing | Creates Git-based snapshots of file changes at each conversation turn | Safely experiment with changes and restore if needed |
+| Context Usage Percentage | Shows how much context window you're using (color-coded in prompt) | Monitor context consumption to avoid hitting limits |
+| Knowledge | Persistent storage and semantic search across chat sessions | Better context retrieval for our codebase patterns |
+| Thinking | Shows AI's step-by-step reasoning process | Understand complex problem solving and debug issues |
+| Tangent Mode | Create conversation checkpoints for exploring side topics | Explore alternatives without losing main conversation |
+| Delegate | Run background tasks with other agents in parallel | Multitask with parallel AI assistance |
+| TODO Lists | Create and manage persistent TODO lists for multi-step tasks | Track progress on complex tickets across sessions |
+
+**Quick Commands:**
+
+```
+/experiment # Toggle features on/off
+/checkpoint list # Show checkpoints
+/checkpoint restore # Restore to previous state
+/knowledge add
+ # Add files to knowledge base
+/knowledge search # Search semantically
+/todos view # View existing TODO lists
+/tangent # Create conversation checkpoint (or Ctrl+T)
+```
+
+**Recommended Combinations:**
+
+- **Knowledge + Thinking** - Great for complex debugging and research
+- **Tangent Mode + TODO Lists** - Perfect for structured problem-solving
+- **Checkpointing + Delegate** - Ideal for experimental development work
+
+
+Kiro rules and configurations for our repositories will be added in the future.
+
+---
+
+# 3. Leadership Structure
+
+We follow a clear lead structure to guide development and decision-making.
+
+## Technical Leadership
+
+### Portal Ownership
+
+- **Affan Ali**Handles Enterprise, Clinic, and Marcia portals
+- **Ibrahim**Handles Consumer, Super Admin, and Referral portals
+
+### Technical Project Leads
+
+- **Primary Lead:** Affan Ali
+- **Secondary Lead:** Ibrahim
+
+
+These leads guide architecture decisions, code reviews, sprint planning, and overall quality.
+
+## Product Leadership
+
+- **Product Owner:** Michael Cammarata
+- **Product Delivery Manager:** Hassaan Elahi
+
+
+---
+
+## 4. Project Management and Sprints
+
+We use **Jira** for planning, tracking, and managing the entire project.
+
+### Epics and Tasks
+
+- Major modules are grouped as **Epics**
+- Each Epic contains detailed **subtasks**
+- Tasks are assigned along with **story points**
+
+### Sprint Cycle
+
+- We follow a **two week** sprint
+- Sprint starts on **Tuesday** and ends on **Monday** two weeks later
+
+### Sprint Planning
+
+- Conducted at the start of each sprint
+- Leads evaluate business priorities
+- Leads consult with project stake holders **Hassaan** and **Michael**
+- Sprint tasks are selected, pointed, assigned, and aligned with a clear sprint goal
+- After planning, the team joins a meeting where the leads walk through the sprint plan
+
+### Mid Sprint Check-In
+
+- Quick alignment call during the middle of the sprint
+- Ensures everyone is on track and blockers are resolved early
+
+
+---
+
+## 5. Environments and Deployment Flow
+
+We maintain three main environments with the following portal URLs:
+
+| Environment | Consumer Portal | Clinic Portal | Enterprise Portal |
+| --- | --- | --- | --- |
+| Pre-Staging | prestaging.pet | prestaging.vet | prestaging.express |
+| Staging | creststaging.pet | creststaging.vet | creststaging.express |
+| Production | crest.pet | crest.vet | crest.express |
+
+**Note:** The platform has **6 portals** total (Clinic, Consumer, Enterprise, Platform, Referral, and Shelters). The table above shows the 3 main portals. See the **README** in the crestpetsystem repository for all portal URLs and localhost setup instructions.
+
+### GitHub Enterprise Structure
+
+
+Our GitHub Enterprise (**Crest Advisory Group**) contains 6 organizations. All orgs have IP allowlists enforced - **Tailscale VPN is required** for all GitHub access (web, API, and git).
+
+
+Two-Factor Authentication (2FA) is mandatory. Enable it at github.com/settings/security. Accounts without 2FA will be removed from all organizations.
+
+
+| Organization | Purpose | Key Repos |
+| --- | --- | --- |
+| cmistaff | Core product & infrastructure (IP-locked) | crestpetsystem, infra, upload, EC2DevsCrestPet, AppCrestPetConsumer, dotfiles |
+| CrestCorp | Corporate websites & client backends | PeacockDigital, peacockfrontend |
+| CrestLabsHQ | R&D, experiments, AI research | autonomous-dev-system-onebox, curious-learner |
+| CrestGov | Government solutions | (future projects) |
+| CrestGovLabs | Government tech research | (future projects) |
+| CrestArchive | Archived & legacy repos (read-only) | 23 legacy repos |
+
+#### Active Development Repos
+
+
+- **Main Product Mono Repo** - [github.com/cmistaff/crestpetsystem](https://github.com/cmistaff/crestpetsystem)
+- **Infrastructure** - [github.com/cmistaff/infra](https://github.com/cmistaff/infra)
+- **Marcia Mobile App** - [github.com/cmistaff/AppCrestPetConsumer](https://github.com/cmistaff/AppCrestPetConsumer)
+- **Dev Workstations** - [github.com/cmistaff/EC2DevsCrestPet](https://github.com/cmistaff/EC2DevsCrestPet)
+
+#### Enterprise Security Policies (Enforced)
+
+
+- **IP Allowlist** - All 6 orgs require Tailscale VPN or devbox access. Personal machines without Tailscale are blocked.
+- **Secret Scanning + Push Protection** - Commits containing API keys, tokens, or credentials are automatically blocked.
+- **No public repos** - Repository creation restricted to admins only.
+- **No repo deletion** - Members cannot delete repositories or change visibility.
+- **No outside collaborators** - Only admins can invite external users.
+
+### CI/CD & Branch Strategy
+
+For detailed documentation on our CI/CD pipelines, branch strategy, promotions, hotfixes, and troubleshooting, see:
+
+👉 CI/CD Onboarding Guide & Branch Strategy Overview
+
+This guide covers:
+
+- Three-tier branch strategy (prestaging → staging → main)
+- Promotion workflows and approvals
+- Hotfix flows (StagingHotFix / ProdHotFix)
+- Rollback procedures
+- Quality gates and automated checks
+- Troubleshooting common issues
+
+### Draft PR Workflow
+
+Whenever you start working on a ticket and create a branch, **immediately create a Draft PR** for it:
+
+1. Create your branch from pre-staging
+2. Make your first commit (even if minimal)
+3. Open a Draft PR targeting pre-staging
+4. Fill out the PR template with the relevant ticket details and context
+5. Keep updating the same PR as you progress
+6. Once your work is complete and ready for review, mark it as "Ready for Review"
+
+
+**Why this matters:**
+
+- Increases visibility across the team
+- Allows AI bots to give early feedback and updates
+- If you're ever away, another teammate can easily continue your work
+- Keeps everyone aligned on progress
+- Ensures your work is always backed up and accessible
+
+### Development Flow
+
+- Developers create PRs **against pre-staging**
+- **Before marking Ready for Review:**
+1. Ensure all unit/integration/e2e tests are written and passing
+2. Record a detailed Loom video covering the feature or change, including all paths and edge cases
+3. Post the Loom in **#crest-loom-reviews** and tag **@Michael Cammarata** for review
+4. **Only after Michael approves the video (with no change requests)** should you move your Draft PR to Ready for Review
+
+**Note:** A Loom video is not required if the PR does not change business logic or UI/UX (e.g., refactoring, dependency updates, documentation changes, or backend-only infrastructure work).
+- After passing code reviews and getting **two approvals**, PRs are merged into pre-staging
+- QA then promotes pre-staging to staging for testing
+
+
+*Note: The GitHub Pull Request template has been updated with a checklist to support this flow.*
+
+### Staging to Production
+
+- Once QA confirms stability and correctness:Staging is deployed to production
+- A release branch is prepared with:Detailed release notes ofNew features
+- Fixes
+- Known issues (if any)
+- A Loom video recorded by team leads explaining new features
+
+
+This ensures clean, predictable releases and smooth coordination across engineering and QA.
+
+---
+
+# 6. Development Standards
+
+## Dynamic Configuration, Permissions, and Feature Flag Standard
+
+When developing features, assume all logic, rules, workflows, and UX behavior must be configurable. **Do not hardcode business logic, thresholds, permissions, or UI states.**
+
+All fields, conditions, role-based access controls, and decision paths must support:
+
+- **Dynamic variables**
+- **User permissions**
+- **Feature flags**
+
+
+These must be adjustable by **Express Admins**, **Clinic Admins**, or **Super Admins** within their respective portals.
+
+### The Objective: Controlled Flexibility at Scale
+
+Clinics and enterprises must be able to adapt workflows, pricing logic, access levels, and operational rules **without engineering intervention**, while feature flags enable safe rollouts, testing, and rapid rollback across tenants.
+
+### Business Impact
+
+- Faster iteration
+- Safer releases
+- Reduced support load
+- Enterprise-grade governance
+
+### Further Reading
+
+- [Feature Toggles](https://martinfowler.com/articles/feature-toggles.html) - Martin Fowler
+- [Configuration Design Patterns](https://cloud.google.com/architecture/configuration-design) - Google Cloud Architecture Center
+- [Authorization Cheat Sheet (RBAC)](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) - OWASP
+- [Feature Flag Best Practices](https://launchdarkly.com/blog/feature-flag-best-practices/) - LaunchDarkly
+
+
+---
+
+## 7. Database Dump Usage (Local Development Without Seeding)
+
+### Purpose
+
+Until automated seeding scripts are finalized, developers must use a **pre-staging database dump** to initialize their local environment. This avoids manual data creation and ensures consistency with realistic data and system state.
+
+### Source of Truth
+
+The latest database dump is always available in the `#crestpet-onboarding` Slack channel:
+
+- **Location:** Go to the channel's **Files** tab → look in the **"dumps"** folder
+- **Source:** Pre-staging environment
+- **File naming format:** `DD-MM-YY-dump.sql` (e.g., `18-12-25-dump.sql`)
+
+
+**⚠️ Important:** New dumps are added periodically as the database evolves. **Always check for and use the latest dump file** to avoid issues with schema mismatches or authentication failures. If a newer dump has been uploaded since your last setup, re-import it to stay current.
+
+### Local Setup Procedure
+
+If seeding scripts are not present or not ready, follow the steps below:
+
+1. Go to the `#crestpet-onboarding` Slack channel
+2. Click on the **Files** tab and navigate to the **"dumps"** folder
+3. Download the **latest database dump** (check the date in the filename)
+4. Navigate to the **root directory** of the project
+5. Run the following command to reset and import the database:
+
+
+```
+pnpm db:reset-and-import
+```
+
+**Example:**
+
+```
+pnpm db:reset-and-import ~/Downloads/18-12-25-dump.sql
+```
+
+This command will:
+
+- Reset the local database
+- Import the pre-staging data
+- Allow development without recreating data manually
+
+### Important Notes
+
+- **Always use the latest dump** - older dumps may be incompatible with current authentication or schema changes (e.g., Better Auth migration)
+- This approach is **temporary** and will be replaced once proper seeding scripts are available
+- Always re-import a fresh dump after major schema or auth changes
+- Check the `#crestpet-onboarding` channel periodically for announcements about new dumps
+
+### Objective
+
+Enable fast, consistent local development while maintaining alignment with real system data - without blocking progress on pending seeding automation.
+
+---
+
+# 8. Security, Brand, and Compliance Policy
+
+This is a strict security, brand, and compliance requirement.
+
+### Email Addresses
+
+You are **never** permitted to use:
+
+- Personal email addresses
+- Vendor email addresses
+- Staffing agency email addresses
+
+
+Only **@creststaff.com** email addresses may be used in any:
+
+- Demo environment
+- Web or mobile UI
+- Test data
+- Screenshots
+- Recordings
+- Customer, client, partner, or user-visible surface
+
+### Vendor Identity Exposure
+
+You are **strictly prohibited** from displaying:
+
+- Vendor names
+- Staffing company names
+- Contractor company names
+
+
+This applies to all demos, UI labels, seeded data, logs, screenshots, recordings, and any customer-facing or externally visible environment.
+
+### External Communications Protocol
+
+When speaking with customers, prospects, partners, or vendors:
+
+- Use your **first name only**
+- Always represent yourself as **working with Crest**
+- Do not disclose, reference, or imply the identity of any vendors Crest uses
+
+
+Under no circumstances should vendor relationships, vendor identities, or internal sourcing details be discussed externally.
+
+### AI Usage, Data Protection, and Account Control Policy
+
+**Effective Immediately** - This is a critical security and confidentiality requirement.
+
+#### 1. Approved AI Accounts Only
+
+You must only use company-managed AI accounts registered under your **@creststaff.com** email for all Crest work, including but not limited to:
+
+- Claude
+- ChatGPT
+- Gemini
+- Manus
+- Any other AI, LLM, automation, or assistant platform
+
+
+**Personal AI accounts are strictly prohibited.**
+
+Crest enforces **training disabled** on approved accounts to ensure no Crest data is used to train external models.
+
+#### 2. Data Upload and API Restrictions
+
+You are **never** permitted to:
+
+- Upload documents, screenshots, logs, or data to any AI system outside your approved Crest account
+- Use personal API keys
+- Use vendor, staffing, or third-party accounts
+- Route Crest data through unapproved tools, plugins, extensions, or integrations
+
+
+All AI usage must occur within Crest-approved accounts, credentials, and environments.
+
+#### 3. Monitoring and Enforcement
+
+- Crest actively scans AI platforms and vendors for uploaded documents and data fingerprints
+- Vendors and internal systems are continuously audited for compliance
+
+
+Any use of personal AI accounts, external APIs, or unapproved document uploads is an **immediate expulsion from the team**.
+
+No warnings. No appeals. No exceptions.
+
+**This is non-negotiable. Data containment and brand protection are mandatory.**
+
+### ⚠️ Enforcement
+
+**Any violation of this policy results in immediate expulsion from the team.**
+
+No warnings. No grace period. No exceptions.
+
+### Lessons Learned: Personal Account & API Misuse
+
+In early 2026, a team member was found using personal API keys, personal AI accounts, and unapproved third-party tools to process Crest project data. This resulted in **immediate termination** and a full forensic investigation.
+
+**To be absolutely clear:**
+
+- **Never** use personal API keys (OpenAI, Anthropic, or any other service) for Crest work
+- **Never** use personal AI accounts (ChatGPT, Claude, Gemini, etc.) for any work-related tasks
+- **Never** install or use unapproved browser extensions, AI plugins, or CLI tools that process code or data
+- **Never** copy code, data, or screenshots to personal devices, accounts, or cloud storage
+- **Never** use personal email addresses for any project-related service signups
+
+
+All AI usage, API access, and tool access is **monitored and audited**. Crest maintains screenshot monitoring (Hubstaff), shell history auditing (SSM), network traffic analysis (CloudWatch), and AWS CloudTrail logging across all dev workstations. Violations are detected and acted upon swiftly.
+
+If you need access to a tool or service that isn't provided, **ask Michael Cammarata**. We will provision it for you under a company-managed account. There is never a valid reason to use personal accounts for Crest work.
+
+---
+
+# 9. Code Quality & Automated Checks
+
+
+All code must pass automated quality gates before merge. These are enforced via CI/CD and cannot be bypassed.
+
+### Copyright Headers (Required)
+
+
+All new source files (except generated/JSON/third-party) must include the copyright header:
+
+
+```
+/**
+ * © 2026 Crest Advisory Group LLC. All rights reserved.
+ *
+ * PROPRIETARY AND CONFIDENTIAL
+ *
+ * This file is part of the Crest Pet System and contains proprietary
+ * and confidential information of Crest Advisory Group LLC.
+ * Unauthorized copying, distribution, or use is strictly prohibited.
+ */
+```
+
+
+This is enforced by `eslint-plugin-headers` as an error-level rule in both client and server ESLint configs. PRs without proper headers will fail CI.
+
+### SonarCloud Quality Gates
+
+
+Every PR is analyzed by [SonarCloud](https://sonarcloud.io/organizations/cmistaff/projects). Quality gates must pass before merge:
+
+
+- **No new bugs** (reliability)
+- **No new vulnerabilities** (security)
+- **No new security hotspots** unreviewed
+- **Code coverage** must not decrease
+- **No new code smells** above threshold
+- **No duplicated code** above 3%
+
+
+SonarCloud runs automatically on every PR. Check results at: [sonarcloud.io/organizations/cmistaff](https://sonarcloud.io/organizations/cmistaff)
+
+### ESLint & Prettier
+
+
+Both client and server enforce strict linting:
+
+
+- **ESLint** - error-level rules, no warnings allowed in CI
+- **Prettier** - code formatting enforced (printWidth: 100, double quotes, trailing commas)
+- Run locally before pushing: `pnpm lint` and `pnpm format`
+
+### Secret Scanning & Push Protection
+
+
+GitHub secret scanning is enabled on all organizations. If you accidentally commit a token, API key, or credential:
+
+
+- The push will be **blocked automatically**
+- You must remove the secret from your commit history before pushing
+- If a secret was already pushed, **rotate it immediately** and notify Michael Cammarata
+
+### Bot Review Checks
+
+
+The following automated reviewers must complete before a PR can be merged:
+
+
+| Bot | What It Checks |
+| --- | --- |
+| SonarCloud | Code quality, bugs, vulnerabilities, coverage |
+| Devin | AI code review |
+| Bugbot | Bug detection |
+| Codex | Code quality analysis |
+| Copilot | AI-assisted review |
+
+
+Do not merge until all bots have completed their review and all comments are resolved.
+
+
+---
+
+# Final Notes
+
+This handbook captures how we operate as a high performing engineering team. Follow these processes consistently. If anything feels unclear or if you need help, reach out to your leads or in the relevant Slack channels.
+
+Welcome again, and looking forward to building great things together.
+

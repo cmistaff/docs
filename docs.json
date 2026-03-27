@@ -33,7 +33,7 @@
             ]
           },
           {
-            "group": "Operations",
+            "group": "Deployment",
             "pages": [
               "guides/deployment"
             ]
@@ -42,6 +42,153 @@
             "group": "API Reference",
             "pages": [
               "api-reference/introduction"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Onboarding",
+        "groups": [
+          {
+            "group": "Engineering Onboarding",
+            "pages": [
+              "onboarding/engineering-handbook",
+              "onboarding/devbox-setup",
+              "onboarding/cicd-guide",
+              "onboarding/data-access",
+              "onboarding/environment-variables"
+            ]
+          },
+          {
+            "group": "Code Review and Quality",
+            "pages": [
+              "onboarding/cursor-bot-pr-review",
+              "onboarding/sonarcloud-sonarlint"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Design System",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "design-system/overview",
+              "design-system/site-maps",
+              "design-system/user-personas",
+              "design-system/permission-matrix",
+              "design-system/plan-features"
+            ]
+          },
+          {
+            "group": "Visual Language",
+            "pages": [
+              "design-system/design-tokens",
+              "design-system/iconography",
+              "design-system/layout-spacing",
+              "design-system/data-visualization"
+            ]
+          },
+          {
+            "group": "Patterns",
+            "pages": [
+              "design-system/component-patterns",
+              "design-system/state-patterns",
+              "design-system/form-patterns",
+              "design-system/interaction-specs",
+              "design-system/microcopy-guide",
+              "design-system/user-flow-templates"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Features",
+        "groups": [
+          {
+            "group": "Scheduling and Appointments",
+            "pages": [
+              "features/scheduler",
+              "features/payment-appointment-booking",
+              "features/payment-referral",
+              "features/payment-lockdown"
+            ]
+          },
+          {
+            "group": "Payments and Pricing",
+            "pages": [
+              "features/payment-dynamic-pricing",
+              "features/dynamic-pricing",
+              "features/billing-plan-management"
+            ]
+          },
+          {
+            "group": "Clinical",
+            "pages": [
+              "features/x-ray-imaging",
+              "features/insurance",
+              "features/docusign",
+              "features/compliance-consent"
+            ]
+          },
+          {
+            "group": "Marcia AI",
+            "pages": [
+              "features/marcia-ai-brd",
+              "features/marcia-architecture",
+              "features/marcia-omnichannel",
+              "features/marcia-judge-llm",
+              "features/unified-ai-pipeline"
+            ]
+          },
+          {
+            "group": "Platform",
+            "pages": [
+              "features/feature-toggles",
+              "features/database-query-logging",
+              "features/dev-seeding"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Operations",
+        "groups": [
+          {
+            "group": "Code Conventions",
+            "pages": [
+              "operations/server-code-conventions"
+            ]
+          },
+          {
+            "group": "Database and Migrations",
+            "pages": [
+              "operations/database-migration-safety",
+              "operations/migration-integrity-audit"
+            ]
+          },
+          {
+            "group": "Security and Storage",
+            "pages": [
+              "operations/s3-tenant-isolation",
+              "operations/owasp-audit"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "operations/multi-region-architecture",
+              "operations/ecs-eks-migration",
+              "operations/cost-analysis",
+              "operations/cost-tracking"
+            ]
+          },
+          {
+            "group": "Systems",
+            "pages": [
+              "operations/autonomous-dev-system",
+              "operations/appointment-auto-confirm"
             ]
           }
         ]

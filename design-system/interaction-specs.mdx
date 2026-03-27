@@ -1,0 +1,307 @@
+---
+title: "Interaction Specs"
+description: "Animation timing, hover states, keyboard navigation, and interaction specifications."
+---
+
+# Interaction Specs
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Timing, states, animations, and interaction patterns for the Crest Pet System.
+
+---
+
+## ⏱️ Transition Timing
+
+### Duration Scale
+
+| Duration | Usage |
+| --- | --- |
+| `150ms` | Micro-interactions (color changes) |
+| `200ms` | Standard transitions |
+| `300ms` | Default (Tailwind) |
+| `500ms` | Sheet/drawer open |
+
+### Easing Functions
+
+| Easing | Usage |
+| --- | --- |
+| `ease-in-out` | Default |
+| `ease-linear` | Sidebar collapse, progress |
+| `ease-in` | Exit animations |
+| `ease-out` | Enter animations |
+
+---
+
+## 🔘 Button States
+
+### State Progression
+
+| State | Visual Change |
+| --- | --- |
+| Default | Base styling |
+| Hover | 90% opacity or lighter shade |
+| Focus | Ring outline |
+| Active | Darker shade |
+| Disabled | 50% opacity, no pointer |
+
+### Focus Ring Standard
+
+```
+className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+```
+
+---
+
+## 🖱️ Hover Effects
+
+### By Element Type
+
+| Element | Hover Effect |
+| --- | --- |
+| Button | Background color change |
+| Card | Subtle shadow increase |
+| Link | Underline or color change |
+| Table row | Background highlight |
+| Navigation | Background + text color |
+
+---
+
+## ⌨️ Keyboard Navigation
+
+### Global Shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl/Cmd + B` | Toggle sidebar |
+| `Escape` | Close modal/dropdown |
+
+### Dropdown Navigation
+
+| Key | Action |
+| --- | --- |
+| `↓` / `↑` | Navigate items |
+| `Enter` | Select item |
+| `Escape` | Close dropdown |
+| `Tab` | Move to next element |
+
+### Modal Behavior
+
+- Focus trapped inside modal
+- `Escape` closes modal
+- Focus returns to trigger on close
+
+### Form Navigation
+
+| Key | Action |
+| --- | --- |
+| `Tab` | Next field |
+| `Shift + Tab` | Previous field |
+| `Enter` | Submit (on buttons) |
+| `Space` | Toggle checkboxes |
+
+---
+
+## 🔔 Toast Notifications
+
+### Using Sonner
+
+| Type | Duration | Color |
+| --- | --- | --- |
+| Success | 4 seconds | Green |
+| Error | 6 seconds | Red |
+| Info | 4 seconds | Blue |
+| Warning | 5 seconds | Amber |
+| Loading | Persistent | Gray |
+
+### Position
+
+- Default: Bottom-right
+- Mobile: Bottom-center
+
+---
+
+## 🪟 Modal/Dialog Behavior
+
+### Open Animation
+
+```
+animate={{ opacity: 1, scale: 1 }}
+initial={{ opacity: 0, scale: 0.95 }}
+transition={{ duration: 0.2 }}
+```
+
+### Close Animation
+
+```
+exit={{ opacity: 0, scale: 0.95 }}
+transition={{ duration: 0.15 }}
+```
+
+### Backdrop
+
+- Click outside closes modal (unless `modal` prop)
+- Fade in/out with content
+
+---
+
+## 📑 Sheet/Drawer Behavior
+
+### Timing
+
+| Action | Duration |
+| --- | --- |
+| Open | 500ms |
+| Close | 300ms |
+
+### Direction
+
+| Position | Animation |
+| --- | --- |
+| Right | Slide from right |
+| Left | Slide from left |
+| Bottom | Slide from bottom (mobile) |
+
+---
+
+## 🎹 Accordion Behavior
+
+### Timing
+
+- Expand/collapse: `200ms`
+- Easing: `ease-in-out`
+
+### Indicator
+
+```
+
+```
+
+---
+
+## 📊 Table Interactions
+
+### Row Hover
+
+```
+className="hover:bg-muted/50"
+```
+
+### Row Selection
+
+```
+className={cn(
+  "cursor-pointer",
+  isSelected && "bg-muted"
+)}
+```
+
+### Sortable Headers
+
+```
+
+  Column
+
+
+```
+
+---
+
+## 📝 Form Field Interactions
+
+### Input Focus
+
+```
+className="focus:border-primary focus:ring-1 focus:ring-primary"
+```
+
+### Invalid State
+
+```
+className="border-destructive focus:ring-destructive"
+```
+
+### Character Counter
+
+- Normal: `text-muted-foreground`
+- Warning (80%): `text-amber-500`
+- Limit reached: `text-destructive`
+
+---
+
+## ⏳ Loading States
+
+### Button Loading
+
+```
+
+
+  Loading...
+
+```
+
+### Skeleton
+
+```
+className="animate-pulse bg-muted"
+```
+
+### Spinner
+
+```
+className="animate-spin"
+```
+
+---
+
+## 📜 Scroll Behavior
+
+### Smooth Scrolling
+
+```
+className="scroll-smooth"
+```
+
+### Custom Scrollbar
+
+```
+className="scrollbar-thin scrollbar-thumb-muted"
+```
+
+### Infinite Scroll
+
+- Trigger at 80% scroll
+- Show skeleton rows while loading
+
+---
+
+## ✨ Animation Keyframes
+
+### Standard Animations
+
+```
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+```
+
+### Framer Motion Standards
+
+```
+const fadeIn = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 }
+}
+
+const staggerChildren = {
+  animate: { transition: { staggerChildren: 0.1 } }
+}
+```

@@ -1,0 +1,950 @@
+---
+title: "S3 Tenant Isolation Audit"
+description: "S3 storage key audit for tenant isolation compliance and migration tracking."
+---
+
+## Executive Summary
+
+An audit of S3 file storage across the Crest Pet System revealed that **14 out of ~26 production code paths** that construct S3 object keys **do not include a **`tenantId`** prefix**. This means files from different tenants are stored in a flat or loosely organized namespace, creating three risks:
+
+1. **No tenant-level isolation** - Without tenantId in the key path, S3 bucket policies cannot restrict access per tenant, and there is no structural boundary between tenants' files.
+2. **No tenant-level lifecycle management** - Cannot apply S3 lifecycle rules, compliance holds, or data deletion per tenant (e.g., when a tenant is offboarded, there is no way to identify and purge their files via prefix).
+3. **Audit and debugging difficulty** - When investigating a storage issue, there is no way to list all files belonging to a specific tenant without querying the database and cross-referencing S3 keys.
+
+
+This document proposes a two-phase approach: (1) fix all new uploads to use tenantId-prefixed keys, and (2) migrate existing S3 objects to the new key format using data from the database.
+
+## Problem Statement
+
+### Why tenantId in S3 keys matters
+
+Crest Pet System is a **multi-tenant SaaS platform**. The core security invariant is that every piece of tenant data must be explicitly scoped. For database queries, this is enforced via `WHERE tenantId = ?` in every repository method. However, this same discipline was not consistently applied to S3 object keys.
+
+### What can go wrong without it
+
+| Risk | Severity | Example |
+| --- | --- | --- |
+| Cannot purge a tenant's files on offboarding | High | Tenant cancels subscription; their files remain mixed with others, requiring DB queries to find them |
+| Cannot apply S3 bucket policies per tenant | Medium | If we ever need IAM-based tenant isolation or S3 Access Points, tenantId-prefixed keys are a prerequisite |
+| Key collisions in flat namespaces | Low | generateUniqueFileName() returns ${uuid}.ext - while UUIDs are unique, the flat structure makes it impossible to identify ownership without a DB lookup |
+| Cannot use S3 Inventory / analytics per tenant | Medium | Billing, storage usage tracking, or compliance reporting per tenant requires prefix-based grouping |
+| Cannot perform per-tenant cost analysis | High | Without tenantId-prefixed keys, there is no way to calculate storage costs per tenant. S3 Storage Lens and S3 Inventory can filter by prefix, enabling per-tenant storage size reports, request counts, and cost attribution - but only if keys are organized by tenant. This is critical for accurate margin analysis, identifying high-storage tenants, enforcing storage quotas, and building usage-based billing models. |
+
+### What is NOT at risk
+
+- **Data leakage between tenants via S3 is NOT currently possible** - All access to S3 is mediated through signed URLs generated server-side, and the server always uses database records (which are tenant-scoped) to find the correct key. A tenant cannot guess another tenant's S3 key and access it directly.
+- This is a **structural/operational improvement**, not an active security vulnerability.
+
+## Current State Analysis
+
+### S3 Buckets (11 total)
+
+| Bucket Enum | Purpose | Shared? |
+| --- | --- | --- |
+| AGENT_CONVERSATION_IMAGES | Chatbot + SMS uploaded images | Single-feature |
+| DOCUMENTS | Consumer docs, pet certificates, insurance, networks, referrals, email attachments | Multi-feature |
+| MEDIA | Pet photos, treatment sheet files, wellness media, branding logos | Multi-feature |
+| TOOTH_SCANS | Tooth scan uploads | Single-feature |
+| POOP_SCANS | Poop scan uploads | Single-feature |
+| VET_ASSISTANT_FILES | Vet assistant files | Single-feature |
+| VIDEO_CONSULTATION_RECORDINGS | Tavus video recordings | Single-feature (externally written) |
+| CONSULTATION_NOTES | Consultation recordings + transcription temp files | Single-feature |
+| TREATMENT_PLANS | Treatment plan audio recordings | Single-feature |
+| CLINIC_DOCUMENTS | Consent forms, health records, clinic-uploaded documents | Multi-feature |
+| DIAGNOSTIC_REQUEST_FILES | Diagnostic request documents | Single-feature |
+
+### Code Paths - Already Correctly Prefixed (12)
+
+| File | Key Pattern | Bucket |
+| --- | --- | --- |
+| clinic-documents.service.ts | ${tenantId}/${petId}/${uuid}.${ext} via generateDocumentS3Key() | CLINIC_DOCUMENTS |
+| template-management.service.ts | consent-forms/${tenantId}/${uniqueId}-${fileName} | CLINIC_DOCUMENTS |
+| upload-and-create-template.helper.ts | consent-forms/${tenantId}/${uniqueId}-${fileName} | CLINIC_DOCUMENTS |
+| consultation-transcription.service.ts | transcription-temp/${tenantId}/${uuid}.${ext} | CONSULTATION_NOTES |
+| treatment-sheet-reading-file.service.ts | ${folder}/${tenantId}/${readingId}/${uuid}.${ext} | MEDIA |
+| clinic-pet-certificate-storage.service.ts | pet-certificates/${tenantId}/${uniqueId}-${fileName} | DOCUMENTS |
+| pet-certificate-signature-handler.service.ts | pet-certificates/${tenantId}/${certId}/signed.pdf | DOCUMENTS |
+| clinic/settings/settings.service.ts | branding/${tenant.slug}/... | MEDIA |
+| enterprise/settings/settings.service.ts | branding/${tenant.slug}/... | MEDIA |
+| tooth-scan.service.ts | ${tenantId}/${uuid}.${ext} | TOOTH_SCANS |
+| poop-scan.service.ts | ${tenantId}/${uuid}.${ext} | POOP_SCANS |
+| health-record.service.ts | ${tenantId}/${petId}/${fileName} | CLINIC_DOCUMENTS |
+
+> **Note on settings services:** These use `tenant.slug` instead of `tenantId`. Slug is unique per tenant and serves the same isolation purpose, but for consistency, consider migrating to `tenantId` in a future pass.
+
+### Code Paths - Missing tenantId (14)
+
+See [Affected Files - Detailed Breakdown](https://cammaratainc.atlassian.net/wiki/spaces/P/pages/291733508/S3+Tenant+Isolation+Migration+Plan#Affected-Files-%E2%80%94-Detailed-Breakdown) below.
+
+## Target Architecture
+
+### Key Format Convention
+
+```
+# Single-feature bucket (bucket itself is the feature scope):
+${tenantId}/${additional-context}/${uuid}.${ext}
+
+# Multi-feature bucket (DOCUMENTS, MEDIA, CLINIC_DOCUMENTS):
+${tenantId}/${feature-prefix}/${additional-context}/${uuid}.${ext}
+
+```
+
+### Why feature-prefix is only needed in shared buckets
+
+Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds tooth scan images). In these buckets, the bucket name already provides the feature context, so a feature prefix in the key is redundant. Only the 4 shared buckets (`DOCUMENTS`, `MEDIA`, `CLINIC_DOCUMENTS`, `VET_ASSISTANT_FILES`) need a feature prefix to distinguish different types of files.
+
+### Examples
+
+| Bucket | Before | After |
+| --- | --- | --- |
+| TREATMENT_PLANS | ${uuid}.webm | ${tenantId}/${uuid}.webm |
+| CONSULTATION_NOTES | ${uuid}.webm | ${tenantId}/${uuid}.webm |
+| AGENT_CONVERSATION_IMAGES | ${uuid}.jpg | ${tenantId}/${uuid}.jpg |
+| DIAGNOSTIC_REQUEST_FILES | ${userId}/${petId}/${uuid}.pdf | ${tenantId}/${uuid}.pdf |
+| DOCUMENTS (insurance) | insurance-policies/${userId}/${uuid}.pdf | ${tenantId}/insurance-policies/${uuid}.pdf |
+| DOCUMENTS (network) | networks/${networkId}/logo.png | ${tenantId}/networks/${networkId}/logo.png |
+| DOCUMENTS (referrals) | patient-referrals/${referralId}/... | ${tenantId}/patient-referrals/${referralId}/... |
+| DOCUMENTS (email) | insurance-email-attachments/${ts}-${name} | ${tenantId}/insurance-email-attachments/${ts}-${name} |
+| MEDIA (pet photos) | pet-photos/${userId}/${petId}/${uuid}.jpg | ${tenantId}/pet-photos/${petId}/${uuid}.jpg |
+
+## Bucket Classification
+
+### Single-Feature Buckets - Key: ${tenantId}/...
+
+| Bucket | Feature prefix needed? |
+| --- | --- |
+| TOOTH_SCANS | No |
+| POOP_SCANS | No |
+| TREATMENT_PLANS | No |
+| CONSULTATION_NOTES | No - but currently mixed use (recordings + transcription-temp). Both are consultation-related, so no ambiguity. |
+| DIAGNOSTIC_REQUEST_FILES | No |
+| AGENT_CONVERSATION_IMAGES | No |
+| VIDEO_CONSULTATION_RECORDINGS | No (externally written by Tavus - read-only from our side) |
+
+### Multi-Feature Buckets - Key: ${tenantId}/${feature}/...
+
+| Bucket | Features | Existing prefixes in use |
+| --- | --- | --- |
+| DOCUMENTS | Consumer docs, pet certificates, insurance policies, insurance email attachments, network logos, referral documents | pet-certificates/, insurance-policies/, insurance-email-attachments/, insurance/authorization/, networks/, patient-referrals/ |
+| MEDIA | Pet photos, treatment sheet files, wellness media, branding/settings | pet-photos/, treatment-sheet-files/, branding/ |
+| CLINIC_DOCUMENTS | Consent form templates, health records, clinic-uploaded documents | consent-forms/, and flat ${tenantId}/ paths |
+| VET_ASSISTANT_FILES | Vet assistant | To be verified |
+
+## Affected Files - Detailed Breakdown
+
+### 1. treatment-plan-file.service.ts
+
+- **Bucket:** `TREATMENT_PLANS` (single-feature)
+- **Current key:** `${uuid}.${ext}` (completely flat, no context at all)
+- **Proposed key:** `${tenantId}/${uuid}.${ext}`
+- **DB model:** `TreatmentPlanFiles.recordingFilepath`
+- **tenantId source:** `TreatmentPlan.tenantId` (1 JOIN via `treatmentPlanId`)
+- **Code change:** `uploadAudioFile()` must accept `tenantId` parameter
+
+### 2. consultation-note-publish.service.ts
+
+- **Bucket:** `CONSULTATION_NOTES` (single-feature)
+- **Current key:** `${uuid}.${ext}` (flat)
+- **Proposed key:** `${tenantId}/${uuid}.${ext}`
+- **DB model:** `ConsultationNotesFiles.recordingFilepath`
+- **tenantId source:** `ConsultationNotes.tenantId` (1 JOIN)
+- **Code change:** Pass tenantId when constructing the key
+
+### 3. consultation-note-management.service.ts
+
+- **Bucket:** `CONSULTATION_NOTES` (single-feature)
+- **Current key:** `${uuid}.${ext}` (flat)
+- **Proposed key:** `${tenantId}/${uuid}.${ext}`
+- **DB model:** `ConsultationNotesFiles.recordingFilepath`
+- **tenantId source:** `ConsultationNotes.tenantId` (1 JOIN)
+- **Code change:** Pass tenantId when constructing the key
+
+### 4. marcia-chatbot.service.ts
+
+- **Bucket:** `AGENT_CONVERSATION_IMAGES` (single-feature)
+- **Current key:** `${uuid}.${ext}` (flat)
+- **Proposed key:** Keep as-is (user-scoped, not tenant-scoped)
+- **DB model:** `ChatbotFiles.filepath`
+- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
+- **Code change:** **None required.** Accepted as user-scoped.
+
+### 5. marcia-sms.service.ts
+
+- **Bucket:** `AGENT_CONVERSATION_IMAGES` (single-feature)
+- **Current key:** `${userId}/${conversationId}/${filename}`
+- **Proposed key:** Keep as-is (user-scoped, not tenant-scoped)
+- **DB model:** `SmsFiles.filepath`
+- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
+- **Code change:** **None required.** Accepted as user-scoped.
+
+### 6. pet-photo.service.ts
+
+- **Bucket:** `MEDIA` (multi-feature)
+- **Current key:** `pet-photos/${userId}/${petId}/${uuid}.${ext}`
+- **Proposed key:** `${tenantId}/pet-photos/${petId}/${uuid}.${ext}`
+- **DB model:** `Pet.image`
+- **tenantId source:** Available in service context (controller passes it)
+- **Code change:** Replace userId with tenantId in key path
+
+### 7. diagnostic-request-file.service.ts
+
+- **Bucket:** `DIAGNOSTIC_REQUEST_FILES` (single-feature)
+- **Current key:** `${userId}/${petId}/${uuid}.${ext}`
+- **Proposed key:** `${tenantId}/${uuid}.${ext}`
+- **DB model:** `Document.documentPath` (via `DiagnosticRequestFile`)
+- **tenantId source:** Available in service context
+- **Code change:** Replace userId/petId with tenantId
+
+### 8. consumer/documents/documents.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `${userId}/${petId}/${uuid}.${ext}`
+- **Proposed key:** `${tenantId}/consumer-documents/${petId}/${uuid}.${ext}`
+- **DB model:** `Document.documentPath`
+- **tenantId source:** Derivable via Pet → PetTenant (see [Special Cases](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#document-model))
+- **Code change:** Replace userId with tenantId, add feature prefix
+
+### 9. insurance-policy-document.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `insurance-policies/${userId}/${uuid}.${ext}`
+- **Proposed key:** `${tenantId}/insurance-policies/${uuid}.${ext}`
+- **DB model:** `PetInsurancePolicy.documentKey`
+- **tenantId source:** Derivable via Pet → PetTenant
+- **Code change:** Replace userId with tenantId
+
+### 10. insurance-authorization-handler.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `insurance/authorization/${policyId}/${envelopeId}.pdf`
+- **Proposed key:** `${tenantId}/insurance/authorization/${policyId}/${envelopeId}.pdf`
+- **DB model:** `InsuranceProviderContactRequest.authorizationDocumentKey`
+- **tenantId source:** `InsuranceProviderContactRequest.tenantId` (direct)
+- **Code change:** Add tenantId prefix
+
+### 11. insurance-authorization-envelope.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `insurance/authorization/${policyId}/${envelopeId}.pdf`
+- **Proposed key:** `${tenantId}/insurance/authorization/${policyId}/${envelopeId}.pdf`
+- **DB model:** `InsuranceProviderContactRequest.authorizationDocumentKey`
+- **tenantId source:** `InsuranceProviderContactRequest.tenantId` (direct)
+- **Code change:** Add tenantId prefix
+
+### 12. network-create.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `networks/${networkId}/logo.png`
+- **Proposed key:** `${tenantId}/networks/${networkId}/logo.png`
+- **DB model:** `Network.networkLogoPath`
+- **tenantId source:** See [Special Cases - Networks](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#networks)
+- **Code change:** Add tenantId prefix (creator's tenantId)
+
+### 13. referral-document.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `patient-referrals/${referralId}/${referrerId}/documents/${ts}-${idx}-${name}`
+- **Proposed key:** `${tenantId}/patient-referrals/${referralId}/documents/${ts}-${idx}-${name}`
+- **DB model:** `PatientReferralDocuments.documentPath`
+- **tenantId source:** See [Special Cases - Referrals](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#referral-documents)
+- **Code change:** Replace referrerId with originating clinic tenantId
+
+### 14. sendgrid-inbound-processor.service.ts
+
+- **Bucket:** `DOCUMENTS` (multi-feature)
+- **Current key:** `insurance-email-attachments/${ts}-${filename}`
+- **Proposed key:** `${tenantId}/insurance-email-attachments/${ts}-${filename}`
+- **DB model:** `InsuranceProviderContactRequest.emailAttachmentKeys` (has `tenantId` directly)
+- **tenantId source:** Resolve via `findMatchingRequest(emailFrom)` *before* upload. See [Special Cases - SendGrid](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#sendgrid-inbound-email-attachments)
+- **Code change:** Reorder flow - resolve tenant first, then upload. Skip upload if no match (eliminates wasted S3 writes).
+
+## Special Cases - Cross-Tenant & Ambiguous Data
+
+### Chatbot & SMS Files
+
+**Models:** `ChatbotFiles`, `SmsFiles` **Problem:** Neither model has `tenantId`. The chain is `ChatbotFiles` → `ChatbotMessage` → `ChatbotConversations` → `userId` (no tenant). Same for SMS.
+
+**Decision: No **`tenantId`** column. Accept user-scoped isolation.**
+
+These features are **tenant-agnostic by design**. The Marcia AI agent is a consumer-facing conversational assistant accessible via WhatsApp, phone calls, and web chat - channels where no tenant context exists. A user can talk to Marcia without being associated with any specific clinic or tenant. The `userId` is the natural isolation boundary, not `tenantId`.
+
+**Implications for S3 keys:**
+
+- `AGENT_CONVERSATION_IMAGES` bucket remains user-scoped (not tenant-scoped)
+- Current key patterns (`${uuid}.${ext}` for chatbot, `${userId}/${conversationId}/${filename}` for SMS) are acceptable
+- No schema changes required for `ChatbotConversations` or `SmsConversation`
+- No S3 key migration needed for these files
+- The `AGENT_CONVERSATION_IMAGES` bucket is an **exception** to the `tenantId`-prefix rule, documented here as an accepted exclusion
+
+### Networks
+
+**Model:** `Network` has no `tenantId`. Ownership is via `NetworkOwnerTenants` (many-to-many).
+
+**Recommendation:** When a network is created, the creating tenant's ID is known. Use `NetworkOwnerTenants WHERE isMasterOwner = true` as the canonical owner for S3 key purposes. The logo is uploaded by the master owner, and displayed to all member clinics - but the file belongs to the creator.
+
+**Migration query:**
+
+```
+SELECT n.id, n."networkLogoPath", not2."ownerTenantId"
+FROM "Network" n
+JOIN "NetworkOwnerTenants" not2 ON not2."networkId" = n.id AND not2."isMasterOwner" = true
+WHERE n."networkLogoPath" IS NOT NULL;
+
+```
+
+### Referral Documents
+
+**Model:** `PatientReferralDocuments` → `PatientReferral` has `fromClinicId` and `toClinicId` (two different tenants).
+
+**Recommendation:** Scope to the **originating clinic** (`fromClinicId`). The referring clinic uploads the documents. Both clinics can access them via signed URLs (as today), but the S3 key is organized under the uploader's tenant.
+
+**Migration query:**
+
+```
+SELECT prd.id, prd."documentPath", pr."fromClinicId" AS "tenantId"
+FROM "PatientReferralDocuments" prd
+JOIN "PatientReferral" pr ON prd."referralId" = pr.id
+WHERE pr."fromClinicId" IS NOT NULL;
+
+```
+
+### Document Model
+
+**Model:** `Document` has no `tenantId`. Has `petId` → `Pet` → `PetTenant`.
+
+**Important:** A pet can belong to multiple tenants (via `PetTenant`). For consumer-uploaded documents, the uploading user's tenant context should be used.
+
+**Migration query:**
+
+```
+SELECT d.id, d."documentPath", pt."tenantId"
+FROM "Document" d
+JOIN "PetTenant" pt ON d."petId" = pt."petId"
+WHERE d."petId" IS NOT NULL
+ORDER BY pt."createdAt" ASC
+LIMIT 1; -- Use earliest tenant association
+
+```
+
+> **Edge case:** Documents with `petId = NULL` cannot be resolved. These should be logged and handled manually or left in place with a `_unscoped/` prefix.
+
+### SendGrid Inbound Email Attachments
+
+**Problem:** Email arrives at a `@Public()` webhook endpoint (`POST /webhooks/sendgrid/inbound`) with no tenant context. Attachments are currently uploaded to S3 *before* the tenant is resolved.
+
+**Decision: Reorder - resolve tenant before upload (Option A).**
+
+**Analysis of current flow:**
+
+1. `SendGridInboundProcessorService.processInboundEmail()` parses the email and extracts attachments
+2. Attachments are uploaded to S3 immediately (no `tenantId`)
+3. S3 keys are passed to `InsuranceEmailReplyService.processEmailReply()`
+4. `findMatchingRequest(emailFrom)` matches the sender email → `InsuranceProviderContactRequest` (which has `tenantId`)
+5. If no match found, the method returns early - **attachments were uploaded for nothing**
+
+
+**Why reordering works:**
+
+- The tenant lookup (`findMatchingRequest`) is a synchronous indexed Prisma query on `insuranceProvider.email` - fast and reliable
+- It runs in the same request lifecycle (not async/background)
+- When no match is found, attachments are already discarded (early return) - uploading first wastes S3 writes
+- `InsuranceProviderContactRequest` always has a `tenantId` column
+
+
+**Required refactor:**
+
+1. Move `findMatchingRequest` (or a lightweight tenant-resolving method) into `SendGridInboundProcessorService`, or call it before `uploadAttachmentsToS3`
+2. If match found → extract `tenantId` → upload with key `${tenantId}/insurance-email-attachments/${ts}-${filename}`
+3. If no match found → skip upload entirely (current behavior: uploads then discards - this is an improvement)
+4. Pass `tenantId` and attachment keys together to `InsuranceEmailReplyService`
+
+
+**Bonus:** Eliminates wasted S3 writes for unmatched emails.
+
+**Staging prefix approach was rejected** - it would add two S3 operations per attachment (write + copy + delete), require an orphan cleanup job, and introduce more failure modes, all for no benefit since the lookup is synchronous and reliable.
+
+### Video Consultation Recordings
+
+**Model:** `VideoConsultation` has `tenantId` and `recordingUrls` (array of S3 URLs written by Tavus).
+
+**Status:** Keys are **externally controlled** by Tavus. We cannot prefix keys with `tenantId` because Tavus determines the S3 key path. We only generate presigned GET URLs from existing keys.
+
+**Mitigation: S3 object tagging.**
+
+Since we can't control the key format, we use **S3 object tags** to associate recordings with tenants. This fills the gap for cost analysis, lifecycle management, and auditing without requiring a key rename.
+
+**How it works:**
+
+1. In `TavusEventHandlingService.handleConversationRecordingReady()`, after saving the recording URL, call `PutObjectTagging` on the S3 object:
+
+
+```
+await this.s3StorageService.tagObject({
+ bucket: bucketName,
+ key: s3_key,
+ tags: { tenantId: consultation.tenantId },
+});
+
+```
+
+1. One extra AWS API call per recording, only when the Tavus webhook fires (not per user request).
+
+
+**Cost:**
+
+- `PutObjectTagging` is a PUT request - **$0.005 per 1,000 requests**. Negligible given video consultation volume.
+- No data transfer, no object copy - tagging is metadata-only.
+
+
+**What tagging enables:**
+
+- **S3 Storage Lens** - filter storage costs by `tenantId` tag
+- **Lifecycle policies** - per-tenant retention rules (e.g., delete recordings after X days for specific tenants)
+- **IAM tag-based policies** - future access control scoped by tenant tag
+- **Compliance / audit** - query all objects belonging to a tenant
+
+
+**Backfill for existing recordings:**
+
+```
+-- Extract S3 keys from existing VideoConsultation records
+SELECT
+ vc.id,
+ vc."tenantId",
+ unnest(vc."recordingUrls") AS recording_url
+FROM "VideoConsultation" vc
+WHERE array_length(vc."recordingUrls", 1) > 0;
+
+```
+
+For each row, extract the S3 key from the URL and call `PutObjectTagging`. Run as a one-time migration script.
+
+**Limitations:**
+
+- Tags don't change the key prefix - S3 bucket policies based on key prefix won't apply. Use IAM tag-based conditions instead.
+- Max 10 tags per object (plenty of room).
+
+
+**Priority:** Low - schedule after the main key-prefix migration is complete.
+
+## Implementation Plan - New Code Changes
+
+### Phase 1: Utility & Infrastructure
+
+1. **Create a tenant-aware S3 key builder utility** to centralize key construction:
+
+
+```
+// s3-key-builder.util.ts
+
+/**
+ * Single-feature bucket: ${tenantId}/${...segments}
+ */
+function buildTenantScopedKey(tenantId: string, ...segments: string[]): string;
+
+/**
+ * Multi-feature bucket: ${tenantId}/${featurePrefix}/${...segments}
+ */
+function buildTenantFeatureKey(tenantId: string, featurePrefix: string, ...segments: string[]): string;
+
+```
+
+1. **Update **`SharedS3StorageService` to validate that every key starts with a UUID-shaped tenantId prefix. Log a warning for keys that don't match (to catch regressions during the transition period, without breaking existing reads).
+
+### Phase 2: Fix Code Paths (organized by bucket/module)
+
+For each affected file, the change follows this pattern:
+
+1. Ensure `tenantId` is available in the method (either passed as parameter or obtained from service context)
+2. Replace the current key construction with the key builder utility
+3. Update any downstream code that reads the key from the database (read paths should work with both old and new key formats during migration)
+
+
+**Work is organized by bucket/module** to minimize cross-developer conflicts. Each work unit is self-contained - one developer owns all changes for a given bucket, touching a predictable set of files. Work units with no file overlap can be developed in parallel on separate branches.
+
+| Work Unit | Bucket | Files | Complexity | Notes |
+| --- | --- | --- | --- | --- |
+| A | TREATMENT_PLANS | treatment-plan-file.service.ts | Easy | Single file. tenantId already in context. |
+| B | CONSULTATION_NOTES | consultation-note-publish.service.ts, consultation-note-management.service.ts | Easy | Same bucket, same DB model. Ship together. |
+| C | DIAGNOSTIC_REQUEST_FILES | diagnostic-request-file.service.ts | Easy | Single file. tenantId already in context. |
+| D | MEDIA | pet-photo.service.ts, clinic settings.service.ts, enterprise settings.service.ts | Medium | Pet photos + branding assets. All write to MEDIA bucket. Branding migrates from tenant.slug to tenantId. |
+| E | DOCUMENTS - insurance | insurance-policy-document.service.ts, insurance-authorization-handler.service.ts, insurance-authorization-envelope.service.ts, sendgrid-inbound-processor.service.ts | Medium | All insurance-related. SendGrid requires flow reorder. Same module - ship together. |
+| F | DOCUMENTS - general | consumer/documents/documents.service.ts, referral-document.service.ts, network-create.service.ts | Medium | Cross-tenant considerations (networks, referrals). Each has different tenantId resolution. |
+| - | AGENT_CONVERSATION_IMAGES | marcia-chatbot.service.ts, marcia-sms.service.ts | - | Excluded. Tenant-agnostic, user-scoped. No changes needed. |
+
+**Parallelization:** Work units A, B, C can run in parallel (no file overlap). D can run in parallel with E and F. E and F touch the same bucket but different modules - they can be parallelized if migration scripts are coordinated.
+
+### Phase 3: Backward Compatibility
+
+During the transition period (old keys in DB, new keys being written):
+
+- **Read paths** must handle both formats. The `getSignedUrlFromKey()` method already handles legacy URLs. No additional changes needed since reads use the key stored in the DB as-is.
+- **Write paths** will use the new format immediately.
+- **Delete paths** use the key from DB - will work with both old and new keys.
+
+## Migration Plan - Existing S3 Data
+
+### Overview
+
+For each affected DB table, the migration script will:
+
+1. **Query** the table (with JOINs as needed) to get the current S3 key and the tenantId
+2. **Copy** the S3 object to the new key (`S3 CopyObject`)
+3. **Update** the DB record with the new key
+4. **Verify** the new object exists and matches the original (ETag/size comparison)
+5. **Delete** the old S3 object (only after verification)
+
+### Migration Scripts - Per Table
+
+#### Script 1: ConsultationNotesFiles (CONSULTATION_NOTES bucket)
+
+```
+-- Find records needing migration
+SELECT
+ cnf.id,
+ cnf."recordingFilepath" AS old_key,
+ cn."tenantId",
+ cn."tenantId" || '/' || cnf."recordingFilepath" AS new_key
+FROM "ConsultationNotesFiles" cnf
+JOIN "ConsultationNotes" cn ON cnf."consultationNotesId" = cn.id
+WHERE cnf."recordingFilepath" NOT LIKE '%/%'
+ OR cnf."recordingFilepath" NOT LIKE cn."tenantId" || '/%';
+
+```
+
+**Bucket:** `CONSULTATION_NOTES` **Estimated rows:** Low-medium (consultation recordings) **Risk:** Low - single-feature bucket, simple prepend
+
+#### Script 2: TreatmentPlanFiles (TREATMENT_PLANS bucket)
+
+```
+SELECT
+ tpf.id,
+ tpf."recordingFilepath" AS old_key,
+ tp."tenantId",
+ tp."tenantId" || '/' || tpf."recordingFilepath" AS new_key
+FROM "TreatmentPlanFiles" tpf
+JOIN "TreatmentPlan" tp ON tpf."treatmentPlanId" = tp.id
+WHERE tpf."recordingFilepath" NOT LIKE tp."tenantId" || '/%';
+
+```
+
+**Bucket:** `TREATMENT_PLANS` **Estimated rows:** Low-medium **Risk:** Low
+
+#### Script 3: ChatbotFiles (AGENT_CONVERSATION_IMAGES bucket) - EXCLUDED
+
+**No migration needed.** Chatbot and SMS files are tenant-agnostic (user-scoped). The `AGENT_CONVERSATION_IMAGES` bucket is an accepted exclusion from the `tenantId`-prefix rule.
+
+#### Script 4: SmsFiles (AGENT_CONVERSATION_IMAGES bucket) - EXCLUDED
+
+**No migration needed.** Same as Script 3 - user-scoped, tenant-agnostic.
+
+#### Script 5: Pet.image (MEDIA bucket)
+
+```
+SELECT
+ p.id,
+ p.image AS old_key,
+ pt."tenantId",
+ pt."tenantId" || '/pet-photos/' || p.id || '/' || SPLIT_PART(p.image, '/', -1) AS new_key
+FROM "Pet" p
+JOIN "PetTenant" pt ON p.id = pt."petId"
+WHERE p.image IS NOT NULL
+ AND p.image NOT LIKE '%' || pt."tenantId" || '%';
+
+```
+
+**Bucket:** `MEDIA` **Risk:** Medium - pet can belong to multiple tenants. Use earliest `PetTenant` association.
+
+#### Script 6: Document.documentPath (DOCUMENTS bucket)
+
+```
+SELECT
+ d.id,
+ d."documentPath" AS old_key,
+ pt."tenantId",
+ d.source
+FROM "Document" d
+JOIN "PetTenant" pt ON d."petId" = pt."petId"
+WHERE d."petId" IS NOT NULL
+ AND d."documentPath" NOT LIKE pt."tenantId" || '/%'
+ORDER BY pt."createdAt" ASC;
+
+```
+
+**Bucket:** Varies by `source` field (`DOCUMENTS`, `AGENT_CONVERSATION_IMAGES`, `DIAGNOSTIC_REQUEST_FILES`, `CLINIC_DOCUMENTS`) **Risk:** Medium - multiple buckets, multiple sources, pets with multiple tenants
+
+#### Script 7: PetInsurancePolicy.documentKey (DOCUMENTS bucket)
+
+```
+SELECT
+ pip.id,
+ pip."documentKey" AS old_key,
+ pt."tenantId"
+FROM "PetInsurancePolicy" pip
+JOIN "PetTenant" pt ON pip."petId" = pt."petId"
+WHERE pip."documentKey" IS NOT NULL
+ AND pip."documentKey" NOT LIKE pt."tenantId" || '/%';
+
+```
+
+**Bucket:** `DOCUMENTS` **Risk:** Low-medium
+
+#### Script 8: InsuranceProviderContactRequest.authorizationDocumentKey (DOCUMENTS bucket)
+
+```
+SELECT
+ ipcr.id,
+ ipcr."authorizationDocumentKey" AS old_key,
+ ipcr."tenantId",
+ ipcr."tenantId" || '/' || ipcr."authorizationDocumentKey" AS new_key
+FROM "InsuranceProviderContactRequest" ipcr
+WHERE ipcr."authorizationDocumentKey" IS NOT NULL
+ AND ipcr."authorizationDocumentKey" NOT LIKE ipcr."tenantId" || '/%';
+
+```
+
+**Bucket:** `DOCUMENTS` **Risk:** Low - tenantId directly on model
+
+#### Script 9: Network.networkLogoPath (DOCUMENTS bucket)
+
+```
+SELECT
+ n.id,
+ n."networkLogoPath" AS old_key,
+ not2."ownerTenantId" AS "tenantId"
+FROM "Network" n
+JOIN "NetworkOwnerTenants" not2 ON not2."networkId" = n.id AND not2."isMasterOwner" = true
+WHERE n."networkLogoPath" IS NOT NULL;
+
+```
+
+**Bucket:** `DOCUMENTS` **Risk:** Low - deterministic via master owner
+
+#### Script 10: PatientReferralDocuments.documentPath (DOCUMENTS bucket)
+
+```
+SELECT
+ prd.id,
+ prd."documentPath" AS old_key,
+ pr."fromClinicId" AS "tenantId"
+FROM "PatientReferralDocuments" prd
+JOIN "PatientReferral" pr ON prd."referralId" = pr.id
+WHERE pr."fromClinicId" IS NOT NULL;
+
+```
+
+**Bucket:** `DOCUMENTS` **Risk:** Low-medium - some referrals may have `fromClinicId = NULL` (outside platform referrals)
+
+#### Script 11: TreatmentSheetReadingFile.filePath (MEDIA bucket)
+
+Already prefixed with tenantId in most cases. Verify and fix any exceptions:
+
+```
+SELECT
+ tsrf.id,
+ tsrf."filePath" AS old_key,
+ tsr."tenantId"
+FROM "TreatmentSheetReadingFile" tsrf
+JOIN "TreatmentSheetReading" tsr ON tsrf."treatmentSheetReadingId" = tsr.id
+WHERE tsrf."filePath" NOT LIKE '%' || tsr."tenantId" || '%';
+
+```
+
+### Migration Execution Strategy
+
+1. **Run in batches** - Process 100-500 records per batch with configurable concurrency
+2. **Idempotent** - Can be re-run safely; check if new key already exists before copying
+3. **Logged** - Every copy/update/delete operation logged to a migration audit table
+4. **Reversible** - Keep old keys logged so we can reverse if needed
+5. **Environment order** - Run on staging first, validate, then production
+
+### Migration Audit Table
+
+```
+CREATE TABLE _s3_migration_audit (
+ id SERIAL PRIMARY KEY,
+ table_name VARCHAR(100) NOT NULL,
+ record_id VARCHAR(100) NOT NULL,
+ bucket VARCHAR(100) NOT NULL,
+ old_key TEXT NOT NULL,
+ new_key TEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, copied, updated, verified, old_deleted, failed
+ error_message TEXT,
+ created_at TIMESTAMP DEFAULT NOW(),
+ completed_at TIMESTAMP
+);
+
+```
+
+## Branding Keys Migration
+
+### Decision: Migrate from tenant.slug to tenantId
+
+**Status:** Approved - scheduled for Phase 2b
+
+### Current State
+
+Branding uploads use `tenant.slug` in the S3 key:
+
+```
+branding/${tenant.slug}/clinicLogo-${timestamp}.jpg (clinic portal)
+branding/${tenant.slug}/${fileType}-${timestamp}.jpg (enterprise portal)
+
+```
+
+The S3 key is stored inside `tenant.settings` JSON (the legacy settings blob) under fields like `settings.mainLogo`, `settings.favicon`, `settings.enterpriseLogo`, `settings.consumerLogo`, `settings.referralLogo`, and `settings.branding.logo` (legacy clinic logo path).
+
+### Why Migrate
+
+1. **Slug collision between tenant types.** The uniqueness constraint is `@@unique([slug, type])`, meaning a CLINIC and CONSUMER tenant can (and do) share the same slug `"mars"`. Both portals upload branding to `branding/mars/`, resulting in files from different tenant IDs coexisting under the same prefix. This works by accident (filenames differ), but it violates tenant isolation.
+2. **Slug mutability.** Nothing prevents a slug from being changed. If a tenant renames their slug, old branding files are orphaned under the old prefix, new uploads go to the new prefix, and there is no way to discover the orphaned files without manual investigation. `tenantId` (UUID) is immutable.
+3. **Consistency.** Every other S3 path in the system will use `tenantId` after this migration. One outlier using slug adds cognitive overhead and special-case logic.
+4. **Cost analysis.** Per-tenant S3 cost attribution via prefix-based tools (S3 Storage Lens, S3 Inventory) will not capture branding files unless they follow the same `${tenantId}/...` convention.
+
+### Target Key Format
+
+```
+${tenantId}/branding/${fileType}-${timestamp}.${ext}
+
+```
+
+Examples:
+
+- `a1b2c3d4-ef56-7890-abcd-ef1234567890/branding/clinicLogo-1737123456789.jpg`
+- `a1b2c3d4-ef56-7890-abcd-ef1234567890/branding/mainLogo-1737123456789.png`
+
+### Affected Files
+
+| File | Current Key Pattern | Change |
+| --- | --- | --- |
+| clinic/settings/settings.service.ts | branding/${tenant.slug}/clinicLogo-${ts}.${ext} | Replace tenant.slug with tenantId |
+| enterprise/settings/settings.service.ts | branding/${tenant.slug}/${fileType}-${ts}.${ext} | Replace tenant.slug with tenantId |
+
+### Migration Script for Existing Data
+
+Branding keys are stored in the `tenant.settings` JSON column, which requires JSON field updates rather than simple column updates.
+
+**Step 1: Extract all branding S3 keys from the settings JSON**
+
+```
+SELECT
+ t.id AS tenant_id,
+ t.slug,
+ t.type,
+ t.settings->>'mainLogo' AS main_logo_key,
+ t.settings->>'favicon' AS favicon_key,
+ t.settings->>'enterpriseLogo' AS enterprise_logo_key,
+ t.settings->>'consumerLogo' AS consumer_logo_key,
+ t.settings->>'referralLogo' AS referral_logo_key,
+ t.settings->'branding'->>'logo' AS legacy_clinic_logo_key
+FROM "Tenant" t
+WHERE t.settings IS NOT NULL
+ AND t.settings != 'null'::jsonb
+ AND (
+ t.settings->>'mainLogo' IS NOT NULL
+ OR t.settings->>'favicon' IS NOT NULL
+ OR t.settings->>'enterpriseLogo' IS NOT NULL
+ OR t.settings->>'consumerLogo' IS NOT NULL
+ OR t.settings->>'referralLogo' IS NOT NULL
+ OR t.settings->'branding'->>'logo' IS NOT NULL
+ );
+
+```
+
+**Step 2: For each non-null key, if it starts with **`branding/`**:**
+
+1. S3 CopyObject from `branding/${slug}/${file}` to `${tenantId}/branding/${file}`
+2. Update the JSON field with the new key:
+
+
+```
+-- Example: update mainLogo key
+UPDATE "Tenant"
+SET settings = jsonb_set(
+ settings,
+ '{mainLogo}',
+ to_jsonb(CONCAT(id, '/branding/', SPLIT_PART(settings->>'mainLogo', '/', 3)))
+)
+WHERE id = ''
+ AND settings->>'mainLogo' LIKE 'branding/%';
+
+-- Example: update legacy nested clinic logo
+UPDATE "Tenant"
+SET settings = jsonb_set(
+ settings,
+ '{branding,logo}',
+ to_jsonb(CONCAT(id, '/branding/', SPLIT_PART(settings->'branding'->>'logo', '/', 3)))
+)
+WHERE id = ''
+ AND settings->'branding'->>'logo' LIKE 'branding/%';
+
+```
+
+**Step 3: Verify and log in migration audit table (same as other scripts)**
+
+### Notes
+
+- The `resolveBrandingAssetUrl()` utility handles both full URLs and S3 keys transparently, so it will work with the new key format without changes.
+- Test fixtures in `branding-test.constants.ts` should be updated to use `${tenantId}/branding/` prefixed keys.
+- Branding files that are already full URLs (`http://...` or `https://...`) or absolute paths (`/...`) are skipped - the resolver already returns them as-is.
+
+## Tavus Recording Keys
+
+### Decision: No action - accept current state
+
+**Status:** Decided - no migration needed
+
+### Current State
+
+Video consultation recordings are written to the `VIDEO_CONSULTATION_RECORDINGS` bucket by **Tavus** (third-party service), not by our application. The flow is:
+
+1. We call the Tavus Create Conversation API with `enable_recording: true`, `recording_s3_bucket_name`, `recording_s3_bucket_region`, and `aws_assume_role_arn`.
+2. Tavus assumes our IAM role and writes the recording to our S3 bucket using **its own key format** (e.g., `conversations/{conversation_id}/recording.mp4`).
+3. Tavus sends an `application.recording_ready` webhook with the `s3_key`.
+4. Our `TavusEventHandlingService` receives the webhook, constructs a full S3 URL, and appends it to `VideoConsultation.recordingUrls`.
+5. When a user requests the recording, we extract the S3 key from the URL and generate a presigned GET URL.
+
+### Why we cannot add tenantId to the key
+
+The Tavus Create Conversation API does **not** support a `recording_s3_key_prefix` or any parameter to customize the S3 key path. The only recording-related properties accepted are:
+
+- `recording_s3_bucket_name`
+- `recording_s3_bucket_region`
+- `aws_assume_role_arn`
+
+
+The S3 key is entirely controlled by Tavus internally. We have no way to inject a tenantId prefix into the key at write time.
+
+### Why this is acceptable
+
+1. **Dedicated single-feature bucket.** `VIDEO_CONSULTATION_RECORDINGS` is only used for Tavus recordings. No other feature writes to it, so there is no cross-feature confusion.
+2. **Tenant scoping via DB is fully functional.** The `VideoConsultation` model has a `tenantId` column. All queries for recordings are tenant-scoped through the database. Tenant offboarding can delete recordings by querying `VideoConsultation WHERE tenantId = ?` and removing the corresponding S3 objects.
+3. **Low volume.** One recording per video consultation. This is not a high-throughput upload path.
+4. **Post-copy is possible but not worth the cost.** We could copy each recording to a tenantId-prefixed key after receiving the webhook, update the DB, and delete the original. However, this adds latency, S3 transfer costs, and complexity for a marginal benefit.
+
+### Future consideration
+
+If Tavus adds a `recording_s3_key_prefix` parameter in the future, we can adopt it with a one-line change in `CommonTavusService.createConversation()`. This is worth raising with the Tavus account manager as a feature request, but should not block this migration.
+
+## NULL petId Documents
+
+### Decision: Skip during migration, log for manual review
+
+**Status:** Decided
+
+### Data
+
+Confirmed from database dumps across environments:
+
+| Environment | Count | Source |
+| --- | --- | --- |
+| Prestaging | 3 | CONSUMER_UPLOAD |
+| Staging | 12 | CONSUMER_UPLOAD |
+| Production | 21 | CONSUMER_UPLOAD |
+
+All records are `CONSUMER_UPLOAD` source (stored in the `DOCUMENTS` bucket). The increasing count across environments suggests these are real user uploads where the pet association was lost or never set, not just test data.
+
+### Why they can't be auto-migrated
+
+The `Document` model has no `tenantId`. The only path to a tenant is `petId` → `Pet` → `PetTenant`. With `petId = NULL`, there is no way to programmatically resolve a tenantId.
+
+### Why this is not a concern
+
+- No production code path creates documents without `petId` - both `consumer/documents.service.ts` and `clinic/clinic-documents.service.ts` validate pet ownership before creating a document.
+- The consumer documents service already throws `ClientNotFoundError("Document has no associated pet")` when encountering NULL petId, meaning these records are effectively inaccessible through the API.
+- 21 records in production is still a very small number relative to total documents, but the pattern across environments (3 → 12 → 21) suggests a code path may have allowed this in the past. Worth investigating the root cause separately to prevent future occurrences.
+
+### Handling strategy
+
+1. **Migration script:** Skip these records (21 in production). Log them to the migration audit table with status `skipped_no_tenant`:
+
+
+```
+INSERT INTO _s3_migration_audit (table_name, record_id, bucket, old_key, new_key, status, error_message)
+SELECT
+ 'Document',
+ d.id,
+ 'DOCUMENTS',
+ d."documentPath",
+ '',
+ 'skipped_no_tenant',
+ 'petId is NULL - cannot resolve tenantId'
+FROM "Document" d
+WHERE d."petId" IS NULL AND d."deletedAt" IS NULL;
+
+```
+
+1. **Post-migration:** Manually review the 21 production records. For each one, either:Link to the correct pet if identifiable from `documentName` or `documentPath`
+2. Soft-delete (`SET deletedAt = NOW()`) if they are orphaned legacy data
+3. **S3 objects:** Leave in place under the old key. They remain accessible if anyone somehow references them directly.
+
+## Rollback Strategy
+
+### For New Code Changes
+
+- Standard deployment rollback: revert the code change to restore old key format for new uploads
+- No feature flag needed - read paths are inherently backward-compatible (they use whatever key is stored in the DB)
+- New uploads created between deployment and rollback will use the new format, which is fine - they are valid S3 keys and the read path handles them
+
+### For Data Migration
+
+- The migration audit table contains the old key for every migrated record
+- Rollback script: copy S3 objects back from new key to old key, update DB records
+- Old S3 objects should be retained for 30 days after migration (use a delayed cleanup job, not immediate deletion)
+
+## Testing Strategy
+
+1. **Unit tests** - Key builder utility: verify tenantId prefix for all bucket/feature combinations
+2. **E2E tests** - For each affected upload/download flow, verify:Upload creates key with correct tenantId prefix
+3. Download resolves key correctly
+4. Delete removes the correct object
+5. **Migration dry-run** - Run migration query (SELECT only) on staging to validate:All records resolve to a tenantId
+6. No ambiguous/NULL tenantId cases
+7. Row counts match expectations
+8. **Post-migration validation** - For each migrated record:New S3 object exists and is accessible
+9. Signed URL generation works
+10. Old S3 object still exists (before cleanup phase)
+
+## Timeline & Phases
+
+| Phase | Scope | Duration (est.) | Dependencies |
+| --- | --- | --- | --- |
+| Phase 1 | Key builder utility + infrastructure | 1 sprint | None |
+| Phase 2a | Fix easy code paths (Priority 1-2: 5 files) | 1 sprint | Phase 1 |
+| Phase 2b | Fix medium code paths (Priority 3-4: 6 files) + branding slug→tenantId migration (2 files) | 1 sprint | Phase 1 |
+| Phase 2c | Fix complex code paths (Priority 5-6: 3 files) | 1 sprint | Schema change decision |
+| Phase 3 | Migration scripts - staging dry-run | 1 sprint | Phase 2a-b deployed |
+| Phase 4 | Migration execution - staging | 1 sprint | Phase 3 validated |
+| Phase 5 | Migration execution - production | 1 sprint | Phase 4 validated |
+| Phase 6 | Old key cleanup (30-day delay) | Automated | Phase 5 + 30 days |
+
+**Total estimated duration:** 6-7 sprints (parallel work possible on Phase 2a/2b)
+
+## Open Questions
+
+| # | Question | Decision Needed By |
+| --- | --- | --- |
+| 1 | Should ChatbotConversations and SmsConversation get a tenantId column? DECIDED: No. These are tenant-agnostic, user-scoped features (Marcia AI via WhatsApp/phone/web - no tenant context). AGENT_CONVERSATION_IMAGES bucket is an accepted exclusion from the tenantId-prefix rule. See Chatbot & SMS Files section. | Architect / Tech Lead |
+| 2 | SendGrid inbound attachments: immediate tenant resolution or staging prefix approach? DECIDED: Immediate resolution (reorder). Resolve tenant via findMatchingRequest before S3 upload. Skip upload if no match. See SendGrid Inbound Email Attachments section. | Backend Lead |
+| 3 | Should branding/${tenant.slug}/ keys be migrated to ${tenantId}/branding/ for consistency? DECIDED: Yes - migrate in Phase 2b. See Branding Keys Migration section. | Product / Engineering |
+| 4 | Should we configure Tavus to use tenantId-prefixed keys for video recordings? DECIDED: No action needed. See Tavus Recording Keys section. | Product / Integrations |
+| 5 | For Document records with petId = NULL, what is the handling strategy? DECIDED: Skip + log. 21 rows in production (all CONSUMER_UPLOAD; 12 on staging, 3 on prestaging). See NULL petId Documents section. | Backend Lead |
+
+## Appendix: Files Already Correctly Prefixed (No Changes Needed)
+
+These code paths already include tenantId in their S3 key and serve as reference implementations:
+
+- `generateDocumentS3Key()` in `clinic/documents/utils/file-sanitization.utils.ts`
+- `template-management.service.ts` - `consent-forms/${tenantId}/...`
+- `upload-and-create-template.helper.ts` - `consent-forms/${tenantId}/...`
+- `consultation-transcription.service.ts` - `transcription-temp/${tenantId}/...`
+- `treatment-sheet-reading-file.service.ts` - `${folder}/${tenantId}/...`
+- `clinic-pet-certificate-storage.service.ts` - `pet-certificates/${tenantId}/...`
+- `pet-certificate-signature-handler.service.ts` - `pet-certificates/${tenantId}/...`
+- `tooth-scan.service.ts` - `${tenantId}/...`
+- `poop-scan.service.ts` - `${tenantId}/...`
+- `health-record.service.ts` - `${tenantId}/...`
+- `clinic/settings/settings.service.ts` - `branding/${tenant.slug}/...` → migrating to `${tenantId}/branding/...` (Phase 2b)
+- `enterprise/settings/settings.service.ts` - `branding/${tenant.slug}/...` → migrating to `${tenantId}/branding/...` (Phase 2b)
+
+

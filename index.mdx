@@ -5,7 +5,7 @@ description: "CrestPet System -- a multi-tenant veterinary practice management p
 
 # CrestPet System
 
-CrestPet System is a comprehensive, multi-tenant veterinary practice management platform. It serves veterinary clinics, pet owners, enterprise organizations, and platform administrators through five dedicated portals, each tailored to a specific user group.
+CrestPet System is a comprehensive, multi-tenant veterinary practice management platform. It serves veterinary clinics, pet owners, enterprise organizations, and platform administrators through seven portals (five core portals plus the Marcia AI assistant and Vendor purchase order confirmation portal), each tailored to a specific user group.
 
 ## What CrestPet Does
 
@@ -22,9 +22,9 @@ CrestPet provides a unified platform for managing every aspect of veterinary car
 - **WhatsApp integration** for client communication via Marcia, the AI veterinary assistant
 - **Document management** with DocuSign templates, consent forms, legal policies, and PDF certificate generation
 
-## The Five Portals
+## The Seven Portals
 
-CrestPet is organized into five portals, each accessed through a subdomain:
+CrestPet is organized into seven portals, each accessed through a subdomain:
 
 <CardGroup cols={2}>
   <Card title="Clinic Portal" icon="stethoscope">
@@ -41,9 +41,17 @@ CrestPet is organized into five portals, each accessed through a subdomain:
   </Card>
 </CardGroup>
 
-<Card title="Referral Portal" icon="share-nodes">
-  Handles inter-clinic patient referrals with availability-based scheduling and audit logging.
-</Card>
+<CardGroup cols={3}>
+  <Card title="Referral Portal" icon="share-nodes">
+    Handles inter-clinic patient referrals with availability-based scheduling and audit logging.
+  </Card>
+  <Card title="Marcia Portal" icon="robot">
+    AI veterinary assistant with chatbot, voice (ElevenLabs), SMS, WhatsApp channels, training data capture, and draft generation.
+  </Card>
+  <Card title="Vendor Portal" icon="truck">
+    Frontend-only portal for vendor purchase order confirmation pages.
+  </Card>
+</CardGroup>
 
 ## Tech Stack
 
@@ -55,9 +63,9 @@ CrestPet is organized into five portals, each accessed through a subdomain:
 | Cache | Redis (ElastiCache) |
 | Auth | Better Auth + JWT + Prisma adapter, Passkey/WebAuthn support |
 | Runtime | Node.js 22, pnpm 10 |
-| Infrastructure | AWS ECS Fargate, RDS, ElastiCache, S3, CloudFront, ALB, WAF |
+| Infrastructure | AWS ECS Fargate, EKS (multi-region), RDS, ElastiCache, S3, CloudFront, ALB, WAF |
 | API Client | Orval (auto-generated from OpenAPI spec) |
-| Testing | Bun test runner (unit + E2E) |
+| Testing | Bun test runner (server unit + E2E), Playwright (frontend E2E) |
 
 ## Quick Links
 

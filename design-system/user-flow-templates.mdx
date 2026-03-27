@@ -1,0 +1,366 @@
+---
+title: "User Flow Templates"
+description: "Templates for documenting user journeys and interaction flows."
+---
+
+# User Flow Templates
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Templates and guidelines for documenting user flows in the Crest Pet System.
+
+---
+
+## 🎯 Flow Diagram Components
+
+### Standard Symbols
+
+| Symbol | Shape | Usage |
+| --- | --- | --- |
+| Screen | Rectangle | UI screens |
+| Decision | Diamond | Yes/No branches |
+| Action | Rounded rect | User actions |
+| Start/End | Oval | Flow boundaries |
+| Error | Red rectangle | Error states |
+| Success | Green rectangle | Success states |
+| API Call | Hexagon | Backend requests |
+
+### Connection Lines
+
+| Line Type | Usage |
+| --- | --- |
+| Solid → | Primary path |
+| Dashed → | Alternative path |
+| Red → | Error path |
+| Numbered | Sequential steps |
+
+---
+
+## 📋 Flow Template Structure
+
+### Header Information
+
+```
+Flow Name: [Name]
+Portal: [Clinic/Consumer/Enterprise/Platform/Referral]
+Actor: [User persona]
+Trigger: [What initiates the flow]
+Success Outcome: [End state]
+Version: [X.X]
+Last Updated: [Date]
+```
+
+### Required Sections
+
+1. **Entry Points** - How users access this flow
+2. **Main Flow** - Primary happy path
+3. **Decision Branches** - Alternative paths
+4. **Error Handling** - Error scenarios
+5. **Exit Points** - How users leave the flow
+
+---
+
+## 🎯 Priority Flows to Document
+
+### Tier 1 (Critical)
+
+| Flow | Portal | Priority |
+| --- | --- | --- |
+| Book Appointment | Consumer | P0 |
+| Add Pet | Consumer | P0 |
+| Create Clinical Note | Clinic | P0 |
+| Check In Patient | Clinic | P0 |
+| Process Payment | Clinic | P0 |
+| Submit Referral | Referral | P0 |
+
+### Tier 2 (Important)
+
+| Flow | Portal | Priority |
+| --- | --- | --- |
+| Invite Staff Member | Clinic/Enterprise | P1 |
+| Configure Clinic Settings | Clinic | P1 |
+| View Wellness Report | Consumer | P1 |
+
+### Tier 3 (Standard)
+
+| Flow | Portal | Priority |
+| --- | --- | --- |
+| Reset Password | All | P2 |
+| Update Profile | All | P2 |
+| Contact Support | All | P2 |
+
+---
+
+## 📝 Example Flow: Book Appointment
+
+### Header
+
+```
+Flow Name: Book an Appointment
+Portal: Consumer
+Actor: Pet Owner (Emily Thompson persona)
+Trigger: User clicks "Book Appointment" from dashboard or pet profile
+Success Outcome: Appointment confirmed with confirmation displayed
+Version: 1.0
+Last Updated: December 2024
+```
+
+### Flow Steps
+
+**Step 1: Entry**
+
+- Dashboard → "Book Appointment" button
+- Pet Profile → "Schedule Visit" button
+- Navigation → Appointments → "New Appointment"
+
+**Step 2: Select Pet**
+
+- If 1 pet: Auto-select, skip to Step 3
+- If multiple pets: Show pet selector
+- If no pets: Redirect to "Add Pet" flow
+
+**Step 3: Select Clinic**
+
+- Show nearby clinics (location-based)
+- Show previously visited clinics
+- Search by name/zip
+
+**Step 4: Select Service Type**
+
+- Wellness Exam
+- Sick Visit
+- Vaccination
+- Follow-up
+- Other
+
+**Step 5: Select Date/Time**
+
+- Calendar view (month)
+- Available slots highlighted
+- Next available shown prominently
+
+**Step 6: Confirm Details**
+
+- Summary card with all selections
+- Add notes field (optional)
+- Terms acceptance checkbox
+
+**Step 7: Confirmation**
+
+- Success message
+- Appointment details
+- Add to calendar option
+- View appointment button
+
+### Error States
+
+| Error | Handling |
+| --- | --- |
+| No availability | Show next available date, offer waitlist |
+| Network error | Show retry button, preserve selections |
+| Session expired | Redirect to login, preserve state if possible |
+
+### Loading States
+
+| Step | Loading UI |
+| --- | --- |
+| Clinics | Skeleton list |
+| Calendar | Skeleton grid |
+| Confirmation | Button spinner |
+
+### Mobile Considerations
+
+- Full-screen steps (wizard pattern)
+- Bottom-anchored "Continue" button
+- Swipe gestures for calendar
+
+### Accessibility Notes
+
+- Keyboard navigable calendar
+- Screen reader announcements for selection changes
+- Focus management between steps
+
+---
+
+## 📊 Screen State Matrix
+
+For each screen, document these states:
+
+| State | Description |
+| --- | --- |
+| Loading | Initial data fetch |
+| Empty | No data to display |
+| Partial | Some data missing |
+| Error | Request failed |
+| Success | Data loaded |
+| Default | Normal state |
+
+---
+
+## 📁 Figma File Structure
+
+Recommended organization:
+
+```
+📁 User Flows
+├── 📄 Flow Index (overview)
+├── 📁 Consumer Portal
+│   ├── 📄 Book Appointment
+│   ├── 📄 Add Pet
+│   └── 📄 View Wellness Report
+├── 📁 Clinic Portal
+│   ├── 📄 Check In Patient
+│   ├── 📄 Create Note
+│   └── 📄 Process Payment
+└── 📁 Enterprise Portal
+    ├── 📄 Add Clinic
+    └── 📄 Invite Staff
+```
+
+---
+
+## 🏷️ Annotation Guidelines
+
+### For Decisions
+
+```
+Decision: [Question being asked]
+Yes → [Next step]
+No → [Alternative step]
+```
+
+### For Screens
+
+```
+Screen: [Name]
+Purpose: [What user does here]
+Key Actions: [Primary CTAs]
+Exit Points: [How to leave]
+```
+
+### For API Calls
+
+```
+API: [Endpoint]
+Method: [GET/POST/PUT/DELETE]
+On Success: [Next step]
+On Error: [Error handling]
+```
+
+---
+
+## 🔗 Cross-Flow References
+
+When one flow leads to another:
+
+```
+→ See: [Flow Name] (link)
+Entry Point: [Specific step in that flow]
+Return Point: [Where to return after completion]
+```
+
+---
+
+## 📝 API Integration Notes
+
+Document for each API call:
+
+| Field | Value |
+| --- | --- |
+| Endpoint | `/api/v1/appointments` |
+| Method | `POST` |
+| Auth Required | Yes |
+| Rate Limited | No |
+| Expected Latency | <500ms |
+
+---
+
+## ✅ Review Checklist
+
+Before finalizing a flow:
+
+
+1
+1d13cd13-9464-4cd0-8868-b0a0f68aae2f
+incomplete
+All states documented (loading, empty, error, success)
+
+
+2
+7f70f323-4585-4cdf-9a49-f00f30a9f954
+incomplete
+Mobile considerations addressed
+
+
+3
+c4b06a41-1015-4d8c-8ae6-098184b1a16d
+incomplete
+Accessibility requirements noted
+
+
+4
+1b25d73e-3145-4693-85a4-ddf1f80c89fd
+incomplete
+Error handling complete
+
+
+5
+92a04fd6-a3ac-425a-9aca-2f219bb86f9a
+incomplete
+API calls documented
+
+
+6
+fb59bf42-f87a-4092-9658-6b427f656feb
+incomplete
+Cross-references linked
+
+
+7
+42153f78-6009-40ec-84a1-a486f8e4fef1
+incomplete
+Personas referenced
+
+
+8
+d5ac8d59-3622-4415-bc8b-5f011cb169ad
+incomplete
+Entry points comprehensive
+
+
+9
+53ccf182-8d7d-4bb8-b1fe-38e4f9cda28d
+incomplete
+Exit points clear
+
+
+10
+b2c0c160-10d7-4cc1-8206-bf0cf3c36892
+incomplete
+Version number updated
+
+
+11
+27878ef4-8d77-4c8f-8517-b3fda4d56fe6
+incomplete
+Date updated
+
+
+12
+06dc79c6-ca27-497b-9d7c-3f90df4fcd8b
+incomplete
+Stakeholder review complete
+
+
+---
+
+## 🛠️ Tools Recommendation
+
+| Tool | Best For |
+| --- | --- |
+| Figma | Flows with wireframes |
+| Miro | Collaborative flows |
+| Whimsical | Clean flowcharts |
+| FigJam | Quick diagramming |
+| Lucidchart | Technical flows |

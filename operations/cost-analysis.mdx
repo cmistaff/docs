@@ -1,0 +1,698 @@
+---
+title: "Cost Analysis"
+description: "External service cost analysis, tracking schema, vendor pricing, and optimization strategy."
+---
+
+## 1️⃣ Overview (What & Why)
+
+Our platform relies on multiple third-party services and infrastructure components such as:
+
+- OpenAI
+- ElevenLabs
+- Twilio
+- Tavus
+- AWS S3 + domains
+- Additional AI + communication services
+
+Each vendor bills us differently (per-token, per-message, per-minute, per-GB storage, per-year subscription…).
+We need visibility into **how much each tenant costs us** vs **how much revenue we generate**, supporting better:
+
+- Profitability tracking
+- Pricing decisions
+- Cost optimization
+- Operational governance
+
+This Cost Analysis Module will provide a **real-time, accurate financial observability layer** across services.
+
+## 2️⃣ Goals / Expected Results
+
+✔ Super Admin can analyze vendor cost in **three distinct views**:
+
+| View | Purpose | Example KPIs |
+| --- | --- | --- |
+| **Summary (Global)** | Total cost vs revenue health | Margins, vendor share of cost |
+| **Tenant-Centric** | Tenant profitability and cost-to-serve | Cost per tenant → upsell/alert |
+| **Infrastructure View** | Long-term operational cost | Bandwidth spikes, S3 storage drift |
+
+✔ Support accurate **per-request** cost metrics
+✔ Align cost attribution with **actual usage**
+✔ Enable reconciliation with real vendor billing
+✔ Provide alerting when costs surpass thresholds
+
+## 3️⃣ What We Need to Understand (Research Questions Answered)
+
+| Question | Answer |
+| --- | --- |
+| At what point do we incur charges? | **At the moment of service invocation** for variable services; **monthly** for infrastructure |
+| Are costs calculated real-time or at billing? | **Real-time**, with end-of-month reconciliation |
+| Do vendors provide pricing APIs? | Some yes, some static only (OpenAI/Twilio: yes; AWS/Tavus: partially) |
+| Do we need to log every request? | Yes ,  **everything that triggers cost** must be logged |
+
+## 4️⃣ Billing Models & Tracking Requirements
+
+| Vendor | Billing Type | Charge Timing | Log Strategy |
+| --- | --- | --- | --- |
+| OpenAI | Pay-per-token + audio | Immediate per request | Track model + tokens per call |
+| ElevenLabs | Per-character | Immediate | Log character usage |
+| Twilio | Per SMS / per call-minute | Immediate event | Log events + durations |
+| Tavus | Per-video generation/minute | Request approval time | Log video creation + duration |
+| AWS S3 | Storage + data transfer | Monthly storage / per-GB transfer | Track file sizes + bandwidth usage events |
+| Domains | Annual fee | Renewal cycles | Amortize cost monthly |
+
+## 5️⃣ Architecture Approach
+
+The module consists of:
+
+### A) Usage Event Logger (in application services)
+
+Captures:
+
+- tenant_id
+- service provider
+- usage units (tokens, SMS, GB, etc.)
+- unit cost (snapshot)
+- total cost
+- metadata (model, country, file ID, etc.)
+- timestamps
+
+➡ Stored in `usage_events` DB table
+
+### B) Pricing Version Table
+
+Stores vendor rate structures, updated when:
+
+- vendor pricing changes
+- we renegotiate costs
+
+➡ Lookup per event to compute cost
+
+### C) Aggregation + Analytics Layer
+
+Summaries grouped by:
+
+- tenant
+- vendor
+- time window (daily / monthly)
+
+➡ Used to drive dashboards
+
+## 6️⃣ Implementation Plan ,  Phases
+
+| Phase | Description | Output |
+| --- | --- | --- |
+| Phase 1 | Data model, pricing tables, event logging for OpenAI + Twilio | MVP cost visibility |
+| Phase 2 | Add ElevenLabs + Tavus usage tracking | Full service coverage |
+| Phase 3 | Infrastructure cost modeling (AWS S3 storage + domains) | Operational cost visibility |
+| Phase 4 | Dashboard UI for 3 views | Super Admin cost screens |
+| Phase 5 | Reconciliation jobs with vendor billing | Audited cost accuracy |
+| Phase 6 | Alerting + cost guardrails | Cost containment automation |
+
+## 7️⃣ Dashboard Requirements
+
+### We will add a Product Feature Usage Analytics Layer to correlate:
+
+- Cost per service vendor
+  ➡ with
+- Usage of our **internal platform services/features**
+
+This tells Super Admin:
+
+- What features generate the most usage?
+- What features cost the most to run?
+- Which features drive revenue efficiently?
+
+#### Dashboard Views
+
+| View | Purpose | Example Visualizations |
+| --- | --- | --- |
+| **Global Summary** | Top-level financial performance | Vendor cost chart, revenue vs cost |
+| **Tenant View** | Which tenants are profitable vs costly | Leaderboards, profit scoring |
+| **Infrastructure View** | Long-term cost growth | S3 storage, bandwidth graphs |
+| **Product/Feature Usage View** 🆕 | Which internal services drive cost + value | Most-used services chart |
+
+### 🆕 Product/Feature Usage View Details
+
+#### Metrics to Show
+
+| Metric | Description | Example |
+| --- | --- | --- |
+| Top used platform services | Ranking by usage events | Extractor used 3,100 times |
+| Cost per platform service | Cost of running each service (mapped from vendor usage) | AI Consultation = $240/month |
+| Revenue per service (if billable) | Margin performance | Scheduler revenue vs SMS cost |
+| Cost-to-Serve ratio | Profitability score per feature | Video Gen Margin = 45% |
+
+This is where features like:
+
+- Medical Document **Extractor**
+- Appointment **Scheduler**
+- AI **Consultation**
+- Video **Generation**
+- SMS **Notifications**
+- File **Storage Access**
+- **Transcription**
+- Etc.
+
+…get ranked and evaluated.
+
+### Data Mapping to Enable This View
+
+For each internal action, we will:
+
+- Tag the action with a service name (feature category)
+- Link internal events → external vendor usage cost
+
+Example linking:
+
+| Internal Feature | Calls Vendor | Cost Tracked As |
+| --- | --- | --- |
+| AI Consultation | OpenAI | Token-based inference cost |
+| Scheduler SMS | Twilio | SMS per region cost |
+| Extractor | Tavus/OpenAI | Video processing + token usage |
+| Medical Uploads | S3 | Storage + bandwidth cost |
+
+This creates a **value vs cost** scoring model.
+
+### Insights Provided
+
+✔ Which service is most adopted
+✔ Which features incur highest operational cost
+✔ Which features are most profitable
+✔ Opportunities for feature-level pricing adjustments
+
+Format examples for dashboard:
+
+- **Bar chart** - Top Used Features
+- **Heatmap** - Profitability by Feature vs Tenant
+- **Alerts** - Unprofitable feature spikes
+
+## 🔚 What This Enables
+
+Product leaders will be able to:
+
+Optimize pricing **per feature**
+
+Decide which features to expand, throttle, or retire
+
+Detect abuse or misconfigured automation
+
+Set better margins in enterprise deals
+
+## 8️⃣ Key Risks / Things to Watch Out For
+
+| Risk | Mitigation |
+| --- | --- |
+| Vendor pricing changes unexpectedly | Versioned pricing table + reconciliation |
+| Billing dashboards are delayed | Rely on internal usage events for real-time data |
+| S3 storage cost depends on duration | Track file lifespan + hourly/daily snapshots |
+| Missing logs → inaccurate billing | Logging middleware + fallback reconciliation |
+| Regional differences for Twilio pricing | Store destination + resolved rate per event |
+| Token usage for OpenAI changes per model | Always store model + tokens used from response metadata |
+
+## 9️⃣ Definition of Done
+
+Cost data accurate within **±5%** vs vendor invoice
+
+Zero-cost usage events **not logged**
+
+Super Admin sees:
+
+🟢 Global Cost Summary
+
+🟢 Tenant-wise cost view
+
+🟢 Infrastructure cost analytics
+
+Alerting for breach of cost thresholds enabled
+
+---
+
+This document describes the database schema for tracking external vendor usage and costs across the Crest Pet System.
+
+## Purpose
+
+The cost analysis schema enables:
+
+1. **Usage Tracking** - Record every call to external paid services (AI, messaging, video, etc.) with tenant attribution
+2. **Cost Estimation** - Compute estimated costs based on usage metrics and internal rate cards
+3. **Profitability Analysis** - Aggregate costs per tenant to analyze profitability
+4. **Analytics Dashboard** - Power the platform admin analytics with usage and cost data
+
+## Design Principles
+
+### Multi-Tenant by Default
+
+Every usage event is scoped to a `tenantId`, enabling per-tenant cost attribution and profitability calculations.
+
+### Flexible Metrics
+
+Rather than having vendor-specific columns, usage metrics are stored in a separate table with a name/quantity pattern. This allows:
+
+- Different vendors to have different metrics (tokens vs. seconds vs. pages)
+- Adding new metrics without schema migrations
+- Aggregating across vendors with similar metrics
+
+### Latency & Anomaly Detection
+
+The `durationMs` field captures request latency, enabling:
+
+- **Performance monitoring** - Track average response times per vendor/operation
+- **Anomaly detection** - Identify unusually slow calls that may indicate issues
+- **SLA compliance** - Verify vendors meet expected response times
+- **Cost correlation** - Analyze whether longer requests correlate with higher costs
+
+### Asynchronous Cost Computation
+
+The `costUsd` field is nullable, allowing:
+
+- Immediate recording of usage events
+- Deferred cost computation (e.g., when vendor pricing requires async lookup like Twilio)
+- Batch cost computation jobs
+- Re-computation when rate cards change
+
+### Type-Safe Enums
+
+- `ExternalVendor` - Ensures only known vendors are recorded
+- `ExternalOperation` - Ensures consistent operation naming across the codebase
+- `ExternalUsageMetricName` - Provides valid metric names for consistency
+
+## Schema
+
+```
+/// 1 row per external vendor call (tenant-scoped).
+model ExternalUsageEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  tenantId  String
+  vendor    ExternalVendor
+  product   String // Model name / feature / SKU (e.g. "claude-3-5-sonnet-20241022")
+  operation ExternalOperation
+
+  occurredAt     DateTime  @default(now())
+  durationMs     Int?
+  costUsd        Decimal?  @db.Decimal(10, 2) // Nullable means that the cost was not computed yet (e.g., asynchronous computation)
+  costComputedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  metrics ExternalUsageMetric[]
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, vendor, occurredAt])
+  @@index([costComputedAt])
+}
+
+enum ExternalVendor {
+  ANTHROPIC
+  OPENAI
+  MISTRAL
+  ELEVENLABS
+  TAVUS
+  TAVILY
+  TWILIO
+  RESEND
+  LIVEKIT
+  DAILY
+  GOOGLE
+  DOCUSIGN
+  TOOTH_SCAN
+  POOP_SCAN
+}
+
+enum ExternalOperation {
+  // AI/LLM
+  CHAT_COMPLETION // OpenAI, Anthropic, Mistral
+  EMBEDDING // OpenAI, Mistral
+
+  // Document processing
+  OCR // Mistral
+
+  // Audio
+  SPEECH_TO_TEXT // ElevenLabs
+
+  // Video
+  VIDEO_CALL // Tavus conversational
+  VIDEO_GENERATION // Tavus
+
+  // Search
+  WEB_SEARCH // Tavily
+
+  // Messaging
+  SMS_SEND // Twilio
+  EMAIL_SEND // Resend
+
+  // Location
+  PLACES_SEARCH // Google
+  PLACE_DETAILS // Google
+
+  // Document signing
+  ENVELOPE_CREATE // DocuSign
+}
+
+/// N rows per usage event (keeps schema flexible as vendors/features evolve).
+model ExternalUsageMetric {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId String
+
+  name     String // e.g. "input_tokens", "output_tokens", "characters", "video_seconds", "pages"
+  quantity Float
+
+  createdAt DateTime @default(now())
+
+  event ExternalUsageEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+enum ExternalUsageMetricName {
+  // AI token metrics
+  INPUT_TOKENS // OpenAI, Anthropic
+  OUTPUT_TOKENS // OpenAI, Anthropic
+  TOTAL_TOKENS // OpenAI, Anthropic
+  REASONING_TOKENS // OpenAI, Anthropic
+  CACHED_INPUT_TOKENS // OpenAI, Anthropic
+
+  // Document processing
+  PAGES_PROCESSED // Mistral OCR
+
+  // Audio/Video duration
+  AUDIO_SECONDS // ElevenLabs (STT input duration)
+  VIDEO_SECONDS // Tavus (video generation output)
+  CALL_SECONDS // Tavus (conversational video duration)
+
+  // API usage
+  API_CREDITS // Tavily (search credits)
+  REQUEST_COUNT // Google APIs, Resend
+
+  // Messaging
+  MESSAGE_SEGMENTS // Twilio SMS
+
+  // Document signing
+  ENVELOPE_COUNT // DocuSign
+}
+```
+
+## Field Reference
+
+### ExternalUsageEvent
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `tenantId` | String | Tenant attribution for multi-tenant cost analysis |
+| `vendor` | ExternalVendor | Which external service was called |
+| `product` | String | Model/SKU identifier (e.g., "gpt-4o", "claude-sonnet-4-20250514") |
+| `operation` | ExternalOperation | What operation was performed |
+| `occurredAt` | DateTime | When the external call occurred |
+| `durationMs` | Int? | Request duration in milliseconds (for latency tracking and anomaly detection) |
+| `costUsd` | Decimal? | Estimated cost in USD (null = not yet computed) |
+| `costComputedAt` | DateTime? | When cost was computed (for cache invalidation) |
+| `metrics` | ExternalUsageMetric[] | Associated usage metrics |
+
+### ExternalUsageMetric
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `eventId` | String | Foreign key to ExternalUsageEvent |
+| `name` | String | Metric name (use ExternalUsageMetricName enum values) |
+| `quantity` | Float | Metric value (tokens, seconds, pages, etc.) |
+
+## Indexes
+
+The schema includes minimal indexes optimized for common query patterns while avoiding redundancy:
+
+### ExternalUsageEvent
+
+| Index | Use Case |
+| --- | --- |
+| `[tenantId, occurredAt]` | Tenant usage over time (also covers tenant-only filtering) |
+| `[tenantId, vendor, occurredAt]` | Tenant usage by vendor over time |
+| `[costComputedAt]` | Find events needing cost computation (WHERE costComputedAt IS NULL) |
+
+### ExternalUsageMetric
+
+| Index | Use Case |
+| --- | --- |
+| `[eventId]` | Join back to parent event |
+
+**Note**: For heavy anomaly detection workloads, consider adding `@@index([vendor, operation, durationMs])` to optimize slow request queries.
+
+## Usage Examples
+
+### Recording an AI Chat Completion
+
+```
+// After calling OpenAI/Anthropic
+const event = await prisma.externalUsageEvent.create({
+  data: {
+    tenantId,
+    vendor: "OPENAI",
+    product: "gpt-4o",
+    operation: "CHAT_COMPLETION",
+    durationMs: responseTime,
+    metrics: {
+      create: [
+        { name: "INPUT_TOKENS", quantity: usage.inputTokens },
+        { name: "OUTPUT_TOKENS", quantity: usage.outputTokens },
+        { name: "TOTAL_TOKENS", quantity: usage.totalTokens },
+      ],
+    },
+  },
+});
+```
+
+### Recording an SMS Send
+
+```
+// After calling Twilio
+const event = await prisma.externalUsageEvent.create({
+  data: {
+    tenantId,
+    vendor: "TWILIO",
+    product: "sms",
+    operation: "SMS_SEND",
+    metrics: {
+      create: [{ name: "MESSAGE_SEGMENTS", quantity: messageSegments }],
+    },
+  },
+});
+
+// Cost computed later via Twilio API callback or batch job
+```
+
+### Querying Tenant Costs
+
+```
+// Total costs by vendor for a tenant
+const costs = await prisma.externalUsageEvent.groupBy({
+  by: ["vendor"],
+  where: {
+    tenantId,
+    occurredAt: { gte: startDate, lte: endDate },
+    costUsd: { not: null },
+  },
+  _sum: { costUsd: true },
+});
+```
+
+### Detecting Slow Requests (Anomalies)
+
+```
+// Find abnormally slow AI requests (> 10 seconds)
+const slowRequests = await prisma.externalUsageEvent.findMany({
+  where: {
+    vendor: { in: ["OPENAI", "ANTHROPIC", "MISTRAL"] },
+    operation: "CHAT_COMPLETION",
+    durationMs: { gt: 10000 },
+    occurredAt: { gte: startDate },
+  },
+  orderBy: { durationMs: "desc" },
+  take: 100,
+});
+
+// Average latency by vendor/operation
+const avgLatency = await prisma.externalUsageEvent.groupBy({
+  by: ["vendor", "operation"],
+  where: {
+    occurredAt: { gte: startDate, lte: endDate },
+    durationMs: { not: null },
+  },
+  _avg: { durationMs: true },
+  _max: { durationMs: true },
+  _count: true,
+});
+```
+
+---
+
+This document lists **external vendors** we call directly and defines, for each vendor:
+
+- **Tracking**: what usage data we must record at call time (or derive deterministically)
+- **Pricing**: how we compute USD cost (typically from an internal rate card, sometimes via async vendor lookup)
+
+Keep entries short and deterministic. If billing/usage details are unknown, mark the section as **Needs verification** instead of guessing.
+
+## OpenAI
+
+- **Tracking**: Record per request; capture token usage from `usage` (`inputTokens`, `outputTokens`, `totalTokens`, plus `reasoningTokens` / `cachedInputTokens` when available).
+- **Pricing**: Compute from an internal rate card sourced from OpenAI pricing: [https://platform.openai.com/docs/pricing](https://platform.openai.com/docs/pricing)
+
+## Anthropic
+
+- **Tracking**: Record per request; capture token usage from `usage` (`inputTokens`, `outputTokens`, `totalTokens`, plus `reasoningTokens` / `cachedInputTokens` when available).
+- **Pricing**: Compute from an internal rate card sourced from Anthropic pricing: [https://platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+
+## Mistral
+
+- **Tracking**:**LLM**: Record per request; capture token usage from `usage` when available.
+- **OCR**: Record per request; capture pages processed when available; otherwise derive best-effort usage from the input (needs verification of vendor response fields).
+
+**Pricing**: Compute from an internal rate card sourced from Mistral pricing: [https://mistral.ai/pricing#api-pricing](https://mistral.ai/pricing#api-pricing)
+
+## ElevenLabs
+
+- **Tracking**: For `speechToText.convert`, record per request; derive audio duration (seconds) from input audio (library response may not include usage; needs verification).
+- **Pricing**: Compute from an internal rate card based on our plan and public pricing: [https://elevenlabs.io/pricing](https://elevenlabs.io/pricing)
+
+## Tavus
+
+### Conversational video
+
+- **Tracking**: Derive call duration from `startTime` and `endTime`.
+- **Pricing**: Compute from an internal rate card based on our plan: [https://www.tavus.io/pricing](https://www.tavus.io/pricing)
+
+### Video generation
+
+- **Tracking**: Derive output video duration (response field if present; otherwise output file metadata) (needs verification).
+- **Pricing**: Compute from an internal rate card based on our plan: [https://www.tavus.io/pricing](https://www.tavus.io/pricing)
+
+## Tavily
+
+- **Tracking**: Record per request; capture the smallest deterministic unit we can (request count, and “credits” if/when the API exposes it) (needs verification).
+- **Pricing**: Compute from an internal rate card sourced from Tavily credits/pricing: [https://docs.tavily.com/documentation/api-credits](https://docs.tavily.com/documentation/api-credits)
+
+## Twilio
+
+- **Tracking**: Record per send and persist Twilio message identifier (e.g., Message SID) for later lookup.
+- **Pricing**: Derive asynchronously from Twilio once available (region/carrier dependent): [https://www.twilio.com/en-us/sms/pricing/us](https://www.twilio.com/en-us/sms/pricing/us)
+
+## Resend
+
+- **Tracking**: Record per send and persist Resend message identifier (if available).
+- **Pricing**: Compute from an internal rate card based on our plan: [https://resend.com/pricing](https://resend.com/pricing)
+
+## LiveKit
+
+**Tracking & pricing**: Needs verification if still used and how it is billed.
+
+## Daily
+
+**Tracking & pricing**: Needs verification if still used and how it is billed.
+
+## Google APIs (Places)
+
+**Tracking**: Record per request; store endpoint, HTTP status, duration, and `fieldMask` (`X-Goog-FieldMask`). If Autocomplete is used, also store `sessionToken`.
+
+**Pricing**: Compute from an internal rate card per Google Maps Platform SKU: [https://developers.google.com/maps/billing-and-pricing/pricing](https://developers.google.com/maps/billing-and-pricing/pricing)
+
+## Toothscan API & Poopscan API
+
+Needs verification whether these are external paid vendors (and what unit is billed) before adding them to external cost analytics.
+
+## DocuSign
+
+**Tracking**: Treat “envelope” as the billable unit. Persist `envelopeId` on creation and use DocuSign Connect webhooks to count billed envelopes for a period.
+
+**Pricing**: Compute from an internal rate card based on our DocuSign contract (included envelopes, overage, add-ons).
+
+---
+
+This document captures cost-optimization considerations for external vendors tracked in [https://cammaratainc.atlassian.net/wiki/pages/resumedraft.action?draftId=233308161&draftShareId=ce5a7ec9-f27d-4a47-b1a5-fb5466db100a&atlOrigin=eyJpIjoiZjk2YzkxN2I3ODczNGQzNTllOTNlNGNjMzgyMGJhNTIiLCJwIjoiYyJ9](https://cammaratainc.atlassian.net/wiki/pages/resumedraft.action?draftId=233308161&draftShareId=ce5a7ec9-f27d-4a47-b1a5-fb5466db100a&atlOrigin=eyJpIjoiZjk2YzkxN2I3ODczNGQzNTllOTNlNGNjMzgyMGJhNTIiLCJwIjoiYyJ9)
+
+### Goals
+
+- **Reduce external vendor spend** where AWS-native equivalents are acceptable.
+- **Improve cost attribution precision** (per-tenant, per-operation, and ideally per-event) by favoring pricing models that map cleanly to our `ExternalUsageEvent` + `ExternalUsageMetric` schema.
+- **Centralize cost sources** by consolidating spend into AWS where possible, reducing the number of vendor-specific pricing models, invoice exports, and “niche API” billing edge cases we need to support.
+
+### Non-goals
+
+- Replacing vendors where AWS has **no functional equivalent** (we’ll document “no AWS alternative” instead of forcing a bad fit).
+- Replacing AWS infrastructure costs (out of scope for “external vendor calls”).
+
+## Consider transitioning external APIs to AWS alternatives
+
+Below is a vendor-by-vendor view of potential AWS alternatives. This is a feasibility matrix; final decisions depend on feature gaps, compliance requirements, and quality.
+In addition to cost, the key motivation is **billing centralization**: when usage is on AWS, pricing sources are more uniform (AWS pricing pages and AWS billing/Cost Explorer), and we avoid having to implement bespoke “how do we get the price?” logic per niche vendor.
+
+### AWS alternatives matrix (by vendor)
+
+| Current Vendor / Capability | Primary AWS Alternative | Notes / Gaps / Considerations |
+| --- | --- | --- |
+| **OpenAI (LLM / vision / tool use)** | **Amazon Bedrock** (model catalog) | Bedrock doesn’t “replace OpenAI” model-for-model; it provides alternative models (AWS Titan, Anthropic Claude via Bedrock, Mistral via Bedrock, etc.). Migration effort is mostly in model behavior parity, safety/guardrails, prompt tuning, and evaluation harnesses. See: [Amazon Bedrock pricing](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-pricing.html) |
+| **Anthropic (LLM)** | **Amazon Bedrock (Claude)** | If we want Anthropic but want AWS billing + IAM + consolidated invoicing, Bedrock can front Claude usage. See: [Amazon Bedrock pricing](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-pricing.html) |
+| **Mistral (LLM)** | **Amazon Bedrock (Mistral)** or **SageMaker** | Bedrock can be the “AWS-native API surface” for Mistral where available; self-hosting (SageMaker) may be possible but increases ops/maintenance. See: [Amazon Bedrock pricing](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-pricing.html) |
+| **Mistral OCR** | **Amazon Textract** | Textract is page-based pricing and returns structured extraction. Likely a strong fit if our OCR needs are “extract text/tables/forms”, not “vendor-specific OCR semantics”. See: [Amazon Textract pricing](https://aws.amazon.com/textract/pricing/) |
+| **ElevenLabs (Speech-to-Text)** | **Amazon Transcribe** | Pay-as-you-go per minute is straightforward to map to `AUDIO_SECONDS`. Feature parity depends on diarization, punctuation, language coverage, and accuracy on veterinary domain audio. See: [Amazon Transcribe pricing](https://aws.amazon.com/transcribe/pricing/) |
+| **ElevenLabs (Text-to-Speech)** (if/when used) | **Amazon Polly** | Polly is pay-as-you-go per character/voice tier. Voice quality/style controls may differ; ElevenLabs may remain better for “human-like” voices and cloning. See: [Amazon Polly pricing](https://aws.amazon.com/polly/pricing/) |
+| **Twilio (SMS)** | **Amazon SNS (SMS)** or **Amazon Pinpoint** | AWS SMS pricing varies by destination (like Twilio). AWS introduces its own origination identity requirements in some regions. For “send SMS + basic status”, SNS is often enough; for campaigns/audiences/journeys, Pinpoint is closer. See: [SNS SMS pricing](https://aws.amazon.com/sns/sms-pricing/), [Pinpoint pricing](https://aws.amazon.com/pinpoint/pricing/) |
+| **Resend (Email sending)** | **Amazon SES** | SES is low cost and pay-as-you-go. Trade-off is operational complexity (deliverability, DKIM/SPF/DMARC, dedicated IPs, warmup). Resend is simpler UX; SES is cheaper at scale. See: [Amazon SES pricing](https://aws.amazon.com/ses/pricing/) |
+| **Google Places APIs** | **Amazon Location Service** | For places/search/geocoding/map tiles, Amazon Location Service can replace many Google Maps Platform SKUs. Feature parity differs by provider and data source; validate quality for our use cases. See: [Amazon Location Service pricing](https://aws.amazon.com/location/pricing/) |
+| **LiveKit (video calls / WebRTC infra)** (needs verification) | **Amazon Chime SDK** | Chime SDK provides meetings, messaging, and real-time audio/video with per attendee-minute pricing. Migration cost includes client SDK changes and server-side session orchestration. See: [Amazon Chime SDK pricing](https://aws.amazon.com/chime/chime-sdk/pricing/) |
+| **Daily (video calls / WebRTC)** (needs verification) | **Amazon Chime SDK** | Similar to LiveKit: Chime SDK is the most direct AWS-native replacement for “video meeting” functionality. See: [Amazon Chime SDK pricing](https://aws.amazon.com/chime/chime-sdk/pricing/) |
+| **Tavily (web search API)** | **No direct AWS equivalent** (closest: **Amazon Kendra**) | Tavily is “web search API”; AWS doesn’t offer a general web search API. Kendra is for indexing/searching your own enterprise content, not the open web. If we need web search, we likely keep a third-party vendor or build a crawler/index ourselves (which becomes a product). |
+| **Tavus (conversational video / video generation)** | **No AWS managed equivalent** | AWS has media building blocks (storage, streaming, transcoding) but not a managed “AI avatar / personalized video generation” API like Tavus. Replacement would be a significant R&D effort with different vendors or custom ML. |
+| **DocuSign (e-signature)** | **No AWS managed equivalent** | AWS does not provide a full e-signature platform comparable to DocuSign. Replacements are typically other dedicated e-sign vendors (not AWS-native). |
+| **Toothscan API / Poopscan API** (needs verification) | **Unknown until clarified** | If these are *external vendors*, AWS alternatives depend on what they do (image classification? report generation? medical device integration?). If these are *internal services*, they should not be in “external vendor cost” tracking. |
+
+### Practical migration ordering (lowest risk → highest risk)
+
+- **Email (Resend → SES)** and **SMS (Twilio → SNS/Pinpoint)** are often the most “commodity” migrations.
+- **Google Places → Amazon Location Service** is feasible but needs quality evaluation.
+- **OCR → Textract** is feasible when “extract text/tables/forms” meets needs.
+- **Video calling → Chime SDK** can be large surface-area change (clients + backend orchestration) but is a clean AWS-native alternative.
+- **Tavus/Tavily/DocuSign** are typically not good AWS-substitution candidates.
+
+## Consider transitioning subscription plans to pay-as-you-go
+
+This is primarily about **cost attribution determinism**.
+
+### Why pay-as-you-go can improve per-event cost precision
+
+When a vendor charges **per unit** (tokens/minutes/pages/requests) with a published unit price, we can compute:
+
+- `costUsd` deterministically from `ExternalUsageMetric` values (plus a rate card)
+- without needing monthly fee allocation logic
+
+This usually makes `costUsd` **more precise per event**, and it also makes re-computation straightforward when prices change (because the cost is a pure function of usage + rate card).
+
+### Why subscription plans make “per-event cost” inherently ambiguous
+
+Subscription plans often include:
+
+- **Included quotas** (e.g., N emails/month, N envelopes/month)
+- **Fixed monthly minimums**
+- **Overage rates**
+
+If a plan includes “first N units are free”, then the question “which exact call was free?” is not intrinsically meaningful unless you define an ordering rule. For cost analytics, the usual deterministic options are:
+
+- **Amortize fixed fees** (allocate monthly subscription cost across tenants by proportional usage)
+- **Marginal pricing model** (treat unit cost as 0 up to quota and overage price after quota, using a deterministic ordering per tenant and period)
+
+Both are valid for profitability, but they are not “true per-call invoice lines” because the vendor doesn’t invoice that way.
+
+### Recommendation: choose pay-as-you-go when it reduces allocation logic and doesn’t harm unit economics
+
+- **Good candidates for pay-as-you-go** (often): LLM usage, OCR pages, transcription minutes, SMS sends, email sends.
+- **Not a guarantee**: Some vendors are pay-as-you-go but still do not expose per-call billed cost; we still compute from our metrics + rate card.
+
+### Vendor notes (typical patterns; verify contracts)
+
+- **AWS services** (Textract/Transcribe/Polly/SNS/SES/Chime SDK/Location): generally **pay-as-you-go**, which tends to map cleanly to per-event costing.
+- **DocuSign**: commonly subscription + included envelopes; pay-as-you-go may not be available depending on plan.
+- **Twilio**: usage-based for messaging, but pricing depends on destination/origination; pay-as-you-go exists but per-message pricing may still require async lookup for exact billed amount.
+- **Resend**: subscription tiers are common; moving to SES is the more “pure pay-as-you-go” alternative.
+- **LiveKit/Daily**: pricing varies; if we use Chime SDK, attendee-minutes are pay-as-you-go and directly costable.

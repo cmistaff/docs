@@ -1,0 +1,186 @@
+---
+title: "Site Maps"
+description: "Site maps for all portals in the Crest Pet System including clinic, consumer, and enterprise."
+---
+
+# Crest Pet System - Site Maps
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+This document contains the complete navigation structure for all 6 portals in the Crest Pet System.
+
+---
+
+## 🏥 Clinic Portal
+
+**URL:** `clinic.localhost:3000`
+**Users:** Veterinarians, Vet Techs, Receptionists, Clinic Managers
+
+### Main Navigation
+
+| # | Label | Route | Icon | Permission | Plan Feature |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Dashboard | /dashboard/home | Stethoscope | CLINIC_DASHBOARD | |
+| 2 | Appointments | /dashboard/appointments/calendar-view | Calendar | CLINIC_APPOINTMENTS | |
+| 3 | Patients | /dashboard/patients | Users | CLINIC_PATIENTS | |
+| 4 | Whiteboard | /dashboard/whiteboards | Clipboard | CLINIC_MANAGEMENT | |
+| 5 | Notes Management | /dashboard/notes-management | FileText | CLINIC_NOTES_MANAGEMENT | ⚡ clinicNotesManagement |
+| 6 | Diagnostic Requests | /dashboard/diagnostic-requests | Microscope | CLINIC_DIAGNOSTIC_REQUEST_PERMISSION | |
+| 7 | Inventory | /dashboard/inventory | Package | CLINIC_INVENTORY | ⚡ clinicInventory |
+| 8 | Pricing | /dashboard/pricing | DollarSign | CLINIC_PRICING | |
+| 9 | Memory | /dashboard/memory | BrainCircuit | CLINIC_MEMORY | |
+| 10 | Medical Records | /dashboard/medical-records | Stethoscope | CLINIC_MEDICAL_RECORDS | |
+| 11 | Wellness Reports | /dashboard/wellness-reports | Activity | CLINIC_WELLNESS_REPORTS | |
+| 12 | Video Consultations | /dashboard/video-consultations | Video | CLINIC_VIDEO_CONSULTATIONS | ⚡ clinicVideoConsultations |
+| 13 | Health Records | /dashboard/health-records | FileCheck | CLINIC_HEALTH_RECORDS | ⚡ clinicHealthRecords |
+| 14 | Staffing | /dashboard/staffing | UserCheck | CLINIC_STAFFING | ⚡ clinicStaffAnalytics |
+| 15 | Network | /dashboard/network | Shield | CLINIC_NETWORK | ⚡ clinicNetworks |
+| 16 | Referrals | /dashboard/referrals | ArrowRightLeft | CLINIC_REFERRALS | |
+| 17 | Payments | /dashboard/payments | CreditCard | CLINIC_PAYMENTS | |
+| 18 | Insights | /dashboard/insights | BarChart3 | CLINIC_INSIGHTS | |
+| 19 | Management | /dashboard/management | Building | CLINIC_MANAGEMENT | |
+| 20 | Platforms | /tenants | Globe | (none) | |
+
+### Bottom Navigation
+
+| Label | Route | Icon | Permission |
+| --- | --- | --- | --- |
+| Profile | /dashboard/profile | User | (none - always visible) |
+| Clinic Settings | /dashboard/clinic-settings | Settings | CLINIC_SETTINGS |
+
+---
+
+## 👨‍👩‍👧‍👦 Consumer Portal
+
+**URL:** `consumer.localhost:3000`
+**Users:** Pet Owners (general public, varying tech literacy)
+
+### Primary Navigation
+
+| # | Label | Route | Icon | Plan Feature |
+| --- | --- | --- | --- | --- |
+| 1 | Dashboard | /dashboard/home | dashboard | |
+| 2 | My Pets | /dashboard/my-pets | pets | |
+| 3 | Wellness Reports | /dashboard/wellness-report | health_and_safety | |
+| 4 | Wellness Assessment | /dashboard/wellness-assessment | medical_services | |
+| 5 | Marcia AI | /dashboard/marcia | smart_toy | |
+| 6 | AI Analysis | /dashboard/ai-analysis | biotech | ⚡ consumerAiAnalysis |
+| 7 | Documents | /dashboard/documents | description | ⚡ consumerExtractor |
+| 8 | Diagnostic Requests | /dashboard/diagnostic-requests | assignment | |
+| 9 | Appointments | /dashboard/appointments | calendar_month | |
+| 10 | Invoices | /dashboard/invoices | receipt | |
+| 11 | Subscriptions | /dashboard/subscriptions | card_membership | |
+| 12 | Video Consultation | /dashboard/video-consultation | video_call | ⚡ consumerVideoConsultation |
+| 13 | Symptom Checker | /dashboard/symptom-checker | healing | ⚡ consumerSymptomChecker |
+
+### Secondary Navigation
+
+| # | Label | Route | Icon | Plan Feature | Special |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Care Guide | /dashboard/care-guide | menu_book | ⚡ consumerCareGuide | |
+| 2 | Platform Access | /tenants | business | | |
+| 3 | Emergency | /dashboard/emergency | emergency | | 🔴 Red styling |
+
+---
+
+## 🏢 Enterprise Portal
+
+**URL:** `enterprise.localhost:3000`
+**Users:** Corporate Managers, Multi-location Administrators
+
+### Main Navigation
+
+| # | Label | Route | Icon | Permission | Plan Feature |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Dashboard | /dashboard/home | LayoutDashboard | ENTERPRISE_DASHBOARD | |
+| 2 | Clinic Management | /dashboard/clinics | Building | ENTERPRISE_CLINIC_MANAGEMENT | ⚡ enterpriseClinicsManagement |
+| 3 | Network Management | /dashboard/network | Network | ENTERPRISE_NETWORK_MANAGEMENT | ⚡ enterpriseNetworkManagement |
+| 4 | Staff Management | /dashboard/staff | Users | ENTERPRISE_STAFF_MANAGEMENT | ⚡ enterpriseStaffManagement |
+| 5 | Analytics | /dashboard/analytics | BarChart3 | ENTERPRISE_ANALYTICS | |
+| 6 | Marcia Predictive | /dashboard/predictive-analytics | Brain | ENTERPRISE_MARCIA_ANALYTICS | ⚡ enterpriseMarciaPredictiveAnalysis |
+| 7 | Payments | /dashboard/payments | CreditCard | ENTERPRISE_PAYMENTS | |
+| 8 | Compliance | /dashboard/compliance | UserCog | ENTERPRISE_COMPLIANCE | |
+| 9 | Performance | /dashboard/performance | TrendingUp | ENTERPRISE_PERFORMANCE | |
+| 10 | Permissions | /dashboard/permissions | Shield | ENTERPRISE_STAFF_MANAGEMENT | |
+| 11 | Plan Management | /dashboard/plans | Layers | ENTERPRISE_PLAN_MANAGEMENT | |
+| 12 | Global Settings | /dashboard/global | Settings | ENTERPRISE_GLOBAL_SETTINGS | |
+| 13 | Platforms | /tenants | Globe | (none) | |
+
+---
+
+## 🛡️ Platform Portal (Admin)
+
+**URL:** `taylor.localhost:3000`
+**Users:** Crest Platform Administrators (internal staff)
+
+### Navigation
+
+| # | Label | Route | Icon |
+| --- | --- | --- | --- |
+| 1 | Overview | /dashboard/overview | Home |
+| 2 | Users | /dashboard/users | Users |
+| 3 | Pets | /dashboard/pets | Heart |
+| 4 | Tenants | /dashboard/tenants | Building2 |
+| 5 | Networks | /dashboard/networks | Network |
+| 6 | Plans | /dashboard/plans | Layers |
+| 7 | Cost Management | /dashboard/costs | DollarSign |
+| 8 | Revenue | /dashboard/revenue/transactions | CreditCard |
+| 9 | Settings | /dashboard/revenue/settings | Settings |
+
+---
+
+## 🔗 Referral Portal
+
+**URL:** `referral.localhost:3000`
+**Users:** Partner Practices, Specialists, Referring Veterinarians
+
+### Navigation (Top Navbar)
+
+| # | Label | Route | Icon | Type |
+| --- | --- | --- | --- | --- |
+| 1 | Dashboard | /dashboard | Building2 | Link |
+| 2 | Clinics | /dashboard/clinics | Building2 | Link |
+| 3 | My Referrals | /dashboard/referrals | FileText | Link |
+| 4 | Make Referral | /dashboard/make-referral | FileText | Button (CTA) |
+
+---
+
+## 🤖 Marcia AI Portal
+
+**URL:** `marcia.localhost:3000`
+**Users:** Pet Owners seeking AI assistance
+
+### Sidebar Tabs
+
+| Tab | Icon | Description |
+| --- | --- | --- |
+| Chat | MessageSquare | Main AI conversation interface |
+| History | History | View past conversations |
+| Analytics | BarChart3 | Pet health tracking |
+| Settings | Settings | User preferences, sign out |
+
+---
+
+## 📊 Navigation Summary
+
+| Portal | Total Nav Items | Permission-Gated | Plan-Gated |
+| --- | --- | --- | --- |
+| Clinic | 20 main + 2 bottom | 19 | 7 |
+| Consumer | 13 primary + 3 secondary | 0 | 6 |
+| Enterprise | 13 | 12 | 5 |
+| Platform | 9 | 0 | 0 |
+| Referral | 4 | 0 | 0 |
+| Marcia AI | 4 tabs | 0 | 0 |
+
+---
+
+## 🔑 Legend
+
+| Symbol | Meaning |
+| --- | --- |
+| ⚡ | Plan-gated feature (requires subscription) |
+| ↳ | Sub-navigation item |
+| 🔴 | Special styling (e.g., emergency red) |
+| (none) | No permission required - always visible |
+

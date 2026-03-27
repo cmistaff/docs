@@ -1,0 +1,105 @@
+---
+title: "Design System"
+description: "Overview of the Crest Pet System design system including site maps, personas, permissions, tokens, and component patterns."
+---
+
+# Crest Pet System - Design System Documentation
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+This documentation package provides comprehensive UI/UX resources for designers and developers working on the Crest Pet System.
+
+---
+
+## 📚 Documentation Index
+
+| # | Document | Description |
+| --- | --- | --- |
+| 1 | Site Maps | Complete navigation structure for all 6 portals |
+| 2 | User Personas | User profiles, goals, and contexts per portal |
+| 3 | Permission Matrix | RBAC permissions by portal and role |
+| 4 | Plan Features | Feature gating and plan tier documentation |
+| 5 | Design Tokens | Color palette, typography, spacing, animations |
+| 6 | Component Patterns | UI component guidelines and best practices |
+| 7 | State Patterns | Loading, empty, error state handling |
+| 8 | Form Patterns | Validation, field types, Zod schemas |
+| 9 | Microcopy Guide | Voice, tone, Marcia AI personality |
+| 10 | Iconography Guide | Lucide + Material icons, sizing, pairing |
+| 11 | Layout & Spacing | Grid systems, breakpoints, responsive patterns |
+| 12 | Data Visualization | Chart types, colors, Recharts patterns |
+| 13 | Interaction Specs | Timing, states, keyboard nav, animations |
+| 14 | User Flow Templates | Templates for documenting user journeys |
+
+---
+
+## 🏗️ System Architecture Overview
+
+### Multi-Tenant Portal System
+
+The Crest Pet System is a **multi-tenant veterinary platform** with 6 distinct portals:
+
+| Portal | URL Pattern | Users |
+| --- | --- | --- |
+| Clinic | clinic.{tenant}.crestpet.com | Vet Staff |
+| Consumer | consumer.{tenant}.crestpet.com | Pet Owners |
+| Enterprise | enterprise.{tenant}.crestpet.com | Corporate |
+| Platform | admin.crestpet.com | Crest Admin |
+| Referral | referral.{tenant}.crestpet.com | Partners |
+| Marcia AI | marcia.crestpet.com | AI Chat |
+
+---
+
+## 🎨 Technology Stack
+
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js 15 (App Router) |
+| UI Library | React 19 |
+| Styling | Tailwind CSS 4 |
+| Components | shadcn/ui + Radix UI |
+| Animations | Framer Motion |
+| Icons | Lucide React + Material Icons |
+| Charts | Recharts |
+| Forms | react-hook-form + Zod |
+
+---
+
+## 🎯 Design Priorities by Portal
+
+| Portal | Priority 1 | Priority 2 | Priority 3 |
+| --- | --- | --- | --- |
+| Clinic | Speed | Density | Reliability |
+| Consumer | Simplicity | Mobile-first | Reassurance |
+| Enterprise | Overview | Drill-down | Export |
+| Platform | Power | Search | Audit |
+| Referral | Clarity | Communication | Tracking |
+
+---
+
+## 📊 Quick Stats
+
+| Metric | Count |
+| --- | --- |
+| Total Portals | 6 |
+| User Personas | 9 |
+| Clinic Permissions | 21 |
+| Enterprise Permissions | 12 |
+| Plan-Gated Features | 20 |
+| Design Tokens | 100+ |
+
+---
+
+## 🔗 Related Resources
+
+| Resource | Location |
+| --- | --- |
+| Tailwind Config | client/tailwind.config.js |
+| shadcn/ui Components | client/src/components/ui/ |
+| UI Component Architect | .claude/agents/ui-component-architect.md |
+| Frontend CLAUDE.md | client/claude.md |
+
+---
+
+**Questions?** Contact the Crest development team.
+

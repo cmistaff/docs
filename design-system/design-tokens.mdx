@@ -1,0 +1,159 @@
+---
+title: "Design Tokens"
+description: "Design token specifications for colors, typography, spacing, and other visual constants."
+---
+
+# Design Tokens
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+> **Source File:** `client/tailwind.config.js`
+
+This document defines all design tokens (colors, typography, spacing, etc.) used in the Crest Pet System.
+
+---
+
+## 🎨 Color Palette
+
+### Enterprise Primary Colors
+
+A sophisticated blue palette for professional appearance.
+
+| Token | Hex | Usage |
+| --- | --- | --- |
+| enterprise-50 | #f0f4ff | Lightest background |
+| enterprise-100 | #e0e9ff | Light background |
+| enterprise-200 | #c7d6ff | Hover states |
+| enterprise-300 | #a4b8ff | Borders |
+| enterprise-400 | #818fff | Secondary elements |
+| enterprise-500 | #6366f1 | Primary brand color |
+| enterprise-600 | #5b5bd6 | Hover on primary |
+| enterprise-700 | #5145a8 | Active states |
+| enterprise-800 | #473c85 | Dark accents |
+| enterprise-900 | #3d3569 | Very dark |
+
+### Semantic Colors
+
+#### Success (Green)
+
+- `enterprise-success-500`: `#22c55e`
+- Range: 50-900
+
+#### Warning (Amber/Gold)
+
+- `enterprise-warning-500`: `#f59e0b`
+- Range: 50-900
+
+#### Danger (Red)
+
+- `enterprise-danger-500`: `#ef4444`
+- Range: 50-900
+
+#### Info (Cyan)
+
+- `enterprise-info-500`: `#06b6d4`
+- Range: 50-900
+
+
+---
+
+## 📤 Typography
+
+### Font Families
+
+| Token | Stack | Usage |
+| --- | --- | --- |
+| font-enterprise | esBuild, Inter, system-ui, sans-serif | Primary text |
+| font-enterprise-mono | JetBrains Mono, Fira Code, monospace | Code, numbers |
+
+### Font Sizes
+
+| Token | Size | Line Height | Usage |
+| --- | --- | --- | --- |
+| enterprise-xs | 12px | 1rem | Fine print |
+| enterprise-sm | 14px | 1.25rem | Secondary text |
+| enterprise-base | 16px | 1.5rem | Body text |
+| enterprise-lg | 18px | 1.75rem | Lead text |
+| enterprise-xl | 20px | 1.75rem | Section headers |
+| enterprise-2xl | 24px | 2rem | Page headers |
+| enterprise-3xl | 30px | 2.25rem | Large headers |
+| enterprise-4xl | 36px | 2.5rem | Hero text |
+
+---
+
+## 📏 Spacing
+
+### Standard Tailwind Scale
+
+| Class | Pixels | Usage |
+| --- | --- | --- |
+| p-1 | 4px | Tight spacing |
+| p-2 | 8px | Button padding |
+| p-3 | 12px | Input padding |
+| p-4 | 16px | Card padding (mobile) |
+| p-6 | 24px | Card padding (desktop) |
+| p-8 | 32px | Large section padding |
+
+---
+
+## 🌑 Shadows
+
+| Token | Usage |
+| --- | --- |
+| enterprise-sm | Subtle elevation |
+| enterprise | Cards |
+| enterprise-md | Dropdowns |
+| enterprise-lg | Modals |
+| enterprise-xl | Overlays |
+| enterprise-glass | Glassmorphism |
+| enterprise-glow | Highlight glow |
+
+---
+
+## 📐 Border Radius
+
+| Token | Value | Usage |
+| --- | --- | --- |
+| enterprise-sm | 4px | Small elements |
+| enterprise | 6px | Default |
+| enterprise-md | 8px | Inputs |
+| enterprise-lg | 12px | Cards |
+| enterprise-xl | 16px | Modals |
+| enterprise-2xl | 24px | Large cards |
+
+---
+
+## 🎭 Gradients
+
+| Token | Usage |
+| --- | --- |
+| enterprise-gradient | Primary CTA |
+| enterprise-dark-gradient | Dark backgrounds |
+| enterprise-subtle-gradient | Light backgrounds |
+| enterprise-glass | Glass effect |
+
+---
+
+## ✨ Animations
+
+| Token | Description |
+| --- | --- |
+| spin-slow | 8s linear rotation |
+| pulse-subtle | 3s subtle pulse |
+| enterprise-fade-in | 0.5s fade in |
+| enterprise-slide-up | 0.3s slide up |
+| enterprise-scale | 0.2s scale in |
+| float-slow | 6s floating effect |
+
+---
+
+## 📱 Breakpoints
+
+| Breakpoint | Width | Usage |
+| --- | --- | --- |
+| sm | 640px | Mobile landscape |
+| md | 768px | Tablet |
+| lg | 1024px | Desktop |
+| xl | 1280px | Large desktop |
+| 2xl | 1536px | Extra large |
+

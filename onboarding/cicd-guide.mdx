@@ -1,0 +1,805 @@
+---
+title: "Crest Pet System CI/CD Onboarding Guide and Branch Strategy Overview"
+description: "Complete guide to the CI/CD pipeline, branch strategy, promotion workflows, hotfixes, and deployment procedures."
+---
+
+**Last Updated**: December 2025
+**Maintainers**: Crest Advisory Group Development Team
+
+## Overview
+
+The Crest Pet System uses a **three-tier branch strategy** with automated CI/CD pipelines built on GitHub Actions. The system ensures code quality through automated testing, linting, and security checks while maintaining a clean, linear git history.
+
+### Key Principles
+
+| Principle | Description |
+| --- | --- |
+| 🔀 Fast-Forward Only | All promotions use --ff-only merges to maintain linear history |
+| 🚀 Automated Deployments | Push to any environment branch triggers deployment automatically |
+| 🔒 Environment Isolation | Strict secret isolation between environments |
+| 🔥 Hotfix Support | Emergency fixes can bypass normal flow with automatic sync-back |
+| ✅ Quality Gates | Linting, testing, and validation before every promotion |
+| 📦 Squash Merges | All PRs should use squash merge for clean, atomic commits |
+
+### Environment URLs
+
+| Environment | API URLs | Web URLs | Branch |
+| --- | --- | --- | --- |
+| 🔵 PreStaging | api.prestaging.vet, api.prestaging.pet, api.prestaging.express | prestaging.vet, prestaging.pet, prestaging.express | prestaging |
+| 🟡 Staging | api.creststaging.vet, api.creststaging.pet, api.creststaging.express | creststaging.vet, creststaging.pet, creststaging.express | staging |
+| 🟢 Production | api.crest.vet, api.crest.pet, api.crest.express | crest.vet, crest.pet, crest.express | main |
+
+## Branch Strategy
+
+### Branch Hierarchy
+
+| Level | Branch | Environment | Promotion Method |
+| --- | --- | --- | --- |
+| 🟢 Top | main | Production | ⬆️ From staging (manual + approval) |
+| 🟡 Middle | staging | Staging | ⬆️ From prestaging (manual) |
+| 🔵 Base | prestaging | PreStaging | ⬆️ From feature branches (PR) |
+| 🌿 Feature | PW-XXX-* | Local | Created from prestaging |
+
+**Flow Direction:**
+
+```
+🌿 Feature Branch → 🔵 prestaging → 🟡 staging → 🟢 main
+ ↓ ↓ ↓ ↓
+ Local PreStaging Staging Production
+
+```
+
+### Branch Rules
+
+| Branch | Purpose | Direct Push | PR Target | Protection |
+| --- | --- | --- | --- | --- |
+| main | Production code | ❌ Never | Only via staging promotion or ProdHotFix | 🔒 Highest |
+| staging | Pre-production testing | ❌ Never | Only via prestaging promotion or StagingHotFix | 🔒 High |
+| prestaging | Development integration | ❌ Never | All feature branches | 🔒 Standard |
+| PW-XXX-* | Feature development | ✅ Yes | prestaging only | 🔓 None |
+
+### Branch Naming Convention
+
+```
+PW--
+
+Examples:
+- PW-123-add-payment-processing
+- PW-456-fix-appointment-scheduling
+- PW-789-refactor-user-auth
+
+```
+
+## Git Workflow
+
+### Standard Development Flow
+
+| Step | Action | Details |
+| --- | --- | --- |
+| 1️⃣ | Create Branch | Branch from prestaging |
+| 2️⃣ | Make Changes | Develop and commit locally |
+| 3️⃣ | Create PR | Target: prestaging |
+| 4️⃣ | CI Checks | Lint, test, AI review run automatically |
+| 5️⃣ | Code Review | Get approval from team |
+| 6️⃣ | Merge PR | Use Squash and Merge |
+| 🚀 | Auto Deploy | Deploys to PreStaging automatically |
+
+### Step-by-Step Commands
+
+```
+# 1. Start from latest prestaging
+git checkout prestaging
+git pull origin prestaging
+
+# 2. Create feature branch
+git checkout -b PW-123-add-feature
+
+# 3. Make changes and commit
+git add .
+git commit -m "feat(module): add new feature [PW-123]"
+
+# 4. Push and create PR
+git push origin PW-123-add-feature
+gh pr create --base prestaging --title "[PW-123] Add new feature"
+
+# 5. After PR is approved and merged → Auto-deploys to PreStaging
+
+```
+
+### Commit Message Format
+
+| Type | Description | Example |
+| --- | --- | --- |
+| feat | New feature | feat(clinic): add appointment scheduling [PW-123] |
+| fix | Bug fix | fix(payment): resolve stripe webhook timeout [PW-456] |
+| docs | Documentation | docs(api): update swagger annotations [PW-789] |
+| style | Formatting | style(lint): fix eslint warnings |
+| refactor | Code refactoring | refactor(auth): simplify token validation [PW-101] |
+| test | Adding tests | test(e2e): add appointment booking tests |
+| chore | Maintenance | chore(deps): update dependencies |
+
+**Format:** `<type>(<scope>): <description> [<jira-ticket>]`
+
+## Merge Rules
+
+### PR Target Rules
+
+| PR Source | PR Target | Allowed? | Condition |
+| --- | --- | --- | --- |
+| Feature branch | prestaging | ✅ Yes | Always (unless freeze active) |
+| prestaging | staging | ✅ Yes | Promotion PRs only |
+| staging | main | ✅ Yes | Promotion PRs only |
+| Feature branch | staging | ⚠️ Conditional | Only with StagingHotFix: prefix |
+| Feature branch | main | ⚠️ Conditional | Only with ProdHotFix: prefix |
+| Feature branch | staging | ❌ No | Auto-retargeted to prestaging |
+| Feature branch | main | ❌ No | Auto-retargeted to prestaging |
+
+### PR Title Prefixes (Special)
+
+| Prefix | Purpose | Target Branch | Bypasses Freeze |
+| --- | --- | --- | --- |
+| StagingHotFix: | Urgent staging fix | staging | ✅ Yes |
+| ProdHotFix: | Critical production fix | main | ✅ Yes |
+| StagingSyncBack: | Manual sync-back PR | staging | ✅ Yes |
+
+### Required Merge Types
+
+> ⚠️ **IMPORTANT**: Use the correct merge type based on PR type to maintain clean git history.
+
+| PR Type | Merge Method | Reason |
+| --- | --- | --- |
+| Feature PR → prestaging | 📦 Squash and Merge | Creates single atomic commit, clean history |
+| Hotfix PR → staging/main | 📦 Squash and Merge | Single commit for easy cherry-pick during sync |
+| Promotion PR | 🔀 Fast-Forward (workflow) | Use promotion workflow, not PR merge |
+| Sync-back PR (StagingSyncBack:) | 🔀 Merge Commit | Preserves commit SHAs, ties histories together |
+
+**Why Squash Merge for Features/Hotfixes?**
+
+| Benefit | Description |
+| --- | --- |
+| 📜 Clean History | Multiple WIP commits become one meaningful commit |
+| ⚛️ Atomic Changes | Each feature/fix is a single commit |
+| ↩️ Easy Rollback | Revert one commit instead of many |
+| 🔄 Hotfix Sync | Single commits are easier to cherry-pick automatically |
+
+**Why Merge Commit for Sync-back?**
+
+| Benefit | Description |
+| --- | --- |
+| 🔗 Preserves SHAs | Original commit hashes remain intact |
+| 🌳 Ties Histories | Creates a merge point showing where branches aligned |
+| 🛡️ Prevents Divergence | Proper merge prevents further git history issues |
+
+**Merge Button Selection:**
+
+| Option | When to Use |
+| --- | --- |
+| ✅ Squash and merge | Feature PRs, Hotfix PRs |
+| ✅ Create a merge commit | Sync-back PRs only |
+| ❌ Rebase and merge | Avoid (rewrites history) |
+
+### Automatic PR Retargeting
+
+PRs targeting `main` or `staging` are automatically retargeted to `prestaging` unless:
+
+- PR is a valid promotion (`prestaging` → `staging` or `staging` → `main`)
+- PR title starts with a hotfix prefix (`StagingHotFix:` or `ProdHotFix:`)
+- PR title starts with sync-back prefix (`StagingSyncBack:`)
+
+
+When retargeted, the PR receives:
+
+- 💬 An explanatory comment explaining the change
+- 🏷️ A `retargeted-to-prestaging` label
+
+## Deployment Process
+
+### Automatic Deployments
+
+| Trigger | Deploys To | Environment |
+| --- | --- | --- |
+| Push to prestaging | 🔵 PreStaging | api.prestaging.* |
+| Push to staging | 🟡 Staging | api.creststaging.* |
+| Push to main | 🟢 Production | api.crest.* |
+
+### Smart Change Detection
+
+Workflows use intelligent change detection to determine if deployment is needed:
+
+**Web Application Triggers:**
+
+- ✅ Changes in `client/**`
+- ✅ Changes in `packages/common/**`
+- ✅ Changes to `client/Dockerfile`, `client/next.config.*`, etc.
+
+
+**API Application Triggers:**
+
+- ✅ Changes in `server/**`
+- ✅ Changes in `packages/common/**`
+- ✅ Changes to `server/Dockerfile`, `server/nest-cli.json`, etc.
+
+### Deployment Pipeline
+
+| Stage | Action | Details |
+| --- | --- | --- |
+| 1️⃣ Detect | Analyze changes | Check git diff, determine if deploy needed |
+| 2️⃣ Build | Docker build | Build with caching, tag as {sha}-{env} |
+| 3️⃣ Push | ECR upload | Push image to Amazon ECR |
+| 4️⃣ Secrets | Fetch config | Get secrets from AWS Secrets Manager |
+| 5️⃣ Deploy | ECS update | Update task definition, deploy to Fargate |
+| 6️⃣ Wait | Stabilize | Wait for service health checks |
+| 7️⃣ Notify | Slack | Send success/failure notification |
+
+### Promotion Workflows
+
+#### PreStaging → Staging Promotion
+
+| Step | Action |
+| --- | --- |
+| 1️⃣ | Go to Actions → Promote PreStaging to Staging |
+| 2️⃣ | Click Run workflow |
+| 3️⃣ | Fill in Release title, Jira tickets, and Migration required |
+| 4️⃣ | Click Run workflow |
+
+**What happens:**
+
+| Check | Description |
+| --- | --- |
+| ✅ Validation | Confirms prestaging is ahead of staging |
+| ✅ Lint | Runs lint checks on client and server |
+| ✅ Merge | Performs fast-forward merge |
+| 🚀 Deploy | Triggers automatic deployment to Staging |
+
+#### Staging → Main (Production) Promotion
+
+| Step | Action |
+| --- | --- |
+| 1️⃣ | Go to Actions → Promote Staging to Main |
+| 2️⃣ | Click Run workflow |
+| 3️⃣ | Fill in: Release title, Jira tickets, Breaking changes, Migration required |
+| 4️⃣ | Wait for approval (production environment requires approval) |
+
+**What happens:**
+
+| Check | Description |
+| --- | --- |
+| ✅ Validation | Confirms staging is ahead of main |
+| ✅ Quality | Runs code quality checks |
+| 🔐 Approval | Requires production environment approval |
+| ✅ Merge | Performs fast-forward merge |
+| 🏷️ Tag | Creates release tag (rel-YYYY.MM.DD-HH.MMZ) |
+| 🚀 Deploy | Triggers automatic deployment to Production |
+| 📢 Notify | Sends Slack notification |
+
+### ⚠️ Post-Promotion: Create GitHub Release
+
+> After production promotion, you must **manually create a GitHub Release** from the generated tag.
+
+#### Creating a GitHub Release (Post-Promotion)
+
+| Step | Action |
+| --- | --- |
+| 1️⃣ | Go to Repository → Releases → Draft a new release |
+| 2️⃣ | Click "Choose a tag" and select the new tag (e.g., rel-2025.01.15-14.30Z) |
+| 3️⃣ | Set Release title: Same as promotion title or more descriptive |
+| 4️⃣ | Write Release notes: Summary, JIRA tickets, breaking changes, migrations |
+| 5️⃣ | Check "Set as latest release" |
+| 6️⃣ | Click "Publish release" |
+
+**Via CLI:**
+
+```
+# List recent tags to find the new one
+git tag -l 'rel-*' --sort=-creatordate | head -5
+
+# Create release from tag
+gh release create rel-2025.01.15-14.30Z \
+ --title "Release: Assessment Filtering Fixes" \
+ --notes "## Changes
+- [PW-644] Fix assessment filtering
+- [PW-645] Improve search performance
+
+## JIRA Tickets
+- PW-644, PW-645"
+
+```
+
+> 💡 **Why manual?** GitHub Releases allow for curated release notes, attached assets, and proper changelog formatting that benefits from human review.
+
+### Manual Deployment
+
+For emergency or specific deployments:
+
+| Step | Action |
+| --- | --- |
+| 1️⃣ | Go to Actions → Deploy Web or Deploy API |
+| 2️⃣ | Click Run workflow |
+| 3️⃣ | Select Environment: prestaging, staging, or production |
+| 4️⃣ | Check Force deploy to bypass change detection |
+| 5️⃣ | Click Run workflow |
+
+## Hotfix Flow
+
+### When to Use Hotfixes
+
+| Scenario | Use Hotfix? |
+| --- | --- |
+| 🔴 Critical production bugs affecting users | ✅ Yes |
+| 🔴 Security vulnerabilities | ✅ Yes |
+| 🔴 Breaking functionality that can't wait | ✅ Yes |
+| 🟡 Minor bugs or improvements | ❌ No - use normal flow |
+| 🟡 New features | ❌ No - use normal flow |
+
+### Staging Hotfix Flow
+
+| Step | Action | Result |
+| --- | --- | --- |
+| 1️⃣ | Create branch from staging | git checkout staging && git checkout -b hotfix-critical-fix |
+| 2️⃣ | Make fix and commit | git commit -m "fix: resolve critical bug" |
+| 3️⃣ | Create PR with prefix | gh pr create --base staging --title "StagingHotFix: Fix critical bug" |
+| 4️⃣ | Merge PR | 🚀 Auto-deploys to Staging |
+| 5️⃣ | Automatic sync | hotfix-sync.yml triggers |
+
+**Automatic Sync Process:**
+
+| Step | Action |
+| --- | --- |
+| 🔍 | Detect StagingHotFix: prefix |
+| 🔒 | Freeze prestaging |
+| 🔄 | Sync prestaging from staging |
+| 🔓 | Unfreeze prestaging |
+| ✅ | Git history aligned! |
+
+**Commands:**
+
+```
+# 1. Create hotfix branch from staging
+git checkout staging && git pull origin staging
+git checkout -b hotfix-critical-fix
+
+# 2. Make fix and commit
+git add .
+git commit -m "fix(payment): resolve critical payment bug"
+
+# 3. Create PR with StagingHotFix prefix
+git push origin hotfix-critical-fix
+gh pr create --base staging --title "StagingHotFix: Fix critical payment bug"
+
+```
+
+### Production Hotfix Flow
+
+| Step | Action | Result |
+| --- | --- | --- |
+| 1️⃣ | Create branch from main | git checkout main && git checkout -b hotfix-security-fix |
+| 2️⃣ | Make fix and commit | git commit -m "fix: patch security vulnerability" |
+| 3️⃣ | Create PR with prefix | gh pr create --base main --title "ProdHotFix: Fix security issue" |
+| 4️⃣ | Merge PR | 🚀 Auto-deploys to Production |
+| 5️⃣ | Automatic sync | hotfix-sync.yml triggers |
+
+**Automatic Sync Process:**
+
+| Step | Action |
+| --- | --- |
+| 🔍 | Detect ProdHotFix: prefix |
+| 🔒 | Freeze staging and prestaging |
+| 🔄 | Sync staging from main |
+| 🔄 | Sync prestaging from staging |
+| 🔓 | Unfreeze all branches |
+| ✅ | All environments synchronized! |
+
+**Commands:**
+
+```
+# 1. Create hotfix branch from main
+git checkout main && git pull origin main
+git checkout -b hotfix-security-fix
+
+# 2. Make fix and commit
+git add .
+git commit -m "fix(auth): patch security vulnerability"
+
+# 3. Create PR with ProdHotFix prefix
+git push origin hotfix-security-fix
+gh pr create --base main --title "ProdHotFix: Fix security vulnerability"
+
+```
+
+### Hotfix Sync Algorithm
+
+| Condition | Sync Method |
+| --- | --- |
+| Target is ancestor of source | 🔀 Fast-forward merge |
+| Branches have diverged | 🍒 Cherry-pick hotfix commits only |
+
+### Manual Sync-Back (Fallback)
+
+If automatic sync fails, create a manual sync-back PR:
+
+```
+# Create sync-back PR
+gh pr create --base staging --head prestaging \
+ --title "StagingSyncBack: Sync hotfix commits from prestaging"
+
+```
+
+> ⚠️ Remember: Sync-back PRs must use **Merge Commit**, not Squash!
+
+## Protection Mechanisms
+
+### Overview
+
+| Protection | Purpose | Method |
+| --- | --- | --- |
+| 🔄 Concurrency Control | Prevents simultaneous promotions | Workflow queue |
+| 🔒 Freeze Mechanism | Blocks merges during hotfix sync | Repository variables |
+| 🛡️ Release Branch Guard | Validates PRs to staging/main | Required check |
+| 🔀 Auto-Retargeting | Redirects PRs to correct branch | Automatic workflow |
+
+### 1. Concurrency Control
+
+Prevents concurrent workflow runs for promotions:
+
+```
+concurrency:
+ group: promote-to-staging # or promote-to-main
+ cancel-in-progress: false # Queue instead of cancel
+
+```
+
+**Protects:** Multiple users running promotion workflows simultaneously
+
+### 2. Freeze Mechanism
+
+Temporarily blocks PR merges during hotfix synchronization:
+
+| Variable | Set By | Checked By | Purpose |
+| --- | --- | --- | --- |
+| FREEZE_PRESTAGING | hotfix-sync.yml | release-branch-guard.yml | Block prestaging merges |
+| FREEZE_STAGING | hotfix-sync.yml | release-branch-guard.yml | Block staging merges |
+
+**Bypass:** Add `override-freeze` label to PR
+
+### 3. Release Branch Guard
+
+Validates all PRs targeting `staging` or `main`:
+
+| Scenario | Result |
+| --- | --- |
+| Valid promotion (prestaging → staging) | ✅ Allowed |
+| Valid promotion (staging → main) | ✅ Allowed |
+| Hotfix PR with proper prefix | ✅ Allowed |
+| Random feature branch | ❌ Blocked |
+| PR during freeze (no override label) | ⚠️ Blocked |
+
+### 4. Auto-Retargeting
+
+Automatically redirects PRs to correct branch:
+
+| Original Target | New Target | Action |
+| --- | --- | --- |
+| main | prestaging | Retargeted + comment + label |
+| staging | prestaging | Retargeted + comment + label |
+
+### Protection Summary
+
+| Scenario | Protection | Method |
+| --- | --- | --- |
+| Concurrent promotions | ✅ Prevented | Concurrency control |
+| Hotfix sync conflicts | ✅ Prevented | Freeze mechanism |
+| Wrong PR target | ✅ Auto-corrected | Retargeting workflow |
+| Invalid PR to release branch | ✅ Blocked | Release branch guard |
+
+## JIRA Integration
+
+### Automatic Ticket Detection
+
+The CI/CD system automatically detects JIRA tickets from:
+
+| Source | Example | Detects |
+| --- | --- | --- |
+| Branch name | PW-123-feature-name | PW-123 |
+| PR title | [PW-123] Add feature | PW-123 |
+| PR body | Any mention of PW-XXX | All mentioned |
+| Hidden marker | <!-- jira-auto-created: PW-123 --> | PW-123 |
+
+### Automatic Ticket Creation
+
+If no ticket is found, the system:
+
+| Step | Action |
+| --- | --- |
+| 1️⃣ | Creates a new JIRA ticket in project PW |
+| 2️⃣ | Updates PR title with ticket: [PW-123] Original Title |
+| 3️⃣ | Adds JIRA link to PR description |
+| 4️⃣ | Searches for related tickets |
+
+### JIRA-GitHub Automation
+
+| GitHub Action | JIRA Transition |
+| --- | --- |
+| PR Created | → 📋 READY FOR DEPLOY |
+| PR Merged | → ✅ DONE |
+
+## Quality Gates
+
+### Lint Workflows
+
+| Workflow | Scope | Timeout | Trigger |
+| --- | --- | --- | --- |
+| lint-web.yml | Frontend (client/) | 15 min | PR to prestaging |
+| lint-api.yml | Backend (server/) | 15 min | PR to prestaging |
+| lint-packages.yml | Shared packages | 10 min | PR to prestaging |
+| lint-prisma.yml | Prisma schema | 10 min | PR to prestaging |
+
+### Test Workflows
+
+| Workflow | Type | Timeout | Trigger |
+| --- | --- | --- | --- |
+| run-unit-tests.yml | Unit tests | 20 min | PR to prestaging |
+| run-int-tests.yml | Integration tests | 30 min | PR to prestaging |
+| run-e2e-tests.yml | End-to-end tests | 45 min | PR to prestaging |
+
+### AI Code Review
+
+The `claude-code-review.yml` workflow provides:
+
+| Feature | Description |
+| --- | --- |
+| 🤖 Automated review | Code review using Claude AI |
+| 🎫 JIRA management | Automatic ticket detection/creation |
+| 🔒 Security checks | Security and best practices analysis |
+| 💡 Suggestions | Improvement recommendations |
+
+### Promotion Validation
+
+Before promotion, workflows validate:
+
+| Check | Description |
+| --- | --- |
+| ✅ Commits ahead | Source has new commits vs target |
+| ✅ Fast-forward possible | No divergence between branches |
+| ✅ Lint passes | All lint checks succeed |
+| ✅ Prisma generates | Prisma client generates successfully |
+| ✅ API types generate | OpenAPI types generate successfully |
+
+## Slack Notifications
+
+### Deployment Notifications
+
+**✅ Success Notification:**
+
+| Field | Content |
+| --- | --- |
+| 🟢 Status | Success indicator |
+| 📦 Repository | Repo name, commit, author |
+| 🔀 Merge type | 📦 squash / 🔀 merge / 🔁 rebase |
+| 🌐 Environments | Deployed environments list |
+| 🔗 Links | Direct links to deployed apps |
+
+**❌ Failure Notification:**
+
+| Field | Content |
+| --- | --- |
+| 🔴 Status | Failure indicator |
+| ❌ Failed envs | List of failed environments |
+| 🔗 Logs | Link to GitHub Actions logs |
+
+### Hotfix Sync Failure Notification
+
+When hotfix sync fails:
+
+| Field | Content |
+| --- | --- |
+| 🔴 Alert | Source and target branches |
+| 🔗 Commit | SHA and workflow run link |
+| 📝 Instructions | Manual resolution steps |
+
+## Rollback Procedures
+
+### Option 1: Rollback to Previous Commit (Fast)
+
+```
+# Get previous commit SHA from promotion summary
+PREVIOUS_SHA="abc123..."
+
+# Rollback
+git checkout main # or staging
+git reset --hard $PREVIOUS_SHA
+git push origin main --force-with-lease
+
+```
+
+### Option 2: Rollback to Release Tag
+
+```
+# List recent release tags
+git tag -l 'rel-*' --sort=-creatordate | head -5
+
+# Rollback to specific tag
+git checkout main
+git reset --hard rel-2025.01.15-14.30Z
+git push origin main --force-with-lease
+
+```
+
+### Rollback Decision Guide
+
+| Situation | Action |
+| --- | --- |
+| Know the bad commit? | git reset --hard PREVIOUS_SHA |
+| Don't know bad commit? | Find last good rel-* tag |
+| After reset | git push --force-with-lease |
+| After push | Verify deployment, notify team |
+
+### Post-Rollback Checklist
+
+| Task | Status |
+| --- | --- |
+| ☐ Verify deployment completed | |
+| ☐ Test critical functionality | |
+| ☐ Update JIRA tickets | |
+| ☐ Notify team in Slack | |
+| ☐ Investigate root cause | |
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Deployment Skipped Unexpectedly
+
+**Symptoms:** "No relevant changes detected"
+
+| Solution | Command/Action |
+| --- | --- |
+| Check trigger patterns | Verify changed files match patterns |
+| Force deploy | Manual deployment with "Force deploy" ✓ |
+| Check git diff | git diff HEAD~1 --name-only |
+
+#### 2. PR Blocked by Freeze
+
+**Symptoms:** "Staging/Prestaging is temporarily frozen"
+
+| Solution | Command/Action |
+| --- | --- |
+| Wait | Hotfix sync may still be running |
+| Override | Add override-freeze label to PR |
+| Check status | View hotfix-sync.yml workflow |
+
+#### 3. Promotion Fails - Branches Diverged
+
+**Symptoms:** "Fast-forward not possible"
+
+| Solution | Command/Action |
+| --- | --- |
+| Check force-push | Did someone force-push to target? |
+| Verify sync | Was hotfix properly synced back? |
+| Manual fix | May require manual resolution |
+
+#### 4. Build Failures
+
+**Symptoms:** Docker build fails
+
+| Solution | Command/Action |
+| --- | --- |
+| Check logs | Review build logs for specific errors |
+| Verify secrets | Ensure all required secrets are set |
+| Update deps | Check if dependencies are current |
+| AWS creds | Verify AWS credentials are valid |
+
+#### 5. ECS Deployment Fails
+
+**Symptoms:** Service doesn't stabilize
+
+| Solution | Command/Action |
+| --- | --- |
+| ECS events | Check ECS service events in AWS Console |
+| Task def | Verify task definition is valid |
+| Logs | Check container logs in CloudWatch |
+| Health check | Verify health check configuration |
+
+#### 6. Slack Notifications Not Working
+
+**Symptoms:** No Slack messages after deployment
+
+| Solution | Command/Action |
+| --- | --- |
+| Secret | Verify SLACK_WEBHOOK_URL is set |
+| URL valid | Check webhook URL is still valid |
+| Logs | Review workflow logs for errors |
+
+### Debug Commands
+
+```
+# Check workflow status
+gh run list --workflow=deploy-web.yml
+
+# View workflow run details
+gh run view
+
+# Check branch comparison
+git log origin/staging..origin/prestaging --oneline
+
+# Verify freeze variables
+gh variable list
+
+# Force refresh branches
+git fetch origin --prune
+
+```
+
+## Quick Reference
+
+### Common Workflows
+
+| Task | Command/Action |
+| --- | --- |
+| Create feature branch | git checkout prestaging && git checkout -b PW-XXX-feature |
+| Create PR | gh pr create --base prestaging --title "[PW-XXX] Description" |
+| Merge PR | Use "Squash and merge" (not regular merge) |
+| Promote to Staging | Actions → "Promote PreStaging to Staging" → Run |
+| Promote to Production | Actions → "Promote Staging to Main" → Run (requires approval) |
+| Create Release | After prod promotion: gh release create rel-XXX --title "Title" |
+| Create Staging Hotfix | gh pr create --base staging --title "StagingHotFix: Fix" |
+| Create Prod Hotfix | gh pr create --base main --title "ProdHotFix: Fix" |
+| Force Deploy | Actions → "Deploy Web/API" → Force deploy ✓ → Run |
+| Bypass Freeze | Add override-freeze label to PR |
+
+### Repository Variables
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| STAGING_HOTFIX_PREFIX | Staging hotfix PR prefix | StagingHotFix: |
+| PROD_HOTFIX_PREFIX | Production hotfix PR prefix | ProdHotFix: |
+| STAGING_SYNC_BACK_PREFIX | Manual sync-back prefix | StagingSyncBack: |
+| FREEZE_STAGING | Staging freeze flag | false |
+| FREEZE_PRESTAGING | Prestaging freeze flag | false |
+
+### Required Secrets
+
+| Secret | Purpose | Required For |
+| --- | --- | --- |
+| REPO_VARIABLES_TOKEN | PAT with Variables write permission | Hotfix freeze/unfreeze |
+| SLACK_WEBHOOK_URL | Slack webhook for notifications | Deployment alerts |
+| AWS_ACCESS_KEY_ID | AWS credentials for deployment | ECS deployments |
+| AWS_SECRET_ACCESS_KEY | AWS credentials for deployment | ECS deployments |
+
+> ⚠️ **Important**: The `REPO_VARIABLES_TOKEN` must be a **Personal Access Token** (not `GITHUB_TOKEN`) because the default token doesn't have permission to modify repository variables. Create a fine-grained PAT with `Variables` read/write permission, or a classic PAT with `repo` scope.
+
+### Workflow Timeouts
+
+| Workflow | Timeout |
+| --- | --- |
+| E2E Tests | 45 min |
+| Integration Tests | 30 min |
+| Unit Tests | 20 min |
+| Lint (API/Web) | 15 min |
+| Lint (Packages) | 10 min |
+
+### Emergency Contacts
+
+| Issue | Contact |
+| --- | --- |
+| 🔧 DevOps Issues | #devops Slack channel |
+| ⚙️ CI/CD Failures | Check GitHub Actions logs |
+| ☁️ AWS Issues | Contact DevOps team |
+
+## Appendix: Workflow Files
+
+| File | Purpose |
+| --- | --- |
+| deploy-web.yml | Web application deployment |
+| deploy-api.yml | API application deployment |
+| promote-prestaging-to-staging.yml | Staging promotion |
+| promote-staging-to-main.yml | Production promotion |
+| hotfix-sync.yml | Automatic hotfix synchronization |
+| release-branch-guard.yml | PR validation for release branches |
+| retarget-pr-to-prestaging.yml | Auto-retarget PRs |
+| pr-jira-automation.yml | JIRA ticket automation |
+| claude-code-review.yml | AI code review |
+| lint-*.yml | Linting workflows |
+| run-*-tests.yml | Test workflows |
+
+**© 2025 Crest Advisory Group LLC. All rights reserved.**
+

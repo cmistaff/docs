@@ -1,0 +1,170 @@
+---
+title: "Iconography Guide"
+description: "Lucide and Material icon usage, sizing conventions, and icon pairing guidelines."
+---
+
+# Iconography Guide
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+Standards for icon usage across the Crest Pet System.
+
+---
+
+## 📚 Icon Libraries
+
+### By Portal
+
+| Portal | Library | Import |
+| --- | --- | --- |
+| Clinic | Lucide React | `import { Icon } from "lucide-react"` |
+| Enterprise | Lucide React | `import { Icon } from "lucide-react"` |
+| Platform | Lucide React | `import { Icon } from "lucide-react"` |
+| Referral | Lucide React | `import { Icon } from "lucide-react"` |
+| Consumer | Material Icons | Google Fonts CDN |
+
+---
+
+## 📏 Icon Sizes
+
+### Size Scale
+
+| Class | Size | Usage |
+| --- | --- | --- |
+| `h-3 w-3` | 12px | Inline indicators |
+| `h-4 w-4` | 16px | Buttons, inputs |
+| `h-5 w-5` | 20px | Navigation items |
+| `h-6 w-6` | 24px | Card headers |
+| `h-8 w-8` | 32px | Feature highlights |
+| `h-12 w-12` | 48px | Empty state icons |
+| `h-16 w-16` | 64px | Hero sections |
+
+### Context-Based Sizing
+
+| Context | Size |
+| --- | --- |
+| Button (sm) | `h-4 w-4` |
+| Button (default) | `h-4 w-4` |
+| Button (lg) | `h-5 w-5` |
+| Navigation | `h-5 w-5` |
+| Table cell | `h-4 w-4` |
+| Card icon | `h-6 w-6` |
+| Empty state | `h-12 w-12` |
+
+---
+
+## 🏷️ Icon + Label Pairing
+
+### When to Use Labels
+
+| Scenario | Icon Only | Icon + Label |
+| --- | --- | --- |
+| Primary navigation | ❌ | ✅ |
+| Collapsed sidebar | ✅ | ❌ |
+| Toolbar actions | ✅ | ❌ |
+| Form buttons | ❌ | ✅ |
+| Universal icons (close, search) | ✅ | ❌ |
+
+### Spacing
+
+| Context | Gap |
+| --- | --- |
+| Button | `gap-2` (8px) |
+| Navigation | `gap-3` (12px) |
+| Large cards | `gap-4` (16px) |
+
+---
+
+## 🎨 Icon Colors
+
+### States
+
+| State | Color Class |
+| --- | --- |
+| Default | `text-muted-foreground` |
+| Hover | `text-foreground` |
+| Active | `text-primary` |
+| Disabled | `text-muted-foreground/50` |
+
+### Semantic Colors
+
+| Meaning | Color | Icons |
+| --- | --- | --- |
+| Success | `text-green-500` | CheckCircle, Check |
+| Warning | `text-amber-500` | AlertTriangle, AlertCircle |
+| Error | `text-red-500` | XCircle, AlertOctagon |
+| Info | `text-blue-500` | Info, HelpCircle |
+
+---
+
+## ✨ Animated Icons
+
+### Loading Spinner
+
+```
+
+```
+
+### Expandable Indicators
+
+```
+
+```
+
+---
+
+## ♿ Accessibility
+
+### Icon-Only Buttons
+
+Always include `aria-label`:
+
+```
+
+
+
+```
+
+### Decorative Icons
+
+Hide from screen readers:
+
+```
+
+Success
+```
+
+---
+
+## 📋 Common Icon Reference
+
+### Navigation
+
+| Icon | Usage |
+| --- | --- |
+| `Home` | Dashboard |
+| `Calendar` | Appointments |
+| `Users` | Patients/Staff |
+| `Settings` | Settings |
+| `BarChart3` | Analytics |
+
+### Actions
+
+| Icon | Usage |
+| --- | --- |
+| `Plus` | Add/Create |
+| `Pencil` | Edit |
+| `Trash2` | Delete |
+| `Download` | Export |
+| `Upload` | Import |
+
+### Status
+
+| Icon | Usage |
+| --- | --- |
+| `CheckCircle` | Success |
+| `AlertTriangle` | Warning |
+| `XCircle` | Error |
+| `Clock` | Pending |
+| `Loader2` | Loading |

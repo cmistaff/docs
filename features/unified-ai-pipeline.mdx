@@ -1,0 +1,106 @@
+---
+title: "Unified AI Pipeline"
+description: "Unified AI pipeline architecture for multi-model routing and processing."
+---
+
+| **Status** | **[Not started]** |
+| --- | --- |
+| **Impact** | **[High]** |
+| **Driver** |  |
+| **Approver** | @ approver |
+| **Contributors** | @ contributors |
+| **Informed** |  |
+| **Due date** | Type // to add a date |
+| **Resources** | Type /link to add links to relevant research, pages, and related decisions |
+
+
+## :blue-star: Background
+
+We’re having two issues mainly:
+    1. We have 6 separate AI analysis features causing confusion and code duplication
+    2. The current AI analysis/data extraction of documents needs to be upgraded.
+
+## 1:
+
+We have **6 separate features** that essentially do the same thing - AI health analysis:
+
+- Documents (analyzing PDFs/images)
+- Wellness Assessment
+- AI Analysis (tooth scans, poop scans)
+- Symptoms Checker
+- Vet Assistant (conversational)
+
+The Problems:  
+**1. User Confusion**: Users don't understand why they need 5 different pages to "analyze pet health with AI". The value proposition is unclear - why upload a document vs do a wellness assessment vs use symptoms checker?  
+
+**2. Data  Fragmentation**: Each feature stores data differently:
+
+- Documents → document analysis schema
+- Wellness → assessment metrics
+- Scans → media analysis results
+- Symptoms → symptom records
+- This prevents us from showing unified health insights
+
+**3. Code Duplication:** We're maintaining 5 different:
+
+- Upload flows
+- AI processing pipelines
+- Result display components
+- Database schemas
+- All doing essentially the same AI analysis
+
+## 2:
+
+We need to **update the AI analysis/data extraction to use AWS services** to make it more
+accurate and reliable, as recommended by Michael.
+
+## :blue-star: Solution:
+
+**Create ONE unified processing pipeline that handles ALL health data, then present it differently based on context.**
+
+How Each Feature Transforms:
+
+1. Documents stays as your primary upload interface - but now uses AWS Textract + Comprehend Medical before sending to LLM. This becomes THE place for all document/image uploads.
+2. Wellness Assessment completely transforms into a questionnaire system - NO uploads allowed. Just forms asking "How often do you walk your dog?" This enriches the pet profile with lifestyle data.
+3. AI Analysis (tooth/poop scans) merges into Documents. Same upload interface, just different analysis templates applied based on what's being analyzed.
+4. Symptoms Checker also merges into Documents. Instead of separate feature, it's just a text input option in the documents interface.
+5. Vet Assistant remains separate because it's conversational (chat interface) not analytical. But now it accesses the unified database table.
+
+  The Architecture:
+
+- All uploads → AWS extraction pipeline → Single database table→ Different views for different users
+- Store both extracted data AND images (Michael's insight for LLM accuracy)
+- Consumer sees simplified/educational view
+- Vets see detailed clinical view
+- Same data, different presentations
+
+```
+Document Input → AWS Textract → Comprehend Medical → LLM → Unified Database
+      ↓              ↓                ↓                ↓
+   + Image      Extract text    Medical entities   Vet context
+   Storage      & structure     & relationships    & validation
+```
+
+## :blue-star: Notes:
+
+#### Why We're Transforming Wellness Assessment:
+
+Right now, Wellness Assessment is essentially a duplicate of our Documents feature - users upload health documents, we analyze them with AI, and generate a report. This creates real confusion for users who don't understand why they have two places to upload the same veterinary documents.
+
+But here's what Michael envisionsd: Wellness Assessment should be about capturing the data that medical documents can't tell us. Things like how often someone walks their dog, what brand of food they're using, or whether their pet's energy has changed recently. This lifestyle and behavioral data is incredibly valuable for understanding a pet's health, but it's never in medical records.
+
+So we're completely transforming it from an upload feature into an interactive questionnaire system. No more uploads allowed - if someone tries, we'll politely redirect them to Documents. Instead, they'll answer quick questions about their pet's daily life through monthly lifestyle assessments or quarterly diet check-ins. This data goes into the same unified database but enriches the pet profile in ways medical documents never could.
+
+#### Why We're Adding AWS Services Before LLM Processing:
+
+Right now, we send entire PDFs directly to LLMs, asking them to do everything from basic text extraction to medical interpretation. It's like asking a specialist doctor to also be a medical transcriptionist - inefficient and not playing to their strengths.
+
+AWS Textract handles the mechanical part first - extracting text, tables, and forms with 99% accuracy. It knows how to read lab report tables, parse forms, and handle handwritten notes. Then Comprehend Medical identifies all the medical entities: medications,dosages, conditions, and procedures. It understands that "Rimadyl 50mg bid" means a specific medication taken twice daily, and links it to the condition being treated.
+
+By the time data reaches the LLM, it's already structured and categorized. The LLM can focus purely on veterinary interpretation - understanding what these values mean for a senior cat versus a puppy, recognizing breed-specific concerns, and providing contextual insights. We're not wasting its intelligence on OCR tasks.
+
+Michael's key insight is to store both the extracted data AND the original images. When we send both to the LLM, it gets the clean, structured data plus the visual context of how information was presented. This dual approach significantly improves accuracy because the LLM can verify extractions and catch visual cues like highlighted abnormal values or handwritten notes in margins. It's the difference between reading a transcript versus seeing the actual document - context matters in medical interpretation.
+
+## :blue-star: Action items
+
+Summarize the outcome.

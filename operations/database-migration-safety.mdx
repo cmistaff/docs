@@ -1,0 +1,2464 @@
+---
+title: "Database Migration Safety Guide"
+description: "Safe database migration procedures for Prisma migrations in the CrestPet multi-tenant system."
+---
+
+## Problem Statement
+
+### How Deployments Work Today
+
+Our ECS rolling deployment runs database migrations **inside the application container** at startup. The `server/package.json` `start` script is:
+
+```
+pnpm -w prisma:migration:run && cross-env NODE_ENV=production node dist/main
+
+```
+
+This means:
+
+| Step | What Happens |
+| --- | --- |
+| 1 | GitHub Actions builds a new Docker image and pushes it to ECR |
+| 2 | ECS starts a new task (Instance 2) alongside the old task (Instance 1) |
+| 3 | Instance 2 runs prisma migrate deploy - schema changes are applied |
+| 4 | Instance 1 is still serving requests against the new schema |
+| 5 | Instance 2 starts node dist/main and begins passing health checks |
+| 6 | Load balancer shifts traffic to Instance 2 |
+| 7 | Instance 1 is drained and stopped |
+
+### The Problem
+
+Between steps 3 and 7, Instance 1 (old code) is running queries against a modified schema. If the migration was **destructive** (renamed a column, added a NOT NULL constraint, dropped a table), those queries will fail.
+
+```
+Timeline:
+ t0 ──── Instance 1 (V1 code) serving traffic ────────────────────── t7
+ t2 ── Instance 2 starts ──────────────────────────────────────────→
+ t3 ── Migration runs ── Schema is now V2 ─────────────────────────→
+ ↑
+ DANGER ZONE (t3 → t7)
+ Instance 1 queries may fail
+ against the V2 schema
+
+```
+
+### Secondary Risk: Migration Races
+
+If ECS scales up multiple new tasks simultaneously, each runs `prisma migrate deploy`. Prisma uses a `_prisma_migrations` lock table to serialize this, so there is no data corruption risk. However, concurrent migration attempts add startup latency.
+
+### Core Principle
+
+> **Every migration MUST be backward-compatible with the currently deployed code.**
+>
+> The old code must continue to work correctly after the migration runs. This is achieved through the **Expand-Contract Pattern**.
+
+## The Expand-Contract Pattern
+
+The expand-contract pattern splits destructive schema changes into multiple deployments:
+
+| Phase | Name | What Happens | Safety |
+| --- | --- | --- | --- |
+| 1 | Expand | Additive-only schema changes (add columns, add tables, add indexes) | Old code works fine - it doesn't know about new columns |
+| 2 | Transition | New code uses new schema elements; old elements still exist | Both old and new code work |
+| 3 | Contract | Remove old schema elements (drop columns, add constraints) | Only new code is running |
+
+### The Golden Rule
+
+> If the migration contains `DROP`, `RENAME`, `ALTER ... TYPE`, or adds a `NOT NULL` constraint, it **cannot ship in the same deploy** as the code that depends on it.
+
+### When Expand-Contract Is Required
+
+| Change Type | Multi-Deploy? | Deploys | Why |
+| --- | --- | --- | --- |
+| Add nullable column | No | 1 | Old code ignores it |
+| Add column with default | No | 1 | Old code ignores it; DB handles default |
+| Add new table | No | 1 | Old code doesn't reference it |
+| Add index | No | 1 | Non-breaking; may cause brief lock on large tables |
+| Drop index | No | 1 | Non-breaking; queries may slow down |
+| Add NOT NULL column | Yes | 2 | Old code inserting without the column will violate constraint |
+| Drop column | Yes | 2 | Previous deploy's code may still reference it during rolling update |
+| Rename column | Yes | 3 | Needs expand (add new) + transition (stop using old) + contract (drop old) |
+| Change column type | Yes | 3 | Same as rename - parallel columns during transition |
+| Drop table | Yes | 2 | Previous deploy's code may still reference it during rolling update |
+| Make nullable column required | Yes | 2 | Old code may insert NULLs; need backfill first |
+
+### Critical Rules for Multi-Deploy Migrations
+
+These rules prevent subtle data corruption and runtime errors during rolling deployments:
+
+**Rule 1: You can only DROP a column when no running code references it.**
+
+Since rolling deployments run two code versions simultaneously, the code version **before** the DROP must already have zero references to that column.
+
+```
+Deploy N: Remove all code references to the column ← code cleanup
+Deploy N+1: DROP COLUMN in migration ← schema cleanup
+
+During Deploy N+1 rollout:
+ [Deploy N code (no references)] + [Deploy N+1 code (no references)] → Safe
+
+```
+
+If you try to combine both into one deploy, the code from Deploy N-1 (which still references the column) will overlap during the rolling update and crash.
+
+**Rule 2: When writing to dual columns (expand phase), write to BOTH in every operation.**
+
+During the expand phase, new code must write to BOTH the old and new columns. Even though a sync trigger (see Rule 5) keeps the new column in sync when old code writes to the old column, new code must still write to the old column so that old instances - which only read the old column - see correct data.
+
+```
+// ✅ REQUIRED during expand phase: write to BOTH
+data: { pet_name: newValue, name: newValue }
+
+// ❌ WRONG: Only writing to new column → old instances see stale pet_name
+data: { name: newValue }
+
+```
+
+**Rule 3: Initial backfill MUST be conditional (WHERE target IS NULL).**
+
+The Deploy 1 migration includes a backfill for all rows that existed before the migration. This backfill must use `WHERE target IS NULL` to avoid overwriting values that application code has already written to the new column.
+
+```
+-- ❌ DATA LOSS: Overwrites values set by new code
+UPDATE "Pet" SET "name" = "pet_name";
+
+-- ✅ SAFE: Only fills rows not yet touched by new code
+UPDATE "Pet" SET "name" = "pet_name" WHERE "name" IS NULL;
+
+```
+
+> **Note:** With the sync trigger approach (Rule 5), the straggler backfill in the Contract deploy is no longer needed - the trigger keeps new rows in sync automatically. The conditional backfill in Deploy 1 is still required for rows that existed before the migration (the trigger only fires on future writes).
+
+**Rule 4: For any destructive change, ask the overlap question.**
+
+> Does the code from the **previous** deploy still reference what I am about to drop/change?
+
+| If yes | You need a transition deploy first to remove those references |
+| --- | --- |
+| If no | Safe to proceed with the destructive migration |
+
+**Rule 5: Use a temporary sync trigger for rename, type-change, and table-split migrations.**
+
+When renaming a column, changing a column type, or splitting a table, create a trigger in the Expand migration that automatically syncs data between old and new locations. This eliminates straggler rows and data staleness during the rolling update overlap window. The trigger type depends on the operation:
+
+- **Column rename / type change (Playbooks 4, 5):** `BEFORE INSERT OR UPDATE` on the same table - syncs old column value to new column.
+- **Table split (Playbook 12):** `BEFORE INSERT OR UPDATE` on the source table - upserts into the new table when old code writes to old columns.
+- **Table merge (Playbook 13):** `AFTER INSERT OR UPDATE` on the source table - updates the target table. ⚠️ AFTER triggers on different tables carry deadlock risk (see Known Limitations).
+
+
+```
+-- Created in Deploy 1 (Expand) migration
+CREATE OR REPLACE FUNCTION sync_old_to_new() RETURNS TRIGGER AS $$
+BEGIN
+ IF TG_OP = 'INSERT' AND NEW.new_col IS NULL THEN
+ NEW.new_col = NEW.old_col;
+ END IF;
+ IF TG_OP = 'UPDATE' AND NEW.old_col IS DISTINCT FROM OLD.old_col THEN
+ NEW.new_col = NEW.old_col;
+ END IF;
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_old_to_new
+ BEFORE INSERT OR UPDATE ON "MyTable"
+ FOR EACH ROW EXECUTE FUNCTION sync_old_to_new();
+
+-- Dropped in Deploy 3 (Contract) migration BEFORE dropping the old column
+DROP TRIGGER IF EXISTS trg_sync_old_to_new ON "MyTable";
+DROP FUNCTION IF EXISTS sync_old_to_new();
+
+```
+
+**Key points:**
+
+- **Prisma does not manage triggers.** You must use `--create-only` and manually add the trigger SQL to the migration file.
+- The trigger fires on every write, so the new column/table is always populated - no straggler rows can exist.
+- The trigger must be dropped in the Contract migration **before** dropping the old column/table (the trigger references old structures).
+- `BEFORE` triggers on the same table (Playbooks 4, 5, 12) have negligible performance impact.
+- `AFTER` triggers across tables (Playbook 13) carry deadlock risk - keep transition period short and monitor logs.
+
+## Safe vs Unsafe Operations
+
+### Safe Operations (Single Deploy)
+
+These migrations can ship alongside application code changes in the same PR:
+
+```
+-- Adding a nullable column (SAFE)
+ALTER TABLE "Pet" ADD COLUMN "microchip" TEXT;
+
+-- Adding a column with a default (SAFE)
+ALTER TABLE "Pet" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
+
+-- Creating a new table (SAFE)
+CREATE TABLE "VaccinationRecord" (
+ "id" TEXT NOT NULL,
+ "petId" TEXT NOT NULL,
+ "vaccine" TEXT NOT NULL,
+ PRIMARY KEY ("id")
+);
+
+-- Adding an index (SAFE, but may lock briefly on large tables)
+CREATE INDEX "Pet_tenantId_species_idx" ON "Pet" ("tenantId", "species");
+
+-- Dropping an index (SAFE, but queries may slow down)
+DROP INDEX "Pet_oldIndex_idx";
+
+```
+
+### Unsafe Operations (Require Multi-Deploy)
+
+These migrations MUST be split across multiple deploys:
+
+```
+-- ❌ UNSAFE: Drop column
+ALTER TABLE "Pet" DROP COLUMN "oldField";
+
+-- ❌ UNSAFE: Rename column (Prisma generates DROP + ADD!)
+ALTER TABLE "Pet" RENAME COLUMN "pet_name" TO "name";
+
+-- ❌ UNSAFE: Change column type
+ALTER TABLE "Pet" ALTER COLUMN "weight" TYPE DECIMAL;
+
+-- ❌ UNSAFE: Add NOT NULL without default
+ALTER TABLE "Pet" ADD COLUMN "ownerId" TEXT NOT NULL;
+
+-- ❌ UNSAFE: Make existing nullable column required
+ALTER TABLE "Pet" ALTER COLUMN "microchip" SET NOT NULL;
+
+-- ❌ UNSAFE: Drop table
+DROP TABLE "OldFeatureTable";
+
+```
+
+## Scenario Playbooks
+
+### Playbook 1: Adding a Nullable Column (1 Deploy)
+
+**Scenario:** Add an optional `microchip` field to the `Pet` model.
+
+**Deploy 1 (single PR):**
+
+```
+// packages/common/prisma/schema/pet.prisma
+model Pet {
+ id String @id @default(uuid())
+ name String
+ species String
+ microchip String? // New nullable field
+}
+
+```
+
+```
+pnpm prisma:migration:create add-pet-microchip
+# Review generated SQL - should only be ALTER TABLE ADD COLUMN ... NULL
+pnpm prisma:migration:run # Test locally
+
+```
+
+**Result:** Old code doesn't read or write `microchip`, so it is unaffected. New code can start using it.
+
+### Playbook 2: Adding a NOT NULL Column (2 Deploys)
+
+**Scenario:** Add a required `ownerId` field to the `Pet` model.
+
+**Deploy 1 (Expand):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ name String
+ ownerId String? // Add as NULLABLE first
+}
+
+```
+
+- Migration: `ALTER TABLE "Pet" ADD COLUMN "ownerId" TEXT;`
+- Code: New writes include `ownerId`; reads handle `null` with a fallback
+- Data: Backfill existing rows (see [Data Backfill Guidelines](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/DATABASE-MIGRATION-SAFETY.md#data-backfill-guidelines))
+
+
+**Deploy 2 (Contract):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ name String
+ ownerId String // Now required - all rows have values
+}
+
+```
+
+- Pre-requisite: ALL existing rows have `ownerId` populated
+- Migration: `ALTER TABLE "Pet" ALTER COLUMN "ownerId" SET NOT NULL;`
+- Code: Remove null-handling fallbacks
+
+
+```
+# Deploy 1
+pnpm prisma:migration:create add-pet-owner-nullable
+# Deploy 2 (after backfill is complete)
+pnpm prisma:migration:create make-pet-owner-required
+
+```
+
+### Playbook 3: Removing a Column (2 Deploys)
+
+**Scenario:** Remove the deprecated `legacyCode` column from `Pet`.
+
+> **Key principle:** You can only DROP a column when **no running code references it**. Since rolling deployments run two code versions simultaneously, the code version **before** the drop must already have zero references to that column.
+
+**Deploy 1 (Code cleanup - no migration):**
+
+- Remove ALL references to `legacyCode` from application code
+- Remove from Prisma `select` clauses, `data` writes, DTOs, services
+- Keep the column in the Prisma schema (do NOT remove yet - column still exists in DB)
+- No migration in this deploy
+- **After this deploy completes:** All running instances (both old draining and new) have transitioned. Once the rolling update finishes, zero running code references `legacyCode`.
+
+
+**Deploy 2 (Schema cleanup):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ name String
+ // legacyCode removed
+}
+
+```
+
+```
+pnpm prisma:migration:create drop-pet-legacy-code
+# Generated SQL: ALTER TABLE "Pet" DROP COLUMN "legacyCode";
+# This is now safe - no running code references it
+
+```
+
+**Why this is safe:** During Deploy 2's rolling update, both Deploy 1 instances (no `legacyCode` references) and Deploy 2 instances (no `legacyCode` references) run simultaneously. Neither touches the column, so dropping it causes no errors.
+
+**Why you cannot combine into 1 deploy:** If you remove code references AND drop the column in the same deploy, the **previous** deploy's code (which still references `legacyCode`) will overlap during the rolling update and fail.
+
+### Playbook 4: Renaming a Column (3 Deploys)
+
+**Scenario:** Rename `pet_name` to `name` in the `Pet` model.
+
+> **Critical Prisma Warning:** Prisma treats a rename as `DROP old + ADD new`. You MUST use `--create-only` and manually edit the SQL.
+
+Renaming requires **3 deploys** because of two overlapping constraints:
+
+1. Old code must keep working during the expand (needs `pet_name`)
+2. Old (expand) code must stop writing to `pet_name` before the contract can drop it
+
+
+```
+Deploy 1 rollout: [Old code (reads pet_name)] + [Deploy 1 code (writes BOTH)] → Safe: both columns exist, trigger syncs
+Deploy 2 rollout: [Deploy 1 code (writes BOTH)] + [Deploy 2 code (writes ONLY name)] → Safe: both columns still exist
+Deploy 3 rollout: [Deploy 2 code (writes ONLY name)] + [Deploy 3 code (writes ONLY name)] → Safe: neither references pet_name
+
+```
+
+> **Why you cannot skip Deploy 2:** If Deploy 1 code writes to BOTH columns and Deploy 3 drops `pet_name`, then during Deploy 3's rolling update, Deploy 1 instances still writing to `pet_name` will crash. Deploy 2 exists solely to ensure all running code has stopped referencing `pet_name` before it is dropped.
+
+**Deploy 1 (Expand):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ pet_name String // Keep old
+ name String? // Add new (nullable for now)
+}
+
+```
+
+Manually edit the generated migration SQL (`--create-only`):
+
+```
+-- 1. Add new column
+ALTER TABLE "Pet" ADD COLUMN "name" TEXT;
+
+-- 2. Create sync trigger: keeps "name" in sync when old code writes to "pet_name"
+CREATE OR REPLACE FUNCTION sync_pet_name_to_name() RETURNS TRIGGER AS $$
+BEGIN
+ -- INSERT: fill name from pet_name if the inserting code didn't set it
+ IF TG_OP = 'INSERT' AND NEW.name IS NULL THEN
+ NEW.name = NEW.pet_name;
+ END IF;
+
+ -- UPDATE: sync name when pet_name changes
+ IF TG_OP = 'UPDATE' AND NEW.pet_name IS DISTINCT FROM OLD.pet_name THEN
+ NEW.name = NEW.pet_name;
+ END IF;
+
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_pet_name_to_name
+ BEFORE INSERT OR UPDATE ON "Pet"
+ FOR EACH ROW EXECUTE FUNCTION sync_pet_name_to_name();
+
+-- 3. Backfill existing rows (trigger only fires on future writes)
+UPDATE "Pet" SET "name" = "pet_name" WHERE "name" IS NULL;
+
+```
+
+**What the trigger does:**
+
+| Scenario | What happens | Result |
+| --- | --- | --- |
+| Old code (V0) INSERTs a row | V0 sets pet_name but not name. Trigger fires: name IS NULL → sets name = pet_name. | No straggler rows. name is always populated. |
+| Old code (V0) UPDATEs a row | V0 changes pet_name only. Trigger fires: pet_name changed → sets name = pet_name. | No stale data. name stays in sync. |
+| New code (V1) writes BOTH | V1 sets both pet_name and name to the same value. Trigger fires but sets name to the same value it already has. | No-op. Harmless. |
+
+Code changes:
+
+```
+// WRITE: Set BOTH columns - required so old instances (V0) see correct pet_name
+await prisma.pet.update({
+ where: { id, tenantId },
+ data: {
+ pet_name: newName, // Keep old column in sync for V0 readers
+ name: newName, // Write to new column
+ },
+ select: { id: true, name: true, pet_name: true },
+});
+
+// READ: Read name directly - trigger guarantees it is always populated
+const displayName = pet.name;
+
+```
+
+> **Why V1 still dual-writes:** The trigger syncs `pet_name → name`, not the reverse. V0 only reads `pet_name`, so V1 must write to `pet_name` to keep V0's reads correct. The trigger ensures `name` is always in sync regardless of which code version writes.
+
+**Deploy 2 (Transition - no migration):**
+
+- Remove ALL writes to `pet_name` from code
+- Remove ALL reads of `pet_name` from code
+- Keep `pet_name` in the Prisma schema (column still exists in DB)
+- No migration - schema unchanged
+
+
+```
+// WRITE: ONLY the new column (stop writing to pet_name)
+await prisma.pet.update({
+ where: { id, tenantId },
+ data: { name: newName },
+ select: { id: true, name: true },
+});
+
+// READ: ONLY the new column
+const displayName = pet.name;
+
+```
+
+**Why this deploy is safe:** During the rolling update, Deploy 1 instances (write BOTH) and Deploy 2 instances (write ONLY `name`) run simultaneously. Both columns still exist in the schema, so Deploy 1 code writing to `pet_name` does not error. The trigger is still active but effectively dormant - Deploy 2 code does not write to `pet_name`, so the trigger's UPDATE condition never fires.
+
+**After this deploy completes:** All running instances have stopped referencing `pet_name`. It is now safe to drop.
+
+**Deploy 3 (Contract):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ name String // Now required
+ // pet_name removed
+}
+
+```
+
+```
+-- 1. Drop trigger + function FIRST (they reference pet_name, which we are about to drop)
+DROP TRIGGER IF EXISTS trg_sync_pet_name_to_name ON "Pet";
+DROP FUNCTION IF EXISTS sync_pet_name_to_name();
+
+-- 2. No straggler backfill needed - trigger kept all rows in sync
+-- Safe to enforce NOT NULL immediately
+ALTER TABLE "Pet" ALTER COLUMN "name" SET NOT NULL;
+
+-- 3. No running code references pet_name - safe to drop
+ALTER TABLE "Pet" DROP COLUMN "pet_name";
+
+```
+
+**Why no straggler backfill is needed:** The sync trigger fired on every V0 INSERT and UPDATE during the Deploy 1 rollout window. Every row that V0 created or modified had `name` automatically populated by the trigger. There are no rows with `name = NULL`.
+
+**Why this deploy is safe:** During the rolling update, both Deploy 2 and Deploy 3 instances reference ONLY `name`. Neither touches `pet_name`, so dropping it causes no errors.
+
+### Playbook 5: Changing a Column Type (3 Deploys)
+
+**Scenario:** Change `weight` from `String` to `Decimal` in the `Pet` model.
+
+The same 3-deploy pattern as renaming applies, including the sync trigger. Deploy 2 ensures all running code stops referencing the old column before Deploy 3 drops it.
+
+**Deploy 1 (Expand):**
+
+```
+model Pet {
+ id String @id @default(uuid())
+ weight String // Old type (keep)
+ weightDecimal Decimal? // New type (add)
+}
+
+```
+
+Manually edit the generated migration SQL (`--create-only`):
+
+```
+-- 1. Add new column
+ALTER TABLE "Pet" ADD COLUMN "weightDecimal" DECIMAL;
+
+-- 2. Create sync trigger: converts weight → weightDecimal when old code writes
+CREATE OR REPLACE FUNCTION sync_weight_to_decimal() RETURNS TRIGGER AS $$
+BEGIN
+ -- INSERT: convert if new code didn't set weightDecimal
+ IF TG_OP = 'INSERT' AND NEW."weightDecimal" IS NULL AND NEW.weight IS NOT NULL
+ AND NEW.weight ~ '^\d+\.?\d*$' THEN
+ NEW."weightDecimal" = CAST(NEW.weight AS DECIMAL);
+ END IF;
+
+ -- UPDATE: sync when weight changes
+ IF TG_OP = 'UPDATE' AND NEW.weight IS DISTINCT FROM OLD.weight
+ AND NEW.weight IS NOT NULL AND NEW.weight ~ '^\d+\.?\d*$' THEN
+ NEW."weightDecimal" = CAST(NEW.weight AS DECIMAL);
+ END IF;
+
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_weight_to_decimal
+ BEFORE INSERT OR UPDATE ON "Pet"
+ FOR EACH ROW EXECUTE FUNCTION sync_weight_to_decimal();
+
+-- 3. Backfill existing rows (trigger only fires on future writes)
+UPDATE "Pet" SET "weightDecimal" = CAST("weight" AS DECIMAL)
+ WHERE "weightDecimal" IS NULL
+ AND "weight" IS NOT NULL
+ AND "weight" ~ '^\d+\.?\d*$';
+
+```
+
+> **Type conversion note:** The trigger includes the regex validation (`~ '^\d+\.?\d*$'`) to avoid casting non-numeric strings. Rows with unparseable `weight` values will have `weightDecimal = NULL` - handle these in application code or a separate data cleanup.
+
+Code: Write to BOTH columns; read from `weightDecimal` directly (trigger guarantees it is populated for valid values).
+
+```
+// WRITE: Keep both in sync for V0 readers
+data: {
+ weight: String(newWeight), // Old format (V0 reads this)
+ weightDecimal: newWeight, // New format
+}
+
+// READ: Read new column directly - trigger keeps it in sync
+const petWeight = pet.weightDecimal;
+
+```
+
+**Deploy 2 (Transition - no migration):**
+
+- Remove ALL writes to `weight` (String) from code
+- Remove ALL reads of `weight` (String) from code
+- Keep `weight` in the Prisma schema (column still exists in DB)
+
+
+```
+// WRITE: Only new column
+data: {
+ weightDecimal: newWeight;
+}
+
+// READ: Only new column
+const petWeight = pet.weightDecimal;
+
+```
+
+**Deploy 3 (Contract):**
+
+```
+-- 1. Drop trigger + function FIRST (they reference weight, which we are about to drop)
+DROP TRIGGER IF EXISTS trg_sync_weight_to_decimal ON "Pet";
+DROP FUNCTION IF EXISTS sync_weight_to_decimal();
+
+-- 2. No straggler backfill needed - trigger kept all rows in sync
+-- Drop old column (no running code references it - removed in Deploy 2)
+ALTER TABLE "Pet" DROP COLUMN "weight";
+
+-- 3. Rename new column to final name
+ALTER TABLE "Pet" RENAME COLUMN "weightDecimal" TO "weight";
+
+-- 4. Add NOT NULL constraint
+ALTER TABLE "Pet" ALTER COLUMN "weight" SET NOT NULL;
+
+```
+
+### Playbook 6: Enum Operations
+
+PostgreSQL enums are database-level types. Unlike column renames, **sync triggers cannot help with enum value changes** - the old and new values live in the same column, so there is nothing to sync between columns. Instead, we rely on backfills and value mapping in code.
+
+> **Prisma caveat:** `ALTER TYPE ... ADD VALUE` cannot run inside a transaction. Prisma handles this automatically by executing it outside the migration transaction. If the migration fails partway through, the new value may already exist in the enum - this is safe but be aware of it.
+
+#### 6a: Adding a New Enum Value (1-2 Deploys)
+
+**Scenario:** Add `'archived'` to the `PetStatus` enum.
+
+**1-deploy approach (when old code handles unknown values gracefully):**
+
+```
+ALTER TYPE "PetStatus" ADD VALUE 'archived';
+
+```
+
+Old code that reads a row with `status = 'archived'` must not crash. This is safe when:
+
+- Code uses a `default` case in switch/if-else chains
+- Code treats unknown values as opaque strings (passes through without validation)
+
+
+**2-deploy approach (when old code validates strictly):**
+
+If old code throws on unknown enum values (e.g., exhaustive switch without default), you need two deploys:
+
+**Deploy 1:** Add the value + teach code to handle it, but **do not write it yet**.
+
+```
+ALTER TYPE "PetStatus" ADD VALUE 'archived';
+
+```
+
+```
+// Code recognizes the new value but does not produce it
+switch (pet.status) {
+ case PetStatus.ACTIVE: ...
+ case PetStatus.INACTIVE: ...
+ case PetStatus.ARCHIVED: ... // Handle reads - but no code path writes this yet
+}
+
+```
+
+**Deploy 2:** Start writing the new value.
+
+```
+// Now safe - all running instances (Deploy 1 + Deploy 2) know how to handle 'archived'
+await prisma.pet.update({
+ where: { id, tenantId },
+ data: { status: PetStatus.ARCHIVED },
+ select: { id: true, status: true },
+});
+
+```
+
+| Old code behavior | Deploys | Reasoning |
+| --- | --- | --- |
+| Has default / passes through unknown values | 1 | Old code won't crash on new value |
+| Exhaustive switch / throws on unknown | 2 | Deploy 1 teaches code, Deploy 2 starts writing |
+
+#### 6b: Removing an Enum Value (2 Deploys)
+
+**Scenario:** Remove `'legacy_inactive'` from the `PetStatus` enum.
+
+PostgreSQL does **not** support `ALTER TYPE ... DROP VALUE`. Removing a value requires Prisma to recreate the type (create new type → alter columns → drop old type). You must ensure no data uses the value first.
+
+**Deploy 1 (Transition + data migration):**
+
+- Stop writing the old value in code (replace with the alternative value)
+- Backfill existing rows
+
+
+```
+// Code no longer writes 'legacy_inactive' - uses 'inactive' instead
+// If reading 'legacy_inactive', treat it as 'inactive'
+const normalizedStatus = pet.status === 'legacy_inactive'
+ ? PetStatus.INACTIVE
+ : pet.status;
+
+```
+
+Migration:
+
+```
+-- Backfill all rows using the old value
+UPDATE "Pet" SET status = 'inactive' WHERE status = 'legacy_inactive';
+
+```
+
+> **Pre-deploy verification:** After this deploy is live in all environments, verify: `SELECT COUNT(*) FROM "Pet" WHERE status = 'legacy_inactive';` - must return 0.
+
+**Deploy 2 (Contract):**
+
+Remove the value from the Prisma enum. Prisma generates the type recreation SQL.
+
+```
+enum PetStatus {
+ active
+ inactive
+ // legacy_inactive removed
+}
+
+```
+
+Migration (auto-generated by Prisma):
+
+```
+-- Safety backfill: catch rows written by old code after Deploy 1's backfill
+UPDATE "Pet" SET status = 'inactive' WHERE status = 'legacy_inactive';
+
+-- Prisma recreates the type
+CREATE TYPE "PetStatus_new" AS ENUM ('active', 'inactive');
+ALTER TABLE "Pet" ALTER COLUMN "status" TYPE "PetStatus_new" USING (status::text::"PetStatus_new");
+ALTER TYPE "PetStatus" RENAME TO "PetStatus_old";
+ALTER TYPE "PetStatus_new" RENAME TO "PetStatus";
+DROP TYPE "PetStatus_old";
+
+```
+
+> **Why the safety backfill in Deploy 2?** During Deploy 1's rollout, old instances may still write `'legacy_inactive'` after the backfill ran. The safety backfill in Deploy 2 catches these straggler rows before the type recreation (which would fail if any row still uses the removed value).
+
+Remove the value mapping from code - only `'active'` and `'inactive'` exist now.
+
+#### 6c: Renaming an Enum Value (2-3 Deploys)
+
+**Scenario:** Rename `'pending_review'` to `'under_review'` in the `AppointmentStatus` enum.
+
+> **Why not use **`ALTER TYPE ... RENAME VALUE`**?** PostgreSQL 10+ supports it, but it is destructive - old code writing `'pending_review'` will get a database error immediately after the rename. We use expand-contract on the **values** instead.
+
+> **Deploy count depends on old code behavior:**
+>
+> - **2 deploys:** If old code silently ignores unknown enum values (e.g., passes them through, displays a fallback label).
+> - **3 deploys:** If old code throws/crashes on unknown enum values, you need a **Deploy 0** first: teach old code to gracefully handle `'under_review'` (same pattern as Playbook 6a strict). Only then proceed with Deploy 1 + Deploy 2 below.
+
+**Deploy 1 (Expand):**
+
+```
+-- Add the new value (both 'pending_review' and 'under_review' now exist)
+ALTER TYPE "AppointmentStatus" ADD VALUE 'under_review';
+
+-- Backfill: remap existing data to new value
+UPDATE "Appointment" SET status = 'under_review' WHERE status = 'pending_review';
+
+```
+
+Code changes:
+
+```
+// WRITE: Only write the new value
+await prisma.appointment.update({
+ where: { id, tenantId },
+ data: { status: 'under_review' },
+ select: { id: true, status: true },
+});
+
+// READ: Map old value to new (for rows written by old code after backfill)
+const normalizedStatus = appointment.status === 'pending_review'
+ ? 'under_review'
+ : appointment.status;
+
+```
+
+**During Deploy 1 rollout:**
+
+| Instance | Writes | Reads |
+| --- | --- | --- |
+| Old code (V0) | 'pending_review' - still valid, value exists | Only knows 'pending_review' - if it reads 'under_review', same risk as adding a new value |
+| New code (V1) | 'under_review' | Maps 'pending_review' → 'under_review' |
+
+> **Note:** If old code throws on unknown enum values, use the 2-deploy adding pattern (6a) as Deploy 0 first: teach old code to handle `'under_review'` before writing it.
+
+**Deploy 2 (Contract):**
+
+Remove `'pending_review'` from the enum.
+
+```
+-- Safety backfill: catch rows written by old code after Deploy 1's backfill
+UPDATE "Appointment" SET status = 'under_review' WHERE status = 'pending_review';
+
+-- Prisma recreates the type (same pattern as 6b)
+CREATE TYPE "AppointmentStatus_new" AS ENUM ('scheduled', 'under_review', 'completed');
+ALTER TABLE "Appointment" ALTER COLUMN "status" TYPE "AppointmentStatus_new"
+ USING (status::text::"AppointmentStatus_new");
+ALTER TYPE "AppointmentStatus" RENAME TO "AppointmentStatus_old";
+ALTER TYPE "AppointmentStatus_new" RENAME TO "AppointmentStatus";
+DROP TYPE "AppointmentStatus_old";
+
+```
+
+Remove value mapping from code - `'pending_review'` no longer exists.
+
+#### 6d: Splitting an Enum Value (2 Deploys)
+
+**Scenario:** Split `'active'` into `'active_healthy'` and `'active_treatment'` in `PetStatus`.
+
+This combines adding new values + removing the old value:
+
+**Deploy 1 (Expand):**
+
+```
+ALTER TYPE "PetStatus" ADD VALUE 'active_healthy';
+ALTER TYPE "PetStatus" ADD VALUE 'active_treatment';
+
+-- Backfill: assign a default for existing 'active' rows
+UPDATE "Pet" SET status = 'active_healthy' WHERE status = 'active';
+
+```
+
+Code: Write one of the new values based on business logic. Map `'active'` → default when reading.
+
+**Deploy 2 (Contract):**
+
+Safety backfill + remove `'active'` (type recreation, same pattern as 6b).
+
+#### Enum Operations: Quick Reference
+
+| Operation | Deploys | Sync trigger? | Key risk | Safety backfill in contract? |
+| --- | --- | --- | --- | --- |
+| Add value (graceful code) | 1 | No | None - old code handles unknowns | No |
+| Add value (strict code) | 2 | No | Old code throws on unknown value | No |
+| Remove value | 2 | No | Data still using the value | Yes |
+| Rename value | 2 | No | Old code writing old value after backfill | Yes |
+| Split value | 2 | No | Same as rename + add | Yes |
+
+### Playbook 7: Adding a Unique Constraint to Existing Column (2 Deploys)
+
+**Scenario:** Add a unique constraint on `email` in the `ClinicUser` table, where duplicates may already exist.
+
+> **Why this is dangerous:** `ALTER TABLE ... ADD CONSTRAINT ... UNIQUE` fails immediately if any duplicate values exist. You must clean the data first.
+
+**Deploy 1 (Expand - dedup + code guard):**
+
+No migration. Code changes only:
+
+1. Add a unique validation check in the service layer (reject new duplicates at the application level)
+2. Run a data cleanup script or migration to resolve existing duplicates
+
+
+```
+-- Find duplicates
+SELECT email, COUNT(*) FROM "ClinicUser"
+WHERE "tenantId" = $1
+GROUP BY email HAVING COUNT(*) > 1;
+
+-- Resolve duplicates (strategy depends on business rules)
+-- Option A: Merge duplicate accounts
+-- Option B: Append suffix to duplicates
+-- Option C: Soft-delete duplicates
+
+```
+
+> **Important:** The dedup strategy is business-logic-dependent. Coordinate with the product team before choosing. Never silently delete data.
+
+After this deploy is live, verify zero duplicates remain:
+
+```
+SELECT email, "tenantId", COUNT(*)
+FROM "ClinicUser"
+GROUP BY email, "tenantId"
+HAVING COUNT(*) > 1;
+-- Must return 0 rows
+
+```
+
+**Deploy 2 (Contract - add constraint):**
+
+```
+model ClinicUser {
+ id String @id @default(uuid())
+ email String
+ // ...
+ @@unique([email, tenantId]) // Add unique constraint
+}
+
+```
+
+```
+-- SAFETY DEDUP: During Deploy 1's rollout, old instances (without the
+-- application-level uniqueness check) may have created new duplicates.
+-- Resolve them before adding the constraint, or the constraint will fail.
+-- Use the same dedup strategy as Deploy 1 (merge/suffix/soft-delete).
+DELETE FROM "ClinicUser" WHERE id IN (
+ SELECT id FROM (
+ SELECT id, ROW_NUMBER() OVER (
+ PARTITION BY email, "tenantId" ORDER BY "createdAt" ASC
+ ) AS row_num
+ FROM "ClinicUser"
+ ) duplicates WHERE row_num > 1
+);
+
+-- Use CONCURRENTLY to avoid locking the table (large tables)
+CREATE UNIQUE INDEX CONCURRENTLY "ClinicUser_email_tenantId_key"
+ ON "ClinicUser" ("email", "tenantId");
+
+ALTER TABLE "ClinicUser"
+ ADD CONSTRAINT "ClinicUser_email_tenantId_key"
+ UNIQUE USING INDEX "ClinicUser_email_tenantId_key";
+
+```
+
+> **Why the safety dedup?** During Deploy 1's rollout, old instances (which lack the application-level uniqueness check) may still create duplicates after Deploy 1's dedup ran. The safety dedup in Deploy 2 catches these before the constraint is added.
+
+> **Prisma note:** Prisma does not generate `CONCURRENTLY` by default. For large tables, use `--create-only` and manually edit the SQL to add `CONCURRENTLY`. Note that `CREATE INDEX CONCURRENTLY` cannot run inside a transaction - you must run it in a separate migration step (create an empty migration with `--create-only`, add only the `CREATE INDEX CONCURRENTLY` statement, and set `-- @transaction off` or run it outside Prisma).
+
+**During Deploy 2 rollout:** Both Deploy 1 and Deploy 2 code already enforce uniqueness at the application level. The database constraint is an additional safety net. No overlap issues.
+
+### Playbook 8: Converting Nullable Column to NOT NULL (2 Deploys)
+
+**Scenario:** The `phone` column on `PetOwner` is currently nullable, but should be required.
+
+> **Why this is dangerous:** `ALTER COLUMN ... SET NOT NULL` fails immediately if any NULL values exist. Additionally, old code may still insert NULLs during the rollout.
+
+**Deploy 1 (Expand - backfill + code guard):**
+
+Migration:
+
+```
+-- Backfill existing NULLs with a sensible default
+UPDATE "PetOwner" SET phone = '' WHERE phone IS NULL;
+-- Or use a business-appropriate default:
+-- UPDATE "PetOwner" SET phone = 'MISSING' WHERE phone IS NULL;
+
+```
+
+Code changes:
+
+- Make `phone` required in all create/update DTOs (validation rejects NULL/empty)
+- Ensure all code paths provide a value for `phone`
+
+
+After this deploy is live, verify zero NULLs remain:
+
+```
+SELECT COUNT(*) FROM "PetOwner" WHERE phone IS NULL;
+-- Must return 0
+
+```
+
+**Deploy 2 (Contract - enforce NOT NULL):**
+
+```
+model PetOwner {
+ phone String // Was String? - now required
+}
+
+```
+
+```
+-- Safety backfill: catch rows created by old code after Deploy 1's backfill
+UPDATE "PetOwner" SET phone = '' WHERE phone IS NULL;
+
+-- Now safe to enforce
+ALTER TABLE "PetOwner" ALTER COLUMN "phone" SET NOT NULL;
+
+```
+
+> **Why the safety backfill?** During Deploy 1's rollout, old instances may still insert rows with `phone = NULL`. The safety backfill catches these before `SET NOT NULL`.
+
+**During Deploy 2 rollout:** Both Deploy 1 and Deploy 2 code already require `phone`. The constraint formalizes what the code already enforces.
+
+### Playbook 9: Adding a Foreign Key to Existing Column (2 Deploys)
+
+**Scenario:** The `ownerId` column on `Pet` exists but has no FK constraint to `PetOwner`.
+
+> **Why this is dangerous:** `ADD CONSTRAINT ... FOREIGN KEY` fails if any rows reference a non-existent parent (orphaned rows). Additionally, on large tables, FK validation locks both tables.
+
+**Deploy 1 (Expand - clean orphans + code guard):**
+
+No migration. Code changes + data cleanup:
+
+1. Add referential integrity checks in the service layer (reject writes with non-existent `ownerId`)
+2. Clean orphaned rows
+
+
+```
+-- Find orphaned rows
+SELECT p.id, p."ownerId" FROM "Pet" p
+LEFT JOIN "PetOwner" po ON po.id = p."ownerId"
+WHERE po.id IS NULL AND p."ownerId" IS NOT NULL;
+
+-- Resolve orphans (strategy depends on business rules)
+-- Option A: Set ownerId to NULL (if column is nullable)
+UPDATE "Pet" SET "ownerId" = NULL
+WHERE "ownerId" NOT IN (SELECT id FROM "PetOwner");
+
+-- Option B: Delete orphaned pets (if business-appropriate)
+-- Option C: Create placeholder owner records
+
+```
+
+After this deploy is live, verify zero orphans remain:
+
+```
+SELECT COUNT(*) FROM "Pet" p
+LEFT JOIN "PetOwner" po ON po.id = p."ownerId"
+WHERE po.id IS NULL AND p."ownerId" IS NOT NULL;
+-- Must return 0
+
+```
+
+**Deploy 2 (Contract - add FK constraint):**
+
+```
+model Pet {
+ ownerId String
+ owner PetOwner @relation(fields: [ownerId], references: [id])
+}
+
+```
+
+```
+-- Safety: clean any orphans created by old code during Deploy 1's rollout
+-- ⚠️ PREFER UPDATE over DELETE to avoid data loss!
+-- Option A (recommended): Set to NULL - preserves the record
+UPDATE "Pet" SET "ownerId" = NULL
+WHERE "ownerId" NOT IN (SELECT id FROM "PetOwner")
+ AND "ownerId" IS NOT NULL;
+
+-- Option B: Re-parent to a designated placeholder owner
+-- UPDATE "Pet" SET "ownerId" = 'placeholder-owner-id'
+-- WHERE "ownerId" NOT IN (SELECT id FROM "PetOwner")
+-- AND "ownerId" IS NOT NULL;
+
+-- Option C (destructive - use ONLY if business rules require it):
+-- DELETE FROM "Pet" WHERE "ownerId" NOT IN (SELECT id FROM "PetOwner")
+-- AND "ownerId" IS NOT NULL;
+
+-- Add FK constraint
+-- For large tables, consider NOT VALID + VALIDATE CONSTRAINT pattern:
+ALTER TABLE "Pet"
+ ADD CONSTRAINT "Pet_ownerId_fkey" FOREIGN KEY ("ownerId")
+ REFERENCES "PetOwner" (id) NOT VALID;
+
+-- Validate in a separate step (non-blocking on writes)
+ALTER TABLE "Pet" VALIDATE CONSTRAINT "Pet_ownerId_fkey";
+
+```
+
+> **Why prefer UPDATE over DELETE?** The safety cleanup catches orphans created by old code *during the Deploy 1 rollout period*. Deleting Pet records to satisfy a FK is destructive - it removes business data. Setting to NULL (or re-parenting to a placeholder) preserves the record and is reversible.
+
+> **Performance note:** On large tables, adding a FK with immediate validation locks both tables. The `NOT VALID` + `VALIDATE CONSTRAINT` pattern adds the constraint without validating existing rows (instant), then validates in the background (non-blocking). Prisma does not generate this pattern - use `--create-only` and edit manually.
+
+### Playbook 10: Dropping a Table (2 Deploys)
+
+**Scenario:** The `LegacyAuditLog` table is no longer used and should be removed.
+
+> **Why 2 deploys?** Same principle as dropping a column: if the migration drops the table while old code still queries it, those queries fail during the rollout.
+
+**Deploy 1 (Transition - remove all code references):**
+
+- Remove all queries, imports, and service references to the table
+- Remove the model from the Prisma schema (but do NOT generate a migration yet)
+- Remove related DTOs, controllers, and service methods
+- Remove any scheduled jobs or background tasks that reference the table
+
+
+> **Checklist:** Search the entire codebase for the table name, model name, and related repository. Every reference must be removed.
+
+```
+# Verify no code references remain
+rg "LegacyAuditLog" --type ts
+rg "legacy_audit_log" --type ts
+rg "legacyAuditLog" --type ts
+# Must return 0 results (except the migration files themselves)
+
+```
+
+**Deploy 2 (Contract - drop the table):**
+
+```
+// LegacyAuditLog model removed from schema
+
+```
+
+```
+-- If there are FKs referencing this table, drop them first
+-- ALTER TABLE "OtherTable" DROP CONSTRAINT "OtherTable_auditLogId_fkey";
+
+DROP TABLE IF EXISTS "LegacyAuditLog";
+
+```
+
+**During Deploy 2 rollout:** Both Deploy 1 and Deploy 2 code have zero references to the table. Dropping it affects neither.
+
+> **Data retention note:** Before dropping a table, consider whether the data needs to be archived (export to S3, move to a data warehouse, etc.). Coordinate with the product team. The DROP is irreversible.
+
+### Playbook 11: Renaming a Table (3 Deploys)
+
+**Scenario:** Rename the `PetOwner` table to `Client`.
+
+> **Critical Prisma Warning:** Prisma treats a table rename as `DROP TABLE + CREATE TABLE`. You MUST use `--create-only` and manually edit the SQL to use `ALTER TABLE ... RENAME TO`.
+
+This follows the same 3-deploy pattern as renaming a column, but operates at the table level. A sync trigger is not applicable here - instead we use a **database view** to maintain backward compatibility.
+
+**Deploy 1 (Expand):**
+
+```
+-- Rename the actual table
+ALTER TABLE "PetOwner" RENAME TO "Client";
+
+-- Create a view with the old name so old code's queries still work
+CREATE VIEW "PetOwner" AS SELECT * FROM "Client";
+
+-- The view also supports INSERT/UPDATE/DELETE for simple single-table views in PostgreSQL
+-- (automatically updatable views: https://www.postgresql.org/docs/current/sql-createview.html)
+
+```
+
+Prisma schema:
+
+```
+model Client {
+ id String @id @default(uuid())
+ name String
+ // ... all fields
+ @@map("Client") // Maps to the new table name
+}
+
+// Keep old model temporarily for reference, or just update all code to use Client
+
+```
+
+Code changes:
+
+- Update all code to use `Client` instead of `PetOwner` (model name, repository, DTOs, service, controller)
+- Update Prisma schema model name
+
+
+> **Why the view works:** PostgreSQL automatically updatable views support INSERT, UPDATE, DELETE on simple single-table views. Old code querying `"PetOwner"` hits the view, which transparently reads/writes `"Client"`. This is the table-level equivalent of the sync trigger.
+
+> **View limitations to be aware of:**
+>
+> - `ON CONFLICT`** (upserts):** Prisma's `upsert()` generates `INSERT ... ON CONFLICT DO UPDATE`, which does **not work** through views. If old code uses upserts on this table, it will fail through the view. **Workaround:** Use `INSTEAD OF INSERT` triggers on the view, or update old code's upserts to use separate find-then-insert/update in Deploy 0.
+> - **Triggers on the original table:** Triggers defined on `"PetOwner"` will NOT fire on the view - they now fire on `"Client"` (the underlying table). Since views are transparent pass-throughs, this is usually fine, but verify if you have triggers that reference the old table name.
+> - **Sequences/defaults:** Serials and `DEFAULT` values work through the view as they are defined on the underlying table.
+
+> **Code update flexibility:** You do NOT have to update all code in Deploy 1. The view ensures old table name references still work. You can spread code updates across Deploy 1 and Deploy 2, as long as ALL old-name references are removed by the time Deploy 2 is finalized. This is useful for large codebases where renaming everything in one PR is impractical.
+
+**During Deploy 1 rollout:**
+
+- Old code queries `"PetOwner"` (the view) - works transparently
+- New code queries `"Client"` (the real table) - works directly
+
+
+**Deploy 2 (Transition - no migration):**
+
+- Verify ALL code references to `PetOwner` are removed
+- Verify no queries, DTOs, or repositories reference the old table name
+
+
+```
+rg "PetOwner" --type ts
+# Must return 0 results (except migration files)
+
+```
+
+**Deploy 3 (Contract):**
+
+```
+-- Drop the compatibility view (no running code references it)
+DROP VIEW IF EXISTS "PetOwner";
+
+```
+
+**During Deploy 3 rollout:** Both Deploy 2 and Deploy 3 code use `"Client"` only. The view drop affects neither.
+
+> **Related objects:** If other tables have FK columns named `petOwnerId` or `pet_owner_id`, consider renaming those columns in a separate multi-phase migration. Do NOT combine table rename + column renames in the same deploy.
+
+### Playbook 12: Splitting a Table - Normalization (3 Deploys)
+
+**Scenario:** Extract `emergencyContactName` and `emergencyContactPhone` from the `PetOwner` table into a new `EmergencyContact` table.
+
+> **Why this is complex:** Data must exist in both locations during the transition. Old code writes to the old columns, new code writes to the new table. Both must stay in sync.
+
+**Deploy 1 (Expand - create new table + backfill + dual-write):**
+
+Migration:
+
+```
+-- 1. Create new table
+CREATE TABLE "EmergencyContact" (
+ "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
+ "petOwnerId" TEXT NOT NULL,
+ "tenantId" TEXT NOT NULL,
+ "name" TEXT NOT NULL,
+ "phone" TEXT NOT NULL,
+ CONSTRAINT "EmergencyContact_pkey" PRIMARY KEY ("id"),
+ CONSTRAINT "EmergencyContact_petOwnerId_fkey"
+ FOREIGN KEY ("petOwnerId") REFERENCES "PetOwner" ("id")
+);
+
+CREATE UNIQUE INDEX "EmergencyContact_petOwnerId_key" ON "EmergencyContact" ("petOwnerId");
+
+-- 2. Backfill from existing data
+INSERT INTO "EmergencyContact" ("petOwnerId", "tenantId", "name", "phone")
+SELECT id, "tenantId", "emergencyContactName", "emergencyContactPhone"
+FROM "PetOwner"
+WHERE "emergencyContactName" IS NOT NULL
+ AND "emergencyContactPhone" IS NOT NULL
+ON CONFLICT ("petOwnerId") DO NOTHING;
+
+```
+
+Code changes:
+
+```
+// WRITE: Dual-write to both locations
+async updateEmergencyContact(ownerId: string, tenantId: string, data: EmergencyContactDto) {
+ // Write to old columns (for old code)
+ await this.petOwnerRepo.update(ownerId, tenantId, {
+ emergencyContactName: data.name,
+ emergencyContactPhone: data.phone,
+ });
+
+ // Write to new table (for new code)
+ await this.emergencyContactRepo.upsert(ownerId, tenantId, {
+ name: data.name,
+ phone: data.phone,
+ });
+}
+
+// READ: Read from new table, fallback to old columns
+const contact = await this.emergencyContactRepo.findByOwner(ownerId, tenantId);
+const name = contact?.name ?? petOwner.emergencyContactName;
+const phone = contact?.phone ?? petOwner.emergencyContactPhone;
+
+```
+
+> **Sync trigger (strongly recommended):** Add a `BEFORE INSERT OR UPDATE` trigger on `PetOwner` that upserts into `EmergencyContact` when old code writes to the old columns. Without a trigger, old instances that update `emergencyContactName` / `emergencyContactPhone` after Deploy 1's backfill will create stale rows in `EmergencyContact` - Deploy 2 code (reading only from the new table) will miss those updates. The trigger eliminates this stale-read window entirely, same principle as the column rename trigger (see Rule 5).
+>
+> ```
+> CREATE OR REPLACE FUNCTION sync_owner_to_emergency_contact() RETURNS TRIGGER AS $$
+> BEGIN
+> IF NEW."emergencyContactName" IS DISTINCT FROM OLD."emergencyContactName"
+> OR NEW."emergencyContactPhone" IS DISTINCT FROM OLD."emergencyContactPhone" THEN
+> INSERT INTO "EmergencyContact" ("petOwnerId", "tenantId", "name", "phone")
+> VALUES (NEW.id, NEW."tenantId", NEW."emergencyContactName", NEW."emergencyContactPhone")
+> ON CONFLICT ("petOwnerId") DO UPDATE
+> SET name = EXCLUDED.name, phone = EXCLUDED.phone;
+> END IF;
+> RETURN NEW;
+> END;
+> $$ LANGUAGE plpgsql;
+>
+> CREATE TRIGGER trg_sync_owner_to_emergency
+> BEFORE INSERT OR UPDATE ON "PetOwner"
+> FOR EACH ROW EXECUTE FUNCTION sync_owner_to_emergency_contact();
+>
+> ```
+>
+> If using the trigger: the fallback read in code (`contact?.name ?? petOwner.emergencyContactName`) is optional but harmless. Drop trigger in Deploy 3.
+
+**Deploy 2 (Transition - read/write only new table):**
+
+- Remove all reads from `emergencyContactName` / `emergencyContactPhone` on `PetOwner`
+- Remove all writes to old columns
+- Keep old columns in schema (not yet dropped)
+
+
+```
+// WRITE: Only new table
+await this.emergencyContactRepo.upsert(ownerId, tenantId, data);
+
+// READ: Only new table
+const contact = await this.emergencyContactRepo.findByOwner(ownerId, tenantId);
+
+```
+
+**Deploy 3 (Contract - drop old columns):**
+
+```
+-- Drop sync trigger (if used - strongly recommended path)
+DROP TRIGGER IF EXISTS trg_sync_owner_to_emergency ON "PetOwner";
+DROP FUNCTION IF EXISTS sync_owner_to_emergency_contact();
+
+-- Drop old columns
+ALTER TABLE "PetOwner" DROP COLUMN "emergencyContactName";
+ALTER TABLE "PetOwner" DROP COLUMN "emergencyContactPhone";
+
+```
+
+### Playbook 13: Merging Tables - Denormalization (3 Deploys)
+
+**Scenario:** Merge the `EmergencyContact` table back into `PetOwner` by adding `emergencyContactName` and `emergencyContactPhone` columns.
+
+This is the reverse of splitting. The pattern is:
+
+**Deploy 1 (Expand - add columns + backfill + dual-write):**
+
+Migration:
+
+```
+-- 1. Add new columns
+ALTER TABLE "PetOwner" ADD COLUMN "emergencyContactName" TEXT;
+ALTER TABLE "PetOwner" ADD COLUMN "emergencyContactPhone" TEXT;
+
+-- 2. Sync trigger: copies data when EmergencyContact is updated
+-- ⚠️ WARNING: AFTER triggers that update another table can cause deadlocks
+-- if concurrent transactions also write to PetOwner directly.
+-- Keep the transition period short. See "Known Limitations" section.
+CREATE OR REPLACE FUNCTION sync_emergency_to_owner() RETURNS TRIGGER AS $$
+BEGIN
+ IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+ UPDATE "PetOwner"
+ SET "emergencyContactName" = NEW.name,
+ "emergencyContactPhone" = NEW.phone
+ WHERE id = NEW."petOwnerId";
+ END IF;
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_emergency_to_owner
+ AFTER INSERT OR UPDATE ON "EmergencyContact"
+ FOR EACH ROW EXECUTE FUNCTION sync_emergency_to_owner();
+
+-- 3. Backfill from existing data
+UPDATE "PetOwner" po
+SET "emergencyContactName" = ec.name,
+ "emergencyContactPhone" = ec.phone
+FROM "EmergencyContact" ec
+WHERE ec."petOwnerId" = po.id
+ AND (po."emergencyContactName" IS NULL OR po."emergencyContactPhone" IS NULL);
+
+```
+
+Code changes:
+
+```
+// WRITE: Dual-write to both locations
+// (trigger handles writes to EmergencyContact → PetOwner sync)
+// New code also writes directly to PetOwner columns for explicit control
+
+// READ: Read from new columns on PetOwner, fallback to EmergencyContact table
+const name = petOwner.emergencyContactName ?? emergencyContact?.name;
+
+```
+
+**Deploy 2 (Transition - read/write only PetOwner columns):**
+
+- Remove all reads from `EmergencyContact` table
+- Remove all writes to `EmergencyContact` table
+- Keep `EmergencyContact` table in schema (not yet dropped)
+
+
+**Deploy 3 (Contract - drop source table):**
+
+```
+-- Drop sync trigger
+DROP TRIGGER IF EXISTS trg_sync_emergency_to_owner ON "EmergencyContact";
+DROP FUNCTION IF EXISTS sync_emergency_to_owner();
+
+-- Drop source table
+DROP TABLE IF EXISTS "EmergencyContact";
+
+-- Optionally enforce NOT NULL on the new columns (if required)
+-- ALTER TABLE "PetOwner" ALTER COLUMN "emergencyContactName" SET NOT NULL;
+-- ALTER TABLE "PetOwner" ALTER COLUMN "emergencyContactPhone" SET NOT NULL;
+
+```
+
+### Data Backfill Guidelines
+
+#### Rule 1: Initial Backfills MUST Be Conditional (Idempotent)
+
+> **This prevents data loss.** A blanket `UPDATE SET new = old` will overwrite values that application code has already written to the new column.
+
+```
+-- ❌ DANGEROUS: Overwrites ALL rows - including those updated by new code
+UPDATE "Pet" SET "name" = "pet_name";
+-- If a user renamed their pet via new code (name = "Max"),
+-- this overwrites it with the stale pet_name = "Fluffy"
+
+-- ✅ SAFE: Only fills rows not yet touched by new code
+UPDATE "Pet" SET "name" = "pet_name" WHERE "name" IS NULL;
+
+```
+
+This applies to ALL multi-phase migrations, not just renames. Anytime you copy data from column A to column B across deploys, the copy must be a "fill gaps" operation, never an "overwrite everything" operation.
+
+> **Sync triggers eliminate the straggler backfill.** When using a sync trigger (see Playbooks 4 and 5), the trigger keeps new rows in sync automatically during the Deploy 1 rollout. The initial backfill in Deploy 1 is still required (for rows that existed before the migration - the trigger only fires on future writes), but the straggler backfill in the Contract deploy is no longer needed.
+
+#### Rule 2: Large Table Backfills Must Be Batched
+
+For large tables, **never run backfills inside the migration transaction**:
+
+```
+-- ❌ BAD: Inside migration transaction (locks entire table)
+UPDATE "Pet" SET "name" = "pet_name" WHERE "name" IS NULL;
+-- If Pet has 1M+ rows, this locks the table for minutes
+
+-- ✅ GOOD: Run as a separate script, in batches
+-- Create a one-off script or background job:
+DO $$
+DECLARE
+ batch_size INT := 10000;
+ affected INT;
+BEGIN
+ LOOP
+ WITH batch AS (
+ SELECT "id" FROM "Pet"
+ WHERE "name" IS NULL
+ LIMIT batch_size
+ FOR UPDATE SKIP LOCKED
+ )
+ UPDATE "Pet"
+ SET "name" = "pet_name"
+ FROM batch
+ WHERE "Pet"."id" = batch."id";
+
+ GET DIAGNOSTICS affected = ROW_COUNT;
+ EXIT WHEN affected = 0;
+
+ RAISE NOTICE 'Updated % rows', affected;
+ PERFORM pg_sleep(0.1); -- Brief pause to reduce lock contention
+ END LOOP;
+END $$;
+
+```
+
+#### Rule 3: Separate Backfills from DDL on Large Tables
+
+**Problem:** When a migration adds a column (DDL) and backfills it (DML) in the same transaction, the `ALTER TABLE` acquires an `ACCESS EXCLUSIVE` lock and holds it for the entire transaction - including the backfill. On a 1M+ row table, this blocks ALL reads and writes to the table for the duration of the backfill (potentially minutes), causing a **production outage**.
+
+**Solution: Split into two separate migrations.**
+
+```
+Migration A (instant): ALTER TABLE ADD COLUMN (default NULL - no rewrite needed)
+ + CREATE TRIGGER (if applicable)
+Migration B (separate): Batched backfill as a separate script (see Rule 2)
+
+```
+
+**Important caveat:** If you separate the backfill from the migration, the new column will be `NULL` for existing rows until the backfill completes. Your V1 code **MUST handle NULLs gracefully** during this window:
+
+```
+// V1 code must tolerate NULL in the new column until backfill completes
+const name = pet.name ?? pet.pet_name; // fallback to old column
+
+```
+
+This is especially relevant for **Playbooks 4, 5, 8, and 12** where Expand migrations both add columns and backfill data.
+
+| Operation | DDL (instant) | Backfill (separate) |
+| --- | --- | --- |
+| Add column | ALTER TABLE ADD COLUMN | UPDATE ... WHERE new_col IS NULL |
+| Add trigger | CREATE TRIGGER | (trigger handles future writes) |
+| Add index | - | CREATE INDEX CONCURRENTLY (after backfill) |
+
+> **Rule of thumb:** If the table has > 100K rows, ALWAYS separate DDL from backfill. The DDL migration should complete in < 1 second.
+
+#### Backfill Sizing Rules
+
+| Table Size | Approach |
+| --- | --- |
+| < 10K rows | Backfill in migration SQL is acceptable |
+| 10K-100K rows | Backfill in migration with caution (test timing locally) |
+| > 100K rows | Always backfill in a separate script/job, in batches |
+| Indexes on backfilled columns | Add indexes AFTER backfill completes (faster) |
+
+### Deep Dive: Renaming a Column - Full Timeline
+
+This section traces every state change, query, and data mutation across all three deploys of a column rename (`pet_name` → `name`) using the **sync trigger approach**. Use this as a reference when planning your own multi-phase migration.
+
+#### Initial State
+
+```
+Schema: Pet(id, pet_name, tenantId)
+Code: V0 - reads/writes pet_name
+Instances: [V0, V0]
+Trigger: None
+
+```
+
+| id | pet_name | tenantId |
+| --- | --- | --- |
+| 1 | Fluffy | t1 |
+| 2 | Buddy | t1 |
+
+#### Deploy 1 - Expand
+
+**Phase 1A: Migration runs (inside new container, before app starts)**
+
+```
+-- 1. Add new column
+ALTER TABLE "Pet" ADD COLUMN "name" TEXT;
+
+-- 2. Create sync trigger
+CREATE OR REPLACE FUNCTION sync_pet_name_to_name() RETURNS TRIGGER AS $$
+BEGIN
+ IF TG_OP = 'INSERT' AND NEW.name IS NULL THEN
+ NEW.name = NEW.pet_name;
+ END IF;
+ IF TG_OP = 'UPDATE' AND NEW.pet_name IS DISTINCT FROM OLD.pet_name THEN
+ NEW.name = NEW.pet_name;
+ END IF;
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_pet_name_to_name
+ BEFORE INSERT OR UPDATE ON "Pet"
+ FOR EACH ROW EXECUTE FUNCTION sync_pet_name_to_name();
+
+-- 3. Backfill existing rows (trigger only fires on future writes)
+UPDATE "Pet" SET "name" = "pet_name" WHERE "name" IS NULL;
+
+```
+
+```
+Schema: Pet(id, pet_name, tenantId, name)
+Trigger: trg_sync_pet_name_to_name ACTIVE
+Instances: [V0] still serving - V1 not yet healthy
+
+```
+
+| id | pet_name | name | Note |
+| --- | --- | --- | --- |
+| 1 | Fluffy | Fluffy | Backfilled |
+| 2 | Buddy | Buddy | Backfilled |
+
+**Phase 1B: V1 app starts, rolling update begins**
+
+```
+Instances: [V0, V1] running simultaneously
+Trigger: ACTIVE - syncs pet_name → name on every INSERT/UPDATE
+V0 code: reads/writes pet_name ONLY (trigger handles name)
+V1 code: writes BOTH (pet_name + name), reads name
+
+```
+
+Queries each instance sends (and what the trigger does):
+
+| Instance | Operation | SQL (simplified) | Trigger effect |
+| --- | --- | --- | --- |
+| V0 | Read pet | SELECT pet_name FROM "Pet" WHERE id = $1 | No trigger (SELECT) |
+| V0 | Update pet | UPDATE "Pet" SET pet_name = $1 WHERE id = $2 | Trigger fires: sets name = pet_name |
+| V0 | Create pet | INSERT INTO "Pet" (pet_name, tenantId) VALUES ($1, $2) | Trigger fires: name IS NULL → sets name = pet_name |
+| V1 | Read pet | SELECT name FROM "Pet" WHERE id = $1 | No trigger (SELECT) |
+| V1 | Update pet | UPDATE "Pet" SET pet_name = $1, name = $1 WHERE id = $2 | Trigger fires: sets name = pet_name (same value - no-op) |
+| V1 | Create pet | INSERT INTO "Pet" (pet_name, name, tenantId) VALUES ($1, $1, $2) | Trigger fires: name IS NOT NULL → skips |
+
+**What happens to data during the overlap (compare with the non-trigger approach):**
+
+| Time | Event | id | pet_name | name | Consistent? | How |
+| --- | --- | --- | --- | --- | --- | --- |
+| t0 | After backfill | 1 | Fluffy | Fluffy | Yes | Backfill |
+| t1 | V0 updates row 1 | 1 | Maxie | Maxie | Yes | Trigger syncs name |
+| t2 | V0 creates row 3 | 3 | Rex | Rex | Yes | Trigger fills name |
+| t3 | V1 reads row 1 | - | - | - | Yes | V1 sees name = "Maxie" (correct) |
+| t4 | V1 updates row 1 | 1 | Luna | Luna | Yes | V1 writes both |
+| t5 | V1 reads row 3 | - | - | - | Yes | V1 sees name = "Rex" (correct) |
+| t6 | V1 creates row 4 | 4 | Daisy | Daisy | Yes | V1 writes both |
+
+**No staleness. No stragglers. The trigger keeps both columns in sync for every write, regardless of which code version performs it.**
+
+**Phase 1C: V0 drained - steady state**
+
+```
+Instances: [V1, V1]
+Trigger: ACTIVE (but V1 writes both, so trigger is effectively a no-op)
+
+```
+
+| id | pet_name | name | Note |
+| --- | --- | --- | --- |
+| 1 | Luna | Luna | Both in sync |
+| 2 | Buddy | Buddy | Unchanged since backfill |
+| 3 | Rex | Rex | Trigger filled name at creation (no straggler) |
+| 4 | Daisy | Daisy | Created by V1 |
+
+All rows have `name` populated. No stragglers exist.
+
+#### Deploy 2 - Transition (Code Only, No Migration)
+
+**Goal:** Stop all running code from referencing `pet_name`, so Deploy 3 can safely drop it.
+
+**Phase 2A: Rolling update begins**
+
+```
+Schema: Pet(id, pet_name, tenantId, name) - unchanged
+Trigger: ACTIVE (but effectively dormant - no code writes to pet_name in V2)
+Instances: [V1, V2] running simultaneously
+V1 code: writes BOTH (pet_name + name)
+V2 code: writes ONLY name, reads ONLY name
+
+```
+
+| Instance | Operation | SQL (simplified) | Trigger effect |
+| --- | --- | --- | --- |
+| V1 | Update pet | UPDATE "Pet" SET pet_name = $1, name = $1 WHERE id = $2 | Trigger fires (no-op - same value) |
+| V2 | Update pet | UPDATE "Pet" SET name = $1 WHERE id = $2 | Trigger: pet_name unchanged → skips |
+| V2 | Read pet | SELECT name FROM "Pet" WHERE id = $1 | No trigger (SELECT) |
+
+**What happens to data:**
+
+| Time | Event | id | pet_name | name | Note |
+| --- | --- | --- | --- | --- | --- |
+| t7 | V2 updates row 2 | 2 | Buddy | Bella | pet_name stale (V2 only writes name). Trigger skips (pet_name didn't change). |
+| t8 | V1 updates row 2 | 2 | Charlie | Charlie | V1 syncs both - last writer wins |
+
+After V1 drains, `pet_name` may be stale on some rows. This does not matter - no running code reads `pet_name` after V1 drains.
+
+**Phase 2B: V1 drained - steady state**
+
+```
+Instances: [V2, V2]
+Trigger: ACTIVE but dormant (no code writes pet_name)
+No code reads or writes pet_name
+
+```
+
+| id | pet_name | name | Note |
+| --- | --- | --- | --- |
+| 1 | Luna | Luna | In sync (last written by V1) |
+| 2 | Charlie | Charlie | In sync (last written by V1) |
+| 3 | Rex | Rex | In sync (trigger filled at creation) |
+| 4 | Daisy | Daisy | In sync |
+
+`pet_name` is now a dead column. No running code touches it. Safe to drop.
+
+#### Deploy 3 - Contract
+
+**Phase 3A: Migration runs**
+
+```
+-- 1. Drop trigger + function FIRST (they reference pet_name)
+DROP TRIGGER IF EXISTS trg_sync_pet_name_to_name ON "Pet";
+DROP FUNCTION IF EXISTS sync_pet_name_to_name();
+
+-- 2. No straggler backfill needed - trigger handled all rows
+-- Safe to enforce NOT NULL immediately
+ALTER TABLE "Pet" ALTER COLUMN "name" SET NOT NULL;
+
+-- 3. No running code references pet_name - safe to drop
+ALTER TABLE "Pet" DROP COLUMN "pet_name";
+
+```
+
+```
+Schema: Pet(id, name, tenantId) - final state
+Trigger: Dropped
+
+```
+
+| id | name | Note |
+| --- | --- | --- |
+| 1 | Luna | |
+| 2 | Charlie | |
+| 3 | Rex | Was synced by trigger (no straggler backfill needed) |
+| 4 | Daisy | |
+
+**Phase 3B: Rolling update**
+
+```
+Instances: [V2, V3] running simultaneously
+V2 code: writes ONLY name - does NOT reference pet_name
+V3 code: writes ONLY name - does NOT reference pet_name
+
+```
+
+Both instances issue identical queries. The DROP COLUMN has no effect on either. Rolling update completes without incident.
+
+**Phase 3C: Steady state - migration complete**
+
+```
+Schema: Pet(id, name, tenantId)
+Instances: [V3, V3]
+Trigger: None
+Rename complete. pet_name no longer exists.
+
+```
+
+#### Summary: All States Across the Rename
+
+| Phase | Schema | Trigger | Instances | pet_name | name | Consistent? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Initial | pet_name | None | V0 + V0 | Authoritative | N/A | Yes |
+| Deploy 1 migration | pet_name + name | Created | V0 (serving) | Authoritative | Backfilled | Yes |
+| Deploy 1 rollout | pet_name + name | Active | V0 + V1 | Written by V0 | Synced by trigger | Yes |
+| Deploy 1 steady | pet_name + name | Active (no-op) | V1 + V1 | Written by V1 | Written by V1 | Yes |
+| Deploy 2 rollout | pet_name + name | Dormant | V1 + V2 | Written by V1 only | Written by V1 + V2 | pet_name may lag |
+| Deploy 2 steady | pet_name + name | Dormant | V2 + V2 | Dead | Authoritative | Yes |
+| Deploy 3 migration | name | Dropped | V2 (serving) | Dropped | Authoritative + NOT NULL | Yes |
+| Deploy 3 rollout | name | None | V2 + V3 | N/A | Authoritative | Yes |
+| Deploy 3 steady | name | None | V3 + V3 | N/A | Authoritative | Yes |
+
+## Multi-Phase Tracking Process
+
+The biggest risk with expand-contract is **forgetting the contract phase**. The expand migration ships, the old column stays forever, and technical debt accumulates.
+
+### Process: GitHub Issues + pending-contract.md
+
+We use two complementary tracking mechanisms:
+
+#### 1. GitHub Issue (for tracking and assignment)
+
+Every expand PR that requires a future contract phase MUST have a linked GitHub Issue:
+
+**Issue template:**
+
+```
+## Contract Migration: [description]
+
+**Expand PR:** #[PR number]
+**Deployed to production:** [date or "pending"]
+**Blocked until:** Next deploy after expand reaches production
+
+### Changes Needed
+
+- [ ] Drop column `Pet.pet_name`
+- [ ] Add NOT NULL constraint to `Pet.name`
+
+### Verification Before Contracting
+
+- [ ] Grep codebase for old column name - zero references
+- [ ] Expand migration is deployed to all environments (prestaging → staging → production)
+- [ ] No rollback has been needed since expand deploy
+
+### Owner
+
+@[developer]
+
+```
+
+#### 2. pending-contract.md (for visibility in code reviews)
+
+A tracked file in the repository that lists all pending contract migrations:
+
+**Location:** `packages/common/prisma/pending-contract.md`
+
+```
+# Pending Contract Migrations
+
+Entries are added when an expand migration ships and removed when the contract migration ships.
+If this file has entries older than 30 days, they should be investigated.
+
+## Active
+
+### rename-pet-name → PR #423, deployed 2026-02-11
+
+- **What:** Drop column `Pet.pet_name` after all code uses `Pet.name`
+- **Blocked until:** Deploy after PR #423 reaches production
+- **Issue:** #456
+- **Owner:** @developer
+
+### add-owner-id → PR #430, deployed 2026-02-15
+
+- **What:** Add NOT NULL constraint to `Pet.ownerId` after backfill completes
+- **Blocked until:** Backfill script confirms zero NULL rows
+- **Issue:** #462
+- **Owner:** @developer
+
+## Completed
+
+### [add-microchip-required] → contracted in PR #470 (2026-02-20)
+
+```
+
+#### Workflow
+
+| Step | Action | Artifact |
+| --- | --- | --- |
+| 1 | Developer creates expand PR | PR includes migration + code changes |
+| 2 | Developer creates GitHub Issue for contract phase | Issue linked in PR description |
+| 3 | Developer adds entry to pending-contract.md | Entry in "Active" section |
+| 4 | PR is reviewed - reviewer verifies expand is safe | PR merged |
+| 5 | Expand deploys through environments | Monitor in each environment |
+| 6 | After production deploy is verified stable | Developer creates contract PR |
+| 7 | Contract PR removes entry from pending-contract.md | Entry moved to "Completed" |
+| 8 | Contract PR closes the tracking Issue | Issue closed |
+
+## CI Automation Roadmap
+
+Three levels of CI automation, from highest-value/lowest-effort to most comprehensive. Implement in order.
+
+### Level 1: Destructive Migration Gate (Recommended First)
+
+**Purpose:** Block destructive migrations from merging without explicit acknowledgment.
+
+**Trigger:** Any PR that adds/modifies files in `packages/common/prisma/migrations/`.
+
+**What it does:** Scans new migration SQL files for destructive DDL keywords. If found, requires a `## Contract Migration Checklist` section in the PR body.
+
+```
+# .github/workflows/migration-safety-check.yml
+name: Migration Safety Check
+
+on:
+ pull_request:
+ paths:
+ - "packages/common/prisma/migrations/**"
+
+jobs:
+ check-migration-safety:
+ name: Check Migration Safety
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v4
+ with:
+ fetch-depth: 0
+
+ - name: Detect destructive migrations
+ env:
+ PR_BODY: ${{ github.event.pull_request.body }}
+ run: |
+ set -euo pipefail
+
+ echo "🔍 Scanning new migrations for destructive operations..."
+
+ # Find migration SQL files changed in this PR
+ CHANGED_MIGRATIONS=$(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD -- 'packages/common/prisma/migrations/**/*.sql' || true)
+
+ if [ -z "$CHANGED_MIGRATIONS" ]; then
+ echo "✅ No new migration files found"
+ exit 0
+ fi
+
+ echo "📁 New migration files:"
+ echo "$CHANGED_MIGRATIONS" | while read -r file; do echo " - $file"; done
+
+ DESTRUCTIVE_FOUND=false
+ DESTRUCTIVE_DETAILS=""
+
+ for file in $CHANGED_MIGRATIONS; do
+ if [ ! -f "$file" ]; then
+ continue
+ fi
+
+ # Check for destructive DDL patterns (case-insensitive)
+ MATCHES=$(grep -inE \
+ '(DROP\s+COLUMN|DROP\s+TABLE|RENAME\s+COLUMN|ALTER\s+COLUMN.*TYPE|SET\s+NOT\s+NULL)' \
+ "$file" || true)
+
+ if [ -n "$MATCHES" ]; then
+ DESTRUCTIVE_FOUND=true
+ DESTRUCTIVE_DETAILS="${DESTRUCTIVE_DETAILS}\n❌ ${file}:\n${MATCHES}\n"
+ fi
+ done
+
+ if [ "$DESTRUCTIVE_FOUND" = true ]; then
+ echo ""
+ echo "⚠️ DESTRUCTIVE MIGRATION DETECTED"
+ echo "========================================"
+ echo -e "$DESTRUCTIVE_DETAILS"
+ echo "========================================"
+ echo ""
+ echo "This migration contains destructive operations that may break"
+ echo "currently running instances during a rolling deployment."
+ echo ""
+
+ # Check if PR body contains the acknowledgment checklist
+ if echo "$PR_BODY" | grep -q '## Contract Migration Checklist'; then
+ echo "✅ Contract Migration Checklist found in PR description"
+ echo ""
+ echo "Reminder: Ensure all checklist items are completed before merging."
+ exit 0
+ else
+ echo "❌ MISSING: Contract Migration Checklist"
+ echo ""
+ echo "To merge this PR, add the following section to your PR description:"
+ echo ""
+ echo "## Contract Migration Checklist"
+ echo "- [ ] This is a CONTRACT migration (expand was deployed in a previous release)"
+ echo "- [ ] No running code references the dropped/renamed columns"
+ echo "- [ ] Verified in prestaging before merging"
+ echo "- [ ] Related GitHub Issue: #___"
+ echo "- [ ] Entry removed from pending-contract.md"
+ echo ""
+ exit 1
+ fi
+ else
+ echo "✅ No destructive operations detected - migration is safe for rolling deployment"
+ fi
+
+```
+
+**Impact:** Prevents the most dangerous mistake (merging destructive migrations without awareness) with minimal setup effort.
+
+### Level 2: Expand Migration Documentation Enforcement
+
+**Purpose:** Warn when an expand migration is added without updating `pending-contract.md`.
+
+**Trigger:** Any PR that adds new migration files.
+
+**What it does:** If a new migration adds nullable columns or new tables (indicators of an expand phase), checks whether `pending-contract.md` was also updated.
+
+```
+# Add as an additional step in the migration-safety-check.yml workflow
+
+- name: Check expand documentation
+ run: |
+ set -euo pipefail
+
+ CHANGED_MIGRATIONS=$(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD -- 'packages/common/prisma/migrations/**/*.sql' || true)
+
+ if [ -z "$CHANGED_MIGRATIONS" ]; then
+ exit 0
+ fi
+
+ # Check if any migration adds nullable columns (potential expand phase)
+ HAS_EXPAND=false
+ for file in $CHANGED_MIGRATIONS; do
+ if [ ! -f "$file" ]; then
+ continue
+ fi
+ # Look for ADD COLUMN without NOT NULL (nullable = likely expand)
+ if grep -iE 'ADD\s+COLUMN' "$file" | grep -ivE 'NOT\s+NULL' | grep -q .; then
+ HAS_EXPAND=true
+ break
+ fi
+ done
+
+ if [ "$HAS_EXPAND" = true ]; then
+ # Check if pending-contract.md was updated
+ PENDING_UPDATED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'packages/common/prisma/pending-contract.md' || true)
+
+ if [ -z "$PENDING_UPDATED" ]; then
+ echo "::warning::Expand migration detected (nullable column added) but pending-contract.md was not updated."
+ echo "::warning::If a contract migration is needed later, document it in packages/common/prisma/pending-contract.md"
+ echo ""
+ echo "If this migration does NOT require a follow-up contract phase, you can safely ignore this warning."
+ else
+ echo "✅ pending-contract.md was updated alongside the expand migration"
+ fi
+
+```
+
+**Impact:** Nudges developers to document the contract phase while the context is fresh. Uses a warning (not a failure) since not every nullable column addition requires a follow-up.
+
+### Level 3: Scheduled Contract Migration Reminders
+
+**Purpose:** Find forgotten contract migrations that have been pending too long.
+
+**Trigger:** Scheduled (e.g., every Monday at 9 AM UTC).
+
+**What it does:** Finds merged PRs labeled `needs-contract-migration` that were merged more than N days ago without a corresponding contract PR, and creates reminder issues.
+
+```
+# .github/workflows/contract-migration-reminder.yml
+name: Contract Migration Reminder
+
+on:
+ schedule:
+ - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
+
+jobs:
+ check-pending-contracts:
+ name: Check Pending Contract Migrations
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v4
+
+ - name: Check pending-contract.md for stale entries
+ uses: actions/github-script@v7
+ with:
+ script: |
+ const fs = require('fs');
+ const path = 'packages/common/prisma/pending-contract.md';
+
+ if (!fs.existsSync(path)) {
+ console.log('No pending-contract.md found - nothing to check');
+ return;
+ }
+
+ const content = fs.readFileSync(path, 'utf8');
+ const activeSection = content.split('## Active')[1]?.split('## Completed')[0] || '';
+
+ if (!activeSection.trim()) {
+ console.log('✅ No active pending contract migrations');
+ return;
+ }
+
+ // Parse entries and check dates
+ const entryPattern = /###\s+(.+?)→.*deployed\s+(\d{4}-\d{2}-\d{2})/g;
+ const STALE_THRESHOLD_DAYS = 14;
+ const now = new Date();
+ const staleEntries = [];
+
+ let match;
+ while ((match = entryPattern.exec(activeSection)) !== null) {
+ const name = match[1].trim();
+ const deployDate = new Date(match[2]);
+ const daysSinceDeploy = Math.floor((now - deployDate) / (1000 * 60 * 60 * 24));
+
+ if (daysSinceDeploy > STALE_THRESHOLD_DAYS) {
+ staleEntries.push({ name, deployDate: match[2], daysSinceDeploy });
+ }
+
+ if (staleEntries.length === 0) {
+ console.log('✅ All pending contract migrations are within the threshold');
+ return;
+ }
+
+ // Create a reminder issue
+ const body = [
+ '## Stale Contract Migrations Detected',
+ '',
+ 'The following expand migrations have been pending for over ' +
+ STALE_THRESHOLD_DAYS + ' days without a contract migration:',
+ '',
+ ...staleEntries.map(e =>
+ `- **${e.name}** - deployed ${e.deployDate} (${e.daysSinceDeploy} days ago)`
+ ),
+ '',
+ 'Please create the contract migration PRs or update `pending-contract.md`',
+ 'if these are no longer needed.',
+ '',
+ 'See: [Database Migration Safety Guide](../docs/DATABASE-MIGRATION-SAFETY.md)',
+ ].join('\n');
+
+ await github.rest.issues.create({
+ owner: context.repo.owner,
+ repo: context.repo.repo,
+ title: `🗃️ Stale contract migrations: ${staleEntries.length} pending`,
+ body,
+ labels: ['tech-debt', 'database'],
+ });
+
+ console.log(`Created reminder issue for ${staleEntries.length} stale entries`);
+
+ - name: Check PRs with needs-contract-migration label
+ uses: actions/github-script@v7
+ with:
+ script: |
+ const GRACE_PERIOD_DAYS = 14;
+ const now = new Date();
+
+ // Find closed PRs with the label
+ const { data: prs } = await github.rest.issues.listForRepo({
+ owner: context.repo.owner,
+ repo: context.repo.repo,
+ labels: 'needs-contract-migration',
+ state: 'closed',
+ per_page: 50,
+ });
+
+ const overduePRs = prs.filter(pr => {
+ const mergedAt = new Date(pr.closed_at);
+ const daysSinceMerge = (now - mergedAt) / (1000 * 60 * 60 * 24);
+ return daysSinceMerge > GRACE_PERIOD_DAYS;
+ });
+
+ if (overduePRs.length === 0) {
+ console.log('✅ No overdue contract migrations from labeled PRs');
+ return;
+ }
+
+ for (const pr of overduePRs) {
+ const daysSinceMerge = Math.floor(
+ (now - new Date(pr.closed_at)) / (1000 * 60 * 60 * 24)
+ );
+
+ console.log(
+ `⚠️ PR #${pr.number} "${pr.title}" merged ${daysSinceMerge} days ago ` +
+ `still has needs-contract-migration label`
+ );
+
+ // Create a reminder issue assigned to the PR author
+ await github.rest.issues.create({
+ owner: context.repo.owner,
+ repo: context.repo.repo,
+ title: `Contract migration needed: follow-up to #${pr.number}`,
+ body: [
+ `PR #${pr.number} included an expand migration that was merged ` +
+ `${daysSinceMerge} days ago.`,
+ '',
+ 'A contract migration (cleanup) is overdue.',
+ '',
+ `**Original PR:** #${pr.number}`,
+ `**Author:** @${pr.user.login}`,
+ '',
+ 'See: [Database Migration Safety Guide](../docs/DATABASE-MIGRATION-SAFETY.md)',
+ ].join('\n'),
+ assignees: [pr.user.login],
+ labels: ['contract-migration', 'tech-debt'],
+ });
+ }
+
+```
+
+**Impact:** Automatically catches forgotten contract migrations. Requires the `needs-contract-migration` label to be applied to expand PRs.
+
+### CI Implementation Priority
+
+| Level | Name | Effort | ROI | Implement When |
+| --- | --- | --- | --- | --- |
+| 1 | Destructive Migration Gate | 30 min | Prevents production incidents | Immediately |
+| 2 | Expand Documentation Enforcement | 30 min | Prevents forgotten cleanups | After Level 1 is stable |
+| 3 | Scheduled Reminders | 1-2 hours | Catches stale tech debt | After team adopts the process |
+
+## Rollback Scenarios
+
+### Scenario 1: Migration Succeeds, New Code Fails Health Check
+
+```
+Timeline:
+ Migration runs ─── Schema is V2
+ New container crashes ─── Health check fails
+ ECS keeps old containers ─── Old code + V2 schema
+
+```
+
+| If migration was... | Outcome |
+| --- | --- |
+| Expand-only (additive) | Old instances keep working. Fix the bug, re-deploy. |
+| Destructive (drop/rename) | Old instances may also be failing. Production incident. |
+
+**Action:** Fix the bug in a new PR and deploy. If using expand-contract, no urgent action needed - old instances are fine.
+
+### Scenario 2: Migration Itself Fails
+
+```
+Timeline:
+ Migration runs ─── ERROR ─── PostgreSQL rolls back transaction
+ Container fails to start ─── ECS keeps old containers
+ Schema unchanged ─── Old code unaffected
+
+```
+
+This is actually the **safest failure mode**:
+
+| Step | What Happens |
+| --- | --- |
+| 1 | PostgreSQL wraps DDL in a transaction; on failure, the schema is unchanged |
+| 2 | The container exits with a non-zero code |
+| 3 | ECS sees the new task fail and keeps old tasks running |
+| 4 | Prisma marks the migration as "failed" in _prisma_migrations table |
+
+**Action:**
+
+| Option | Command |
+| --- | --- |
+| Fix the migration and re-deploy | Edit SQL, push, deploy |
+| Mark as rolled back and create a new one | pnpm prisma migrate resolve --rolled-back <migration_name> |
+
+### Scenario 3: Need to Roll Back After Successful Deploy
+
+New code is running in production, but a bug is discovered hours later.
+
+**With expand-contract:**
+
+| Step | Action |
+| --- | --- |
+| 1 | Re-deploy the previous Docker image tag (see CI/CD Onboarding Guide - Rollback Procedures) |
+| 2 | Old code runs against V2 schema - works because expand was additive |
+| 3 | The new columns sit unused until next deploy |
+
+**Without expand-contract:**
+
+| Step | Action |
+| --- | --- |
+| 1 | Re-deploying the old image will NOT fix it - old code hits missing/renamed columns |
+| 2 | Must create a NEW migration that reverses the schema change |
+| 3 | Deploy the reverse migration + old code together |
+| 4 | This is slow, error-prone, and high-stress |
+
+> Prisma has **no built-in rollback migration command**. You must manually write reverse SQL.
+
+### Scenario 4: Partial Migration (Multi-Statement)
+
+Prisma wraps PostgreSQL migrations in a transaction. If any statement fails, the entire migration is rolled back atomically.
+
+**Exception:** Some PostgreSQL operations cannot run inside a transaction:
+
+| Operation | Transactional? | Risk |
+| --- | --- | --- |
+| CREATE INDEX CONCURRENTLY | No | May leave partial index on failure |
+| ALTER TYPE ... ADD VALUE (enum) | No | Value is added even if migration fails |
+
+For these, manual cleanup may be required if the migration fails partway.
+
+### Scenario 5: Two Developers Create Conflicting Migrations
+
+```
+Developer A: Adds column "status" to Pet (migration_20260211_001)
+Developer B: Adds column "breed" to Pet (migration_20260211_002)
+Both merge to prestaging around the same time
+
+```
+
+**Result:** Both migrations run sequentially. Prisma orders by timestamp prefix. This is safe **unless** both migrations modify the same column or constraint.
+
+**Prevention:** Review `pending-contract.md` and active migration PRs before creating your own. Communicate in the team channel.
+
+### Rollback Decision Matrix
+
+| Situation | Schema Changed? | Action |
+| --- | --- | --- |
+| Migration failed | No (rolled back) | Fix migration SQL, re-deploy |
+| Code fails health check, expand migration | Yes (additive) | Fix code, re-deploy (old code still works) |
+| Code fails health check, destructive migration | Yes (breaking) | Incident - write reverse migration, deploy urgently |
+| Bug found after deploy, expand migration | Yes (additive) | Roll back Docker image; schema is fine |
+| Bug found after deploy, destructive migration | Yes (breaking) | Incident - write reverse migration, deploy urgently |
+| Backfill script fails | Partially | Re-run script; it should be idempotent (WHERE ... IS NULL) |
+
+## Future: Separate Migration Step
+
+### Problem with Current Setup
+
+Even with expand-contract discipline, the current setup has drawbacks:
+
+| Issue | Impact |
+| --- | --- |
+| Migrations run inside each container | Race conditions if multiple tasks start simultaneously |
+| Migration failure = container failure | No clean separation between migration and application errors |
+| Cannot run migration without deploying code | Limits flexibility for data-only operations |
+| Each deploy adds migration check latency | Even when no migrations exist |
+
+### Proposed Architecture: Pre-Deploy Migration Task
+
+Run migrations as a **separate, one-shot ECS task** before the rolling deployment begins:
+
+```
+Current:
+ Deploy → [Container starts → Run migration → Start app] × N containers
+
+Proposed:
+ Deploy → [Migration task runs → Exit] → [Container starts → Start app] × N containers
+
+```
+
+### Implementation Plan
+
+#### 1. Add a Migration-Only Start Script
+
+```
+// server/package.json
+{
+ "scripts": {
+ "start": "cross-env NODE_ENV=production node dist/main",
+ "migrate:deploy": "pnpm -w prisma:migration:run"
+ }
+
+```
+
+Note: `start` no longer runs migrations.
+
+#### 2. Create a Migration-Only Dockerfile Target (Optional)
+
+Alternatively, override the command in the ECS task definition:
+
+```
+# In the ecs-deploy action or task definition:
+command: ["pnpm", "--filter", "server", "migrate:deploy"]
+
+```
+
+#### 3. Add a Migration Step to the Deploy Workflow
+
+```
+# In deploy-api.yml, between the ECR push and ecs-deploy steps:
+
+- name: Run database migration
+ uses: ./.github/actions/ecs-run-task
+ with:
+ cluster: ${{ env.CLUSTER }}
+ task-family: ${{ env.TASK_FAMILY }}
+ image: ${{ steps.build.outputs.image }}
+ command: '["pnpm", "--filter", "server", "migrate:deploy"]'
+ wait-for-completion: true
+ timeout: 300
+
+```
+
+This would require a new `ecs-run-task` composite action that:
+
+| Step | Action |
+| --- | --- |
+| 1 | Registers a temporary task definition with the migration command override |
+| 2 | Runs it as a one-shot ECS task (aws ecs run-task) |
+| 3 | Waits for the task to complete (aws ecs wait tasks-stopped) |
+| 4 | Checks the exit code |
+| 5 | If exit code is non-zero, aborts the deployment |
+
+#### 4. Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Single migration execution | No race conditions between containers |
+| Clean error separation | Migration failure clearly distinct from app failure |
+| Abort on migration failure | Deployment stops before any new code is deployed |
+| Faster container startup | No migration check on every container start |
+| Enables migration-only deploys | Run data backfills without deploying code |
+
+#### 5. Risks and Mitigations
+
+| Risk | Mitigation |
+| --- | --- |
+| Migration task has no app context | Migrations are pure SQL - no app context needed |
+| Increased deploy time | Migration task runs in parallel with image pull; minimal impact |
+| Migration task infrastructure cost | One-shot task, runs for seconds; negligible cost |
+| Complexity | Well-documented composite action; one-time setup |
+
+#### 6. Timeline
+
+This is a separate engineering effort from the expand-contract documentation. Recommended implementation order:
+
+| Phase | Milestone |
+| --- | --- |
+| Now | Adopt expand-contract discipline (this document) |
+| Next sprint | Implement Level 1 CI check (destructive migration gate) |
+| Following sprint | Implement separate migration ECS task (Strategy A) |
+| Ongoing | Add Level 2 and Level 3 CI checks as needed |
+
+## Quick Reference
+
+### Prisma Migration Commands
+
+| Command | Purpose |
+| --- | --- |
+| pnpm prisma:migration:create <name> | Create a new migration (generates SQL from schema diff) |
+| pnpm prisma:migration:run | Apply pending migrations (prisma migrate deploy) |
+| pnpm prisma:migration:generate | Regenerate Prisma client without migration |
+| pnpm prisma:migration:reset | Reset database and reapply all migrations |
+
+### Known Limitations & Edge Cases
+
+#### Concurrent Migration Attempts (Prisma Advisory Locks)
+
+Prisma uses a PostgreSQL advisory lock (`_prisma_migrations` table) to prevent concurrent migration execution. If two ECS tasks attempt to run `prisma migrate deploy` simultaneously:
+
+- **One succeeds**, the other waits (or times out and retries).
+- **This is safe** - Prisma's locking prevents corruption or double-application.
+- **However**, if the winning migration takes a long time (e.g., large backfill inside the transaction), the loser may time out, and the ECS task fails health checks.
+
+
+**Mitigation:** Keep migration transactions fast (separate large backfills - see Data Backfill Rule 3). If using Strategy A (separate migration ECS task), only one task runs migrations, avoiding this entirely.
+
+#### ALTER TYPE ADD VALUE Is Non-Transactional
+
+PostgreSQL's `ALTER TYPE ... ADD VALUE` **cannot run inside a transaction**. This has important implications:
+
+- If a migration contains `ALTER TYPE ADD VALUE` followed by other SQL (e.g., a backfill `UPDATE`), and the backfill fails, the new enum value **has already been committed** - it cannot be rolled back.
+- Prisma wraps each migration file in a transaction. To work around this, Prisma executes `ALTER TYPE ADD VALUE` statements **outside the transaction boundary** automatically.
+- **Partial failure scenario:** If `ALTER TYPE ADD VALUE` succeeds but a subsequent statement fails, the migration is marked as `failed` in `_prisma_migrations`. The enum value exists in the database but the migration is incomplete. **Manual recovery required:** fix the failing SQL, then mark the migration as applied (`prisma migrate resolve --applied <migration_name>`) or delete the failed entry and re-run.
+
+
+**Mitigation:** Keep enum migrations minimal - add the value in one migration, backfill in a separate migration. This isolates the non-transactional operation.
+
+#### CREATE INDEX CONCURRENTLY Cannot Run in a Transaction
+
+PostgreSQL's `CREATE INDEX CONCURRENTLY` cannot execute inside a transaction block. Since Prisma wraps migrations in transactions by default:
+
+- You **must** create a separate migration file (using `--create-only`) containing only the `CREATE INDEX CONCURRENTLY` statement.
+- Remove the Prisma-generated transaction wrapper, or use a Prisma feature/convention to run it non-transactionally (check Prisma docs for your version).
+- If this migration fails partway, the index is left in an `INVALID` state. Check with: `SELECT * FROM pg_indexes WHERE indexname = '...'` - if invalid, `DROP INDEX` and retry.
+
+#### AFTER Trigger Deadlock Potential (Playbook 13)
+
+The `AFTER INSERT OR UPDATE` trigger in Playbook 13 (Merge Tables) updates a different table (`PetOwner`) in response to writes on `EmergencyContact`. This cross-table update pattern can cause **deadlocks** if:
+
+- A concurrent transaction updates `PetOwner` directly (e.g., V1 dual-write code) while another transaction inserts into `EmergencyContact` (firing the trigger, which also tries to update `PetOwner`).
+- Both transactions acquire row locks on the same `PetOwner` row in different orders.
+
+
+**Mitigations:**
+
+1. Use `BEFORE` triggers instead of `AFTER` where possible (Playbooks 4, 5, 12 already use `BEFORE`).
+2. For Playbook 13, keep the transition period short - Deploy 2 should follow quickly after Deploy 1 is stable.
+3. If deadlocks occur in practice, add retry logic to the application layer or switch from trigger-based sync to application-level dual-write only.
+4. Monitor PostgreSQL logs for `deadlock detected` during the transition period.
+
+### Migration PR Checklist
+
+Copy this into your PR description when the PR includes a database migration:
+
+```
+## Migration Checklist
+
+### Safety
+
+- [ ] Migration is backward-compatible with currently deployed code
+- [ ] Reviewed generated SQL (`--create-only`) for unexpected destructive operations
+- [ ] Tested migration locally against a populated database
+- [ ] No `DROP COLUMN`, `RENAME`, `ALTER TYPE`, or `SET NOT NULL` on existing columns
+
+### If This Is an Expand Migration
+
+- [ ] New columns are nullable or have defaults
+- [ ] Code writes to BOTH old and new locations (dual-write) - see Rule 2
+- [ ] Initial backfill uses `WHERE target_column IS NULL` (not blanket update) - see Rule 3
+- [ ] Sync trigger created in migration (if rename, type change, or table split) - see Rule 5 / Playbooks 4, 5, 12
+- [ ] For table rename (Playbook 11): backward-compat view created; verified `ON CONFLICT` not used through view
+- [ ] For table merge (Playbook 13): AFTER trigger warning reviewed; transition period planned to be short
+- [ ] For large tables (> 100K rows): DDL and backfill are in SEPARATE migrations - see Data Backfill Rule 3
+- [ ] Created GitHub Issue for the contract phase: #\_\_\_
+- [ ] Added entry to `packages/common/prisma/pending-contract.md`
+- [ ] Added `needs-contract-migration` label to this PR
+
+### If This Is a Transition Deploy (Code-Only, No Migration)
+
+- [ ] ALL references to old column/table name removed from code (select, data, DTOs, repositories)
+- [ ] Old column/table still exists in Prisma schema (no schema change)
+- [ ] Previous deploy (expand) is deployed to ALL environments
+
+### If This Is a Contract Migration
+
+- [ ] Transition deploy (code-only) was deployed to ALL environments (prestaging → staging → production)
+- [ ] No running code references the columns/tables being dropped (grep verified)
+- [ ] All temporary triggers and functions dropped BEFORE dropping old columns/tables (Playbooks 4, 5, 12, 13)
+- [ ] Safety backfill included before enum type recreation (if removing/renaming enum value) - see Playbooks 6b, 6c
+- [ ] Safety dedup/cleanup included BEFORE adding constraint (if unique/FK) - see Playbooks 7, 9
+- [ ] For table rename (Playbook 11): backward-compat view dropped
+- [ ] Removed entry from `packages/common/prisma/pending-contract.md`
+- [ ] Closing the tracking GitHub Issue: #\_\_\_
+
+### If This Involves Enum Changes (Playbooks 6a-6d)
+
+- [ ] Old code handles unknown enum values gracefully (default case), OR this is a multi-deploy migration with Deploy 0
+- [ ] If renaming enum value (6c): determined if 2 or 3 deploys needed based on old code behavior
+- [ ] Backfill remaps existing data before removing/renaming values
+- [ ] Verified zero rows use the old value before contract deploy: `SELECT COUNT(*) ... WHERE status = 'old_value'`
+- [ ] Value mapping in code handles both old and new values during expand phase
+- [ ] Aware that `ALTER TYPE ADD VALUE` is non-transactional (see Known Limitations)
+
+### If This Adds a Unique / FK Constraint (Playbooks 7, 9)
+
+- [ ] Safety dedup/cleanup included in the Contract migration BEFORE adding constraint
+- [ ] Constraint uses `NOT VALID` + `VALIDATE CONSTRAINT` pattern (for large tables)
+- [ ] FK cleanup prefers UPDATE SET NULL over DELETE (preserves data)
+
+### Performance
+
+- [ ] Large table operations use `CONCURRENTLY` where possible
+- [ ] Data backfills are batched (if > 10K rows affected)
+- [ ] New indexes are on columns used in WHERE/JOIN clauses
+- [ ] For tables > 100K rows: DDL and backfill are in SEPARATE migrations (see Data Backfill Rule 3)
+- [ ] `CREATE INDEX CONCURRENTLY` runs in its own non-transactional migration
+
+```
+
+### Safe/Unsafe Quick Reference
+
+| Operation | Safe? | Deploys | Phases | Playbook |
+| --- | --- | --- | --- | --- |
+| ADD nullable column | Yes | 1 | - | 1 |
+| ADD column with DEFAULT | Yes | 1 | - | 1 |
+| ADD table | Yes | 1 | - | - |
+| ADD/DROP index | Yes | 1 | - | - |
+| ADD enum value (graceful code) | Yes | 1 | - | 6a |
+| ADD enum value (strict code) | No | 2 | Expand (add value + handle reads) → Start writing | 6a |
+| ADD NOT NULL column (new) | No | 2 | Expand (nullable) → Contract (set NOT NULL) | 2 |
+| ADD NOT NULL to existing column | No | 2 | Expand (backfill NULLs + code guard) → Contract (safety backfill + set NOT NULL) | 8 |
+| ADD UNIQUE to existing column | No | 2 | Expand (dedup data + code guard) → Contract (safety dedup + add constraint) | 7 |
+| ADD FOREIGN KEY to existing col | No | 2 | Expand (clean orphans + code guard) → Contract (safety cleanup + add FK, use NOT VALID + VALIDATE) | 9 |
+| DROP column | No | 2 | Transition (remove code refs) → Contract (drop) | 3 |
+| DROP table | No | 2 | Transition (remove code refs) → Contract (drop) | 10 |
+| REMOVE enum value | No | 2 | Transition (stop writing + backfill) → Contract (safety backfill + recreate type) | 6b |
+| RENAME enum value | No | 2-3 | [Deploy 0 if old code throws on unknown values] → Expand (add new value + backfill + map reads) → Contract (safety backfill + recreate type) | 6c |
+| RENAME column | No | 3 | Expand (add new + sync trigger, write both) → Transition (write only new) → Contract (drop trigger + old) | 4 |
+| CHANGE column type | No | 3 | Expand (add new type + sync trigger, write both) → Transition (write only new) → Contract (drop trigger + old) | 5 |
+| RENAME table | No | 3 | Expand (rename + create view) → Transition (remove old name refs) → Contract (drop view) | 11 |
+| SPLIT table (normalize) | No | 3 | Expand (create table + backfill + sync trigger + dual-write) → Transition (new table only) → Contract (drop trigger + old columns) | 12 |
+| MERGE tables (denormalize) | No | 3 | Expand (add columns + backfill + dual-write) → Transition (new columns only) → Contract (drop source table) | 13 |
+
+### Labels Reference
+
+| Label | Applied To | Meaning |
+| --- | --- | --- |
+| needs-contract-migration | Expand PRs | Contract phase is pending |
+| contract-migration | Contract PRs | This PR is the cleanup phase |
+| tech-debt | Reminder issues | Auto-created by CI for stale entries |
+| database | Migration PRs | For filtering and discovery |
+
+**© 2026 Crest Advisory Group LLC. All rights reserved.**
+

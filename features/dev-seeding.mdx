@@ -1,0 +1,282 @@
+---
+title: "Dev Seeding Implementation"
+description: "Implementation guide for database seeding in development environments."
+---
+
+**Proposed by:** Dylan Vidal
+
+**Supported by:** Bryant Parchinski
+
+**Date:** February 2026
+
+**Status:** Implementation In Progress
+
+**Ticket: **[[PW-4201]](https://cammaratainc.atlassian.net/browse/PW-4201?atlOrigin=eyJpIjoiNTUxMDg0YjMxMGM2NGIwZTlkM2Q5NzViZTE1YjZkMWUiLCJwIjoiaiJ9)
+
+## Problem Statement
+
+The `seed.ts` script is currently not committed to version control because running it in production would be dangerous (could overwrite production data with seed data). However, this creates friction for developers who need to:
+
+- Share seed script updates with the team
+- Keep seed data in sync as features get merged
+- Work with the complex Postgres schema without manual DB editing tools
+
+## Proposed Solution
+
+Implement an automated dev database seeding pipeline inspired by the Knight Hacks project setup.
+
+### Architecture Overview
+
+```
+Prestaging DB
+ ↓
+ [Clone via pg_dump]
+ ↓
+ Prestaging Clone (temp CI database)
+ ↓
+ [Run seed.ts]
+ ↓
+ Seeded Dev DB Dump
+ ↓
+ [Upload to S3]
+ ↓
+ Developers run `pnpm db:fetch`, which retrieves dump
+ from S3 and imports to local dev database.
+```
+
+> **Note:** Prestaging contains only development/test data - no real customer PII or production data. The database can be cloned as-is without sanitization.
+
+## Automation Flow
+
+**On merge to prestaging:**
+
+1. GitHub Actions workflow triggers
+2. Spin up temp PostgreSQL container, run Prisma migrations
+3. Clone prestaging data via `pg_dump` from read-replica
+4. Import clone into temp container
+5. Run `seed.ts` against the cloned data
+6. Dump the seeded database, compress, and upload to S3
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ GitHub Actions (on merge to prestaging) │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Spin up temp PostgreSQL container │
+│ 2. Run Prisma migrations to create schema │
+│ 3. pg_dump prestaging read-replica → import into temp DB │
+│ 4. Run seed.ts against temp database │
+│ 5. pg_dump → gzip → upload to S3 │
+└─────────────────────────────────────────────────────────────────┘
+ ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ S3 Bucket (crest-pet-dev-db-dumps) │
+│ └── dumps/seeded-dev-db.sql.gz (latest) │
+│ └── dumps/archive/seeded-dev-db-{timestamp}.sql.gz │
+└─────────────────────────────────────────────────────────────────┘
+ ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Developer: pnpm db:fetch │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Validate NODE_ENV=development & DATABASE_URL not production │
+│ 2. Download seeded-dev-db.sql.gz from S3 │
+│ 3. Validate SHA256 checksum │
+│ 4. Extract and import using db:reset-and-import pattern │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Developer Experience
+
+### Fetching the latest DB: pnpm db:fetch
+
+This command will:
+
+1. Download latest `sql.dump` from S3 bucket
+2. Reset and import into local dev database
+
+## Safety Guards
+
+| Guard | Implementation |
+| --- | --- |
+| NODE_ENV check | db:fetch validates development or test only |
+| Database URL validation | Rejects URLs containing production, crest.vet, crest.pet, rds.amazonaws.com |
+| Source database safety | Pipeline only connects to prestaging read-replica |
+| Dump integrity | SHA256 checksum generated and validated on download |
+
+## What Needs to Be Built
+
+| Component | Status | Description |
+| --- | --- | --- |
+| GitHub Actions Workflow | Planned | .github/workflows/dev-db-seeding.yml |
+| Developer Fetch Script | Planned | scripts/db-fetch.sh |
+| S3 Bucket Enum | Planned | Add DEV_DB_DUMPS to enum |
+| Config Schema | Planned | Add devDbDumps to S3 config |
+| Package.json Scripts | Planned | db:fetch |
+
+> **Simplification:** Prestaging contains only dev/test data - no real customer PII. The sanitization step has been removed from the pipeline. The prestaging read-replica is cloned directly via `pg_dump`.
+
+## Blockers & Prerequisites
+
+### 1. S3 Bucket Creation (CRITICAL)
+
+**Bucket Name:** `crest-pet-dev-db-dumps` **Region:** `us-east-1`
+
+**Required Configuration:**
+
+- **Encryption:** AES-256 (SSE-S3)
+- **Versioning:** Enabled
+- **Lifecycle Rules:**Delete non-current versions after 30 days
+- Delete incomplete multipart uploads after 7 days
+
+
+**Public Access:** Block all public access
+
+**Verification:**
+
+bash
+
+```
+aws s3 ls s3://crest-pet-dev-db-dumps/
+# Should return empty (no error)
+```
+
+### 2. IAM Policy Updates (CRITICAL)
+
+**Role:** `crest-dev-ec2-role` (and GitHub Actions OIDC role)
+
+**Required Permissions:**
+
+json
+
+```
+{
+ "Version": "2012-10-17",
+ "Statement": [
+ {
+ "Sid": "DevDbDumpsAccess",
+ "Effect": "Allow",
+ "Action": [
+ "s3:GetObject",
+ "s3:PutObject",
+ "s3:ListBucket",
+ "s3:DeleteObject"
+ ],
+ "Resource": [
+ "arn:aws:s3:::crest-pet-dev-db-dumps",
+ "arn:aws:s3:::crest-pet-dev-db-dumps/*"
+ ]
+ }
+ ]
+}
+```
+
+**Roles that need this policy:**
+
+| Role | Purpose |
+| --- | --- |
+| crest-dev-ec2-role | Developer VMs to run pnpm db:fetch |
+| GitHub Actions OIDC Role | CI pipeline to upload dumps |
+
+### 3. GitHub Secret (CRITICAL)
+
+**Environment:** `prestaging` **Secret Name:** `PRESTAGING_READ_REPLICA_URL`
+
+**Value Format:**
+
+```
+postgresql://username:password@prestaging-read-replica-host:5432/crest_pet?schema=public
+```
+
+### 4. Environment Variable (LOW PRIORITY)
+
+**File:** `server/.env` (local development)
+
+```
+AWS_S3_BUCKET_DEV_DB_DUMPS=crest-pet-dev-db-dumps
+```
+
+> **Note:** Only needed if services reference the bucket programmatically. The `db:fetch` script hardcodes the bucket name.
+
+## Testing Plan
+
+Once blockers are resolved, test in this order:
+
+### Test 1: Manual S3 Upload (Verify Bucket Access)
+
+bash
+
+```
+echo "test" > /tmp/test.txt
+aws s3 cp /tmp/test.txt s3://crest-pet-dev-db-dumps/test.txt
+aws s3 ls s3://crest-pet-dev-db-dumps/
+aws s3 rm s3://crest-pet-dev-db-dumps/test.txt
+```
+
+### Test 2: Manual Dump Upload (Verify Full Flow)
+
+bash
+
+```
+pg_dump "$DATABASE_URL" | gzip > /tmp/test-dump.sql.gz
+aws s3 cp /tmp/test-dump.sql.gz s3://crest-pet-dev-db-dumps/dumps/seeded-dev-db.sql.gz
+NODE_ENV=development pnpm db:fetch
+```
+
+### Test 3: GitHub Actions (Full Pipeline)
+
+1. Merge PR to prestaging
+2. Monitor GitHub Actions workflow
+3. Verify dump appears in S3
+4. Run `pnpm db:fetch` on dev VM
+
+## Benefits
+
+- `seed.ts` can be committed to VCS safely
+- All developers share consistent seed data
+- Automatic sync when prestaging schema changes
+- No manual DB editing required
+- Fast onboarding for new developers
+
+## Dev DB Seeding Pipeline - Infra Requirements
+
+ Automated pipeline creates seeded dev DB dumps on push to prestaging. Devs consume via pnpm db:fetch.
+
+### AWS Resources (Terraform)
+
+- S3 Bucket: crest-pet-dev-db-dumps (us-east-2, SSE-AES256). Already created manually by Michael - needs terraform import.
+- S3 Objects: dumps/seeded-dev-db.sql.gz (latest), .sha256 (checksum), dumps/archive/* (timestamped)
+- IAM Role (pipeline): OIDC-based, stored as SEED_AWS_ROLE_TO_ASSUME secret. Needs s3:PutObject + s3:ListBucket on bucket, and rds-db:connect for viewer_iam DB user.
+- IAM Policy (devs): Devs use own AWS creds. Need s3:GetObject on dumps/*
+
+### GitHub Secrets
+
+- SEED_AWS_ROLE_TO_ASSUME - New IAM role ARN from Terraform output (Infra team)
+- PRESTAGING_DB_HOST - RDS endpoint hostname (Infra team)
+- PRESTAGING_DB_NAME - Database name: crest_pet_prestaging (Infra team)
+- SLACK_WEBHOOK_URL - Already exists
+
+### IAM Role Permissions for SEED_AWS_ROLE_TO_ASSUME
+
+- s3:PutObject on arn:aws:s3:::crest-pet-dev-db-dumps/dumps/*
+- s3:GetObject on arn:aws:s3:::crest-pet-dev-db-dumps/dumps/*
+- s3:ListBucket on arn:aws:s3:::crest-pet-dev-db-dumps
+- rds-db:connect on arn:aws:rds-db:{region}:{account}:dbuser:{dbi-resource-id}/viewer_iam
+
+### OIDC Trust Policy
+
+ Trust: [token.actions.githubusercontent.com](http://token.actions.githubusercontent.com)
+ Audience: [sts.amazonaws.com](http://sts.amazonaws.com)
+ Subject: repo:cmistaff/crestpetsystem:*
+
+### Runner Requirements
+
+ Self-hosted [build] runner with: Docker, pg_dump/psql, gzip, sha256sum, aws CLI, Node 22.x + pnpm.
+ Network access to prestaging RDS, S3, and GitHub OIDC endpoint.
+
+### DB Access Method
+
+ Uses IAM database authentication with the existing viewer_iam role (SELECT-only). No read replica needed.
+ Workflow generates a 15-minute auth token via aws rds generate-db-auth-token at runtime. Requires SSL
+ (PGSSLMODE=require).
+

@@ -1,0 +1,172 @@
+---
+title: "Permission Matrix"
+description: "Role-based permission matrix across all portals and user types."
+---
+
+# Permission Matrix (RBAC)
+
+> **Source Branch:** `prestaging`
+> **Last Updated:** December 2024
+
+This document defines all permissions in the system and their mapping to navigation/features.
+
+---
+
+## 🔐 Permission System Overview
+
+### Architecture
+
+Permissions flow: **Tenant → Tenant Role → Role Permissions → Tenant User**
+
+- Each tenant has roles (e.g., "Veterinarian", "Receptionist")
+- Each role has a set of permissions with access levels (READ or WRITE)
+- Users are assigned roles and inherit those permissions
+
+### Access Levels
+
+| Level | Description |
+| --- | --- |
+| READ | View-only access to the feature |
+| WRITE | Full access including create/update/delete |
+
+---
+
+## 🏥 Clinic Portal Permissions
+
+### Permission List
+
+| Permission | Navigation Item | Description |
+| --- | --- | --- |
+| CLINIC_DASHBOARD | Dashboard | Main clinic dashboard |
+| CLINIC_APPOINTMENTS | Appointments | Calendar, booking management |
+| CLINIC_PATIENTS | Patients | Patient/pet records |
+| CLINIC_NOTES_MANAGEMENT | Notes Management | Clinical notes, SOAP notes |
+| CLINIC_INVENTORY | Inventory | Stock management |
+| CLINIC_MEMORY | Memory | AI memory/context storage |
+| CLINIC_MEDICAL_RECORDS | Medical Records | Medical history access |
+| CLINIC_DIAGNOSTIC_REQUEST_PERMISSION | Diagnostic Requests | Lab requests, imaging |
+| CLINIC_WELLNESS_REPORTS | Wellness Reports | Wellness assessments |
+| CLINIC_VIDEO_CONSULTATIONS | Video Consultations | Telehealth features |
+| CLINIC_HEALTH_RECORDS | Health Records | Health document management |
+| CLINIC_STAFFING | Staffing | Staff scheduling, analytics |
+| CLINIC_NETWORK | Network | Clinic network features |
+| CLINIC_REFERRALS | Referrals | Patient referral management |
+| CLINIC_PAYMENTS | Payments | Payment processing, invoices |
+| CLINIC_PRICING | Pricing | Service pricing, templates |
+| CLINIC_INSIGHTS | Insights | Analytics, reporting |
+| CLINIC_MANAGEMENT | Management, Whiteboard | Clinic configuration |
+| CLINIC_AUDIT_LOGS | (Audit section) | Activity logs |
+| CLINIC_SETTINGS | Clinic Settings | Practice settings |
+
+### Suggested Role Templates
+
+#### Veterinarian (Full Access)
+
+- CLINIC_DASHBOARD: WRITE
+- CLINIC_APPOINTMENTS: WRITE
+- CLINIC_PATIENTS: WRITE
+- CLINIC_NOTES_MANAGEMENT: WRITE
+- CLINIC_MEDICAL_RECORDS: WRITE
+- CLINIC_DIAGNOSTIC_REQUEST_PERMISSION: WRITE
+- CLINIC_WELLNESS_REPORTS: WRITE
+- CLINIC_VIDEO_CONSULTATIONS: WRITE
+- CLINIC_HEALTH_RECORDS: WRITE
+- CLINIC_REFERRALS: WRITE
+- CLINIC_PRICING: READ
+- CLINIC_INSIGHTS: READ
+
+#### Vet Technician
+
+- CLINIC_DASHBOARD: READ
+- CLINIC_APPOINTMENTS: WRITE
+- CLINIC_PATIENTS: WRITE
+- CLINIC_INVENTORY: WRITE
+- CLINIC_MEDICAL_RECORDS: READ
+- CLINIC_DIAGNOSTIC_REQUEST_PERMISSION: WRITE
+- CLINIC_WELLNESS_REPORTS: READ
+
+#### Receptionist
+
+- CLINIC_DASHBOARD: READ
+- CLINIC_APPOINTMENTS: WRITE
+- CLINIC_PATIENTS: WRITE
+- CLINIC_PAYMENTS: WRITE
+
+#### Practice Manager
+
+- All permissions: WRITE
+
+
+---
+
+## 🏢 Enterprise Portal Permissions
+
+| Permission | Navigation Item | Description |
+| --- | --- | --- |
+| ENTERPRISE_DASHBOARD | Dashboard | Enterprise overview |
+| ENTERPRISE_CLINIC_MANAGEMENT | Clinic Management | Manage subsidiary clinics |
+| ENTERPRISE_NETWORK_MANAGEMENT | Network Management | Network administration |
+| ENTERPRISE_STAFF_MANAGEMENT | Staff Management, Permissions | Staff across locations |
+| ENTERPRISE_ANALYTICS | Analytics | Cross-clinic analytics |
+| ENTERPRISE_MARCIA_ANALYTICS | Marcia Predictive | AI-powered predictions |
+| ENTERPRISE_PAYMENTS | Payments | Financial management |
+| ENTERPRISE_COMPLIANCE | Compliance | Regulatory tracking |
+| ENTERPRISE_PERFORMANCE | Performance | Performance metrics |
+| ENTERPRISE_PLAN_MANAGEMENT | Plan Management | Subscription plans |
+| ENTERPRISE_GLOBAL_SETTINGS | Global Settings | Enterprise configuration |
+
+---
+
+## 👨‍👩‍👧‍👦 Consumer Portal Permissions
+
+The Consumer Portal uses **plan-based feature gating** rather than role-based permissions. All authenticated users have access to base features; premium features are controlled by plan subscription.
+
+See **Plan Features** document for details.
+
+---
+
+## 🛡️ Platform Portal Permissions
+
+Platform portal access is controlled at the user level:
+
+| Role | Description |
+| --- | --- |
+| SUPER_ADMIN | Full system access |
+| ADMIN | Standard admin access |
+| SUPPORT | Read-only with support tools |
+
+---
+
+## 🔗 Referral Portal Permissions
+
+Referral portal uses simplified access control:
+
+- Authenticated users from partner clinics have full access
+- Access is tenant-scoped (can only see own referrals)
+
+
+---
+
+## 🎨 UI Implementation
+
+### Visual Indicators
+
+| Scenario | UI Treatment |
+| --- | --- |
+| No permission | Hide navigation item entirely |
+| Plan-gated (no plan) | Show disabled, with tooltip |
+| READ-only access | Show, disable edit/delete buttons |
+| WRITE access | Full functionality |
+
+---
+
+## 📊 Permission Count Summary
+
+| Portal | Total Permissions | Notes |
+| --- | --- | --- |
+| Clinic | 21 | Most granular |
+| Enterprise | 12 | Business-level |
+| Consumer | 0 | Plan-based instead |
+| Platform | 3 roles | User-level access |
+| Referral | 0 | Tenant-scoped |
+

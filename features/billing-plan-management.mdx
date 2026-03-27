@@ -1,0 +1,279 @@
+---
+title: "Billing and Plan Management"
+description: "Super admin billing, plan management, and subscription configuration."
+---
+
+### Overview
+
+The **Billing & Plan Management** module enables the **Super Admin** to define, assign, and manage subscription plans for all tenants.
+It also provides granular **feature control**, ensuring each tenant’s access aligns with their assigned plan.
+
+From the tenant’s perspective, the module provides transparency into their plan details, usage limits, and available features ,  as well as a clear path for requesting upgrades or plan changes.
+
+---
+
+## 🧩 1. Plan Management (Super Admin View)
+
+### Purpose
+
+Super Admin can manage all subscription plans across the platform ,  from creation and editing to assigning them to specific tenants.
+
+---
+
+### Plan Creation Flow
+
+**User Flow:**
+
+Super Admin navigates to **Super Admin Portal → Plans → “Create New Plan”**.
+
+A form appears with fields for:
+
+- **Plan Name** (e.g., Free, Professional, Enterprise)
+- **Description** (summary of what this plan offers)
+- **Price (Monthly / Annual)**
+- **Included Features** (list of enabled features)
+- **Usage Limits** (optional ,  API calls, storage, etc.)
+
+Super Admin clicks **Save**, and the plan is added to the global catalog.
+
+**Notes:**
+
+- Plans are **global** ,  all tenants can be assigned any plan from the catalog.
+- If a tenant needs a **custom plan**, Super Admin can **clone** an existing template and edit its attributes manually.
+
+---
+
+### Plan Assignment Flow
+
+**User Flow:**
+
+Super Admin opens **Tenant Management → Selects Tenant → Billing Tab**.
+
+Under “Current Plan”, a **dropdown** displays available plans.
+
+Super Admin selects a plan and clicks **Assign Plan**.
+
+System updates the tenant’s record with:
+
+- Assigned plan name
+- Effective start date
+- Associated feature set
+
+Tenant immediately sees their new plan reflected in their dashboard.
+
+### Plan Lifecycle
+
+| Status | Description |
+| --- | --- |
+| **Active** | Tenant currently subscribed and within billing cycle |
+| **Expired** | Subscription ended (manual or system-triggered) |
+| **Pending Change** | Tenant scheduled for upgrade/downgrade next cycle |
+| **Custom** | Unique configuration created by Super Admin |
+
+---
+
+### Open Questions
+
+- When a plan changes (e.g., Professional → Enterprise), should the system automatically **prorate/recalculate** payments, or just record an effective date for manual adjustment?
+- Should we allow **scheduled plan changes** (effective next cycle) or immediate only?
+
+---
+
+## 💳 2. Billing Management (Super Admin View)
+
+### Purpose
+
+Track and manage billing events per tenant ,  including plan renewals, payment status, and invoices.
+
+---
+
+### Billing Overview Flow
+
+**User Flow:**
+
+Super Admin opens **Tenant → Billing Tab → “Billing Details”**.
+
+System shows:
+
+- **Current Plan**
+- **Next Renewal Date**
+- **Payment History**
+- **Outstanding Invoices / Balance**
+
+Super Admin can manually update payment status or notes (for now, since Stripe isn’t fully integrated).
+
+**Future Enhancements (Planned):**
+
+- Integration with **Stripe Webhooks** to auto-update payment transactions.
+- **Automated invoicing** and renewal reminders.
+
+---
+
+### Open Questions
+
+- Do we want to show **real-time billing summaries** (usage-based charges)?
+- Should plan pricing be visible to tenants or only plan names?
+- Once Stripe is active, should **failed payments** auto-trigger a downgrade or warning?
+
+---
+
+## ⚙️ 3. Feature Control (Super Admin View)
+
+### Purpose
+
+Allow the Super Admin to control which features are enabled or disabled per plan or tenant.
+
+---
+
+### Feature Toggle Flow
+
+**User Flow:**
+
+Super Admin opens **Super Admin → Features Tab**.
+
+Sees a list of all features (e.g., Tooth Scan, Poop Scan, Chat Assistant, etc.).
+
+Toggles each feature **ON/OFF** for specific plans or tenants.
+
+Changes apply immediately across the platform.
+
+
+**Notes:**
+
+- Enforcement is **real**, not just UI-based ,  backend denies API calls if a feature is disabled for a tenant.
+- Feature toggles only apply **when a plan is assigned**.
+- Super Admin can override defaults on a per-tenant basis if needed.
+
+---
+
+### Open Questions
+
+- Should usage caps (limits) be applied **per feature per tenant** or **globally per plan**?
+- Should Super Admin be able to **preview feature availability** from the tenant’s view?
+
+---
+
+## 👤 4. Tenant Experience
+
+### Purpose
+
+Give tenants visibility into their current plan, limits, and upgrade options ,  without exposing sensitive billing details.
+
+---
+
+### Tenant Dashboard Flow
+
+**User Flow:**
+
+Tenant logs into their dashboard.
+
+Opens **Settings → Subscription or Billing Tab**.
+
+Sees:
+
+- **Current Plan Name**
+- **Plan Description**
+- **Enabled Features List**
+- **Usage Summary** (if applicable)
+- **Upgrade / Change Plan Request** button
+
+If feature is disabled by plan, tenant sees a message:
+
+“This feature is unavailable in your current plan. Upgrade to access.”
+
+### Upgrade Request Flow
+
+Tenant clicks **Request Upgrade**, triggering a notification to Super Admin.
+
+Super Admin reviews and applies the new plan manually.
+
+Tenant receives confirmation in their dashboard.
+
+---
+
+### Open Questions
+
+Should tenants see **pricing** or just plan names?
+
+Should upgrade requests require **Super Admin approval**, or auto-apply with audit logging?
+
+---
+
+## 🧩 5. Notes & Open Items for Discussion
+
+| Area | Question / Decision Point |
+| --- | --- |
+| **Billing Logic** | Should plan upgrades trigger automatic billing recalculation or remain manual? |
+| **Stripe Integration** | When do we plan to enable live payments and webhook handling? |
+| **Feature Enforcement** | Should limits (usage caps) reset monthly or be cumulative? |
+| **Tenant Visibility** | Should tenants see custom plan details if assigned one? |
+| **Audit Trail** | Should all plan changes be logged with timestamp + Super Admin name for compliance? |
+| **Service codes** | Do we need a center for the "Service codes" that will contain the database for all clinic's and regions, maybe local-global service-codes relations. |
+| **Complete user management** | Possibly do we need a complete user management for selected clinic's features like deletion, roles management for urgent situations or edge-cases when we need to edit access for a user. |
+
+---
+
+## 🚀 6. Next Steps
+
+### To Finalize with Michael
+
+Confirm **proration handling** for plan changes (automatic vs. manual).
+
+Confirm if tenants should see **plan pricing and upgrade options**.
+
+Define **usage limit policy** (per feature or per plan).
+
+Decide on **billing notification flow** (email, dashboard, or both).
+
+---
+
+### Backend Tasks
+
+Create models for **Plan**, **TenantPlanAssignment**, and **FeatureControl**.
+
+Add endpoints for:
+
+Listing global plans
+
+Assigning plans to tenants
+
+Fetching tenant’s assigned plan + features
+
+Implement enforcement middleware for feature access.
+
+Add audit logging for plan and feature changes.
+
+---
+
+### Frontend Tasks
+
+Build **Plan Management UI** (Super Admin → Plans).
+
+Add **Billing Tab** under Tenant details.
+
+Create **Feature Toggle UI** with grid layout.
+
+Add **Tenant Subscription UI** showing plan + upgrade request flow.
+
+---
+
+### Future Enhancements
+
+Integrate with **Stripe** for automatic billing sync.
+
+Enable **scheduled plan changes** for future billing cycles.
+
+---
+
+✅ **Summary**
+This document outlines the complete **user flow and structure** for Super Admin and Tenant Billing & Plan Management, including:
+
+Global plan catalog management
+
+Manual plan assignment
+
+Feature control per plan
+
+Tenant visibility into plans
+
+Clear next steps for product, backend, and frontend alignment

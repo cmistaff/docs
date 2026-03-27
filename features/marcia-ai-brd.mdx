@@ -1,0 +1,391 @@
+---
+title: "Marcia AI Assistant - Business Requirements"
+description: "Business requirements document for the Marcia AI veterinary assistant."
+---
+
+# Marcia AI Assistant - Business Requirements Document
+
+**Version:** 1.0
+**Date:** December 2024
+**System:** Crest Pet Health Management System
+
+## Executive Summary
+
+Marcia is an AI-powered SMS assistant designed to provide 24/7 customer support for veterinary clinic appointments and pet health guidance within the Crest Pet Health Management ecosystem. Named "Marcia," this intelligent assistant serves as the primary interface between pet owners and veterinary services, offering appointment booking, health consultations, and diagnostic image analysis through SMS, web chat, and voice call interfaces.
+
+## Business Objectives
+
+- **24/7 Availability:** Provide instant customer support outside business hours
+- **Appointment Booking:** Books appointments for user based on understanding their requirements and getting the best available slot for them
+- **Toothscan and Poopscan:** Utilize Mars (An organization) APIs to perform toothscan and poopscan analysis which the user provides
+- **Voice Interaction:** Natural voice conversations via ElevenLabs with phone number verification
+- **Customer Engagement:** Maintain continuous engagement with pet owners through conversational AI. Also has image and document support
+- **Follow-up Care:** Proactive follow-up management for treatments, vaccinations, and health check-ins
+
+## Business Requirements
+
+### 1. Core User Experience Requirements
+
+**R001: Conversational Interface**
+
+- **Description**: Marcia must provide natural, conversational interactions via SMS and web chat
+- **Acceptance Criteria**: Responses feel natural and human-like
+- Maintains context throughout conversations
+- Uses pet and owner names when available
+- Provides warm, empathetic responses for health concerns
+
+**R002: Multi-Channel Support**
+
+- **Description**: Support both SMS (via Twilio) and web-based chat interfaces
+- **Acceptance Criteria**:Consistent experience across SMS and web platforms
+- Real-time message synchronization
+- File upload support (images for health assessment)
+- Conversation history persistence
+- Natural speech-to-text and text-to-speech capabilities through ElevenLabs
+- Voice call authentication via phone number verification
+- Agent-like voice interactions that feel like talking to a real person
+
+**R003: User Authentication Integration**
+
+- **Description**: Seamless integration with existing NextAuth authentication system
+- **Acceptance Criteria**:Automatic user identification via phone number or login session
+- Secure access to personal pet information
+- Graceful handling of unregistered users with registration prompts
+
+### 2. Appointment Management Requirements
+
+**R004: Intelligent Appointment Booking**
+
+- **Description**: End-to-end appointment booking through conversational interface
+- **Business Value**: Reduces staff workload and improves customer convenience
+- **Workflow**:User identification and verification
+- Pet selection from user's registered pets
+- Service type selection from clinic offerings
+- Real-time availability checking
+- Time slot selection and confirmation
+- Automatic booking confirmation
+
+**R005: Appointment Lifecycle Management**
+
+- **Description**: Complete appointment management capabilities
+- **Features**:View existing appointments
+- Modify or reschedule appointments
+- Cancel appointments with appropriate notice
+- Send appointment reminders
+- Post-appointment follow-up
+
+**R006: Multi-Clinic Support**
+
+- **Description**: Support booking across multiple clinic locations
+- **Acceptance Criteria**:Clinic discovery by location or specialty
+- Service availability by clinic location
+- Unified booking experience across network
+
+### 3. Health Assessment Requirements
+
+**R007: AI-Powered Health Consultations**
+
+- **Description**: Provide preliminary health assessments and guidance
+- **Features**:Symptom analysis and triage
+- Emergency situation detection
+- Wellness guidance and preventive care tips
+
+**R008: Medical Image Analysis**
+
+- **Description**: Automated analysis of pet health images
+- **Capabilities**:**Dental Analysis**: Tooth condition assessment, tartar detection, dental health scoring
+- **Stool Analysis**: Digestive health evaluation, consistency analysis, abnormality detection
+- Automated scoring (0-100 scale) with actionable recommendations
+- Professional veterinary review recommendations when necessary
+
+### 4. Business Logic Requirements
+
+**R009: Smart Triage System**
+
+- **Description**: Intelligent prioritization of appointments and health concerns
+- **Priority Levels**:**HIGH**: Emergency conditions requiring immediate attention
+- **MEDIUM**: Urgent conditions needing attention within 1-3 days
+- **LOW**: Routine care and preventive services
+
+**Business Impact**: Optimizes clinic resource allocation and improves patient outcomes
+
+**R010: Cost and Revenue Optimization**
+
+**Description**: Dynamic pricing and resource optimization
+
+**Features**:
+
+Real-time availability management
+
+Dynamic pricing based on demand and clinic utilization
+
+Automated upselling of relevant services
+
+Insurance verification and claim assistance
+
+---
+
+## Technical Architecture
+
+### AI Model Configuration
+
+**Primary Model**: OpenAI GPT-4.1 (gpt-4.1)
+
+**Temperature**: 0.7 (balanced creativity and consistency)
+
+**Tool Integration**: Function calling for appointment booking, health analysis
+
+**Context Management**: Conversation history and user context preservation
+
+### Integration Points
+
+**SMS Integration (Twilio)**
+
+Webhook endpoint: `/api/twilio/receive-sms-webhook`
+
+Outbound messaging via Twilio API
+
+Media message support (image uploads)
+
+Duplicate message prevention
+
+Error handling and retry logic
+
+**Voice Call Integration (ElevenLabs)**
+
+Phone number verification for secure access
+
+Natural voice conversations with AI agent
+
+Real-time speech-to-text and text-to-speech processing
+
+Voice-based appointment booking and health consultations
+
+Seamless integration with SMS and web chat context
+
+**Web Chat Integration**
+
+Real-time chat interface at `/marcia`
+
+File upload capabilities
+
+Message history and conversation management
+
+Responsive design for mobile and desktop
+
+**Database Integration**
+
+User and pet information retrieval
+
+Appointment management
+
+Conversation history storage
+
+Medical record access
+
+Scan result storage (tooth and poop analyses)
+
+### SMS-Specific Guidelines
+
+Responses under 160 characters when possible
+
+Clear, simple language
+
+Direct but friendly tone
+
+Numbered messages for longer responses
+
+## Core Features
+
+### 1. User Management
+
+Email-based user identification and verification
+
+Pet profile management and selection
+
+Multi-pet support
+
+User registration assistance for new customers
+
+### 2. Appointment Services
+
+**Clinic Discovery**: Find clinics by location and specialization
+
+**Service Selection**: Browse available veterinary services
+
+**Availability Checking**: Real-time appointment slot availability
+
+**Booking Management**: Complete appointment lifecycle management
+
+**Calendar Integration**: Appointment reminders and notifications
+
+### 3. Health Assessment Tools
+
+**Symptom Checker**: AI-powered preliminary health assessments
+
+**Medical Image Analysis**:
+
+Dental health assessment from tooth photos
+
+Digestive health analysis from stool samples
+
+**Health Scoring**: 0-100 scale assessment with recommendations
+
+**Emergency Detection**: Immediate escalation for urgent conditions
+
+### 4. Customer Support
+
+**General Inquiries**: Platform guidance and feature explanations
+
+**Technical Support**: Troubleshooting and account assistance
+
+**Educational Content**: Pet care tips and wellness guidance
+
+**Service Information**: Detailed information about clinic offerings
+
+## User Journey Flows
+
+### New User Registration Flow
+
+User sends SMS to Marcia
+
+System detects unregistered phone number
+
+Marcia provides warm greeting and registration guidance
+
+Directs user to platform registration at [https://paweasy.crest.pet](https://paweasy.crest.pet)
+
+Explains available features post-registration
+
+### Appointment Booking Flow
+
+**User Authentication**: Email verification and user identification
+
+**Pet Selection**: Choose from registered pets
+
+**Clinic Selection**: Find and select appropriate clinic
+
+**Service Selection**: Choose from available clinic services
+
+**Availability Check**: View real-time available appointment slots
+
+**Booking Confirmation**: Confirm appointment details and book
+
+**Confirmation Message**: Send booking confirmation with details
+
+### Health Assessment Flow
+
+**Concern Description**: User describes pet health concerns
+
+**Image Upload** (optional): Upload photos for visual analysis
+
+**AI Analysis**: Process symptoms and/or images
+
+**Health Scoring**: Provide 0-100 health score with explanation
+
+**Recommendations**: Actionable advice and next steps
+
+**Escalation**: Recommend veterinary consultation if needed
+
+### Medical Image Analysis Flow
+
+**Image Upload**: User sends tooth or stool images via SMS
+
+**Image Processing**: Upload to Supabase storage
+
+**AI Analysis**: Specialized analysis models process images
+
+**Score Generation**: Generate health scores (0-100)
+
+**Recommendations**: Provide specific actionable advice
+
+**Record Storage**: Save analysis results to user's health record
+
+### Follow-up Management Flow
+
+**Event Detection: **Marcia identifies follow-up-worthy events during conversations (vaccinations, treatments, procedures)
+
+**Timeline Calculation:** System calculates appropriate follow-up timing based on treatment type
+
+**Follow-up Scheduling:** Marcia schedules proactive check-ins in conversation database
+
+**Automated Outreach:** System sends follow-up messages at appropriate intervals
+
+**Context-Aware Check-ins:** Marcia references previous treatments and pet history in follow-ups (e.g., "How is Milo feeling after his vaccination last Tuesday?")
+
+**Continuous Monitoring:** System tracks pet health progression and adjusts follow-up frequency
+
+## Security and Compliance
+
+### Authentication and Authorization
+**User Verification**: Email and phone number verification
+
+**API Security**: Secure API key validation for agent requests
+
+**Session Management**: Secure conversation and user session handling
+
+## Technical Specifications
+
+### API Endpoints
+
+**Agent APIs** (`/api/agent/*`)
+
+`GET /user-info` - User profile retrieval
+
+`GET /user-pets` - Pet information retrieval
+
+`GET /appointments` - Appointment history
+
+`GET /get-clinics` - Clinic discovery
+
+`GET /clinic-services` - Service offerings by clinic
+
+`GET /check-availability` - Real-time availability checking
+
+`POST /book-appointment` - Appointment booking
+
+`POST /tooth-scan` - Dental image analysis
+
+`POST /poop-scan` - Stool sample analysis
+
+**SMS Integration**
+
+`POST /api/twilio/receive-sms-webhook` - Incoming SMS processing
+
+Real-time message processing and response
+
+Media message handling (image uploads)
+
+Conversation thread management
+
+**Web Chat APIs** (`/api/chatbot/*`)
+
+`POST /conversation` - Create new conversation
+
+`GET /conversation` - Retrieve conversation history
+
+`GET /conversation/{id}/messages` - Load conversation messages
+
+`POST /conversation/{id}/messages` - Send new message
+
+`POST /generate-response` - Generate AI response
+
+### AI Model Integration
+
+**SMS Agent Model**: Specialized for appointment booking and customer service
+
+**Tooth Scan Analyzer**: Dental health assessment from images
+
+**Poop Scan Analyzer**: Digestive health assessment from stool samples
+
+**Document Analyzer**: Veterinary record processing (additional capability)
+
+### Data Storage
+
+**Conversation Storage**: Persistent SMS and chat conversations
+
+**Media Storage**: Supabase storage for uploaded images
+
+**User Data**: Integrated with existing user and pet management
+
+**Scan Results**: Permanent storage of health analysis results

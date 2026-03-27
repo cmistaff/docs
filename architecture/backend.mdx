@@ -38,7 +38,7 @@ server/src/modules/
 │       ├── ai/             # Anthropic, Mistral AI
 │       ├── audio/          # Audio processing
 │       ├── docusign/       # Electronic signatures
-│       ├── email/          # SendGrid, SES
+│       ├── email/          # AWS SES (transactional email)
 │       ├── google-api/     # Google services
 │       ├── mistral/        # Mistral AI
 │       ├── s3-storage/     # AWS S3 file storage
@@ -55,7 +55,8 @@ server/src/modules/
     ├── enterprise/         # 19 modules
     ├── platform/           # 18 modules
     ├── referral/           # 5 modules
-    └── shared/             # 75 cross-portal modules
+    ├── marcia/             # 5 modules (chatbot, elevenlabs, sms, whatsapp)
+    └── shared/             # ~78 cross-portal modules
 ```
 
 ## Controller-Service-Repository Pattern

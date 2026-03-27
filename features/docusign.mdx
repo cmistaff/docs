@@ -1,0 +1,26 @@
+---
+title: "DocuSign Integration"
+description: "DocuSign electronic signature integration for consent forms and agreements."
+---
+
+We have two types of Docusign Implementation.
+
+1. Our Own Docusign with account secrets in `.env` file, and verified by JWT.
+2. Clinic’s Docusign account verified with OAuth.
+
+### Internal Docusign
+
+#### APIs
+
+1. Create Envelope API
+2. Get Embedded Signing URL API
+3. Get Envelope Status API
+
+#### Models
+**Agreement**
+
+This stores details about the agreement, so that we can look it up via docusign. It stores status and timestamps, and signingURL.
+
+**EntityAgreementMap**
+
+This stores entityID (petId, userId, clinicId etc), agreementId and entity type (pet, user, clinic etc). This also store whether this agreement was created by us or clinics.

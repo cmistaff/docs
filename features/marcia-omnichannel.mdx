@@ -1,0 +1,915 @@
+---
+title: "Marcia Omnichannel Brain Integration"
+description: "Integration plan for Marcia AI across web, SMS, WhatsApp, and voice channels."
+---
+
+## Marcia Omnichannel MCP ,  Current State & Production Critical Path
+
+### Metadata
+
+- **Document version**: 10
+- **Last updated**:
+- **Repos audited**: `crestpetsystem/`, `marcia-omnichannel-mcp/`, `infra/`
+
+#### Current Crest-hosted chat system
+![Image: image-20251212-015850.png](image-20251212-015850.png)
+#### Phase 1: Target MCP-hosted realtime chat + Crest as system-of-record for tool actions
+![Image: image-20251212-020152.png](image-20251212-020152.png)
+#### Phase 2-5: Target with omnichannel via MCP
+![Image: image-20251212-020351.png](image-20251212-020351.png)
+## Executive Summary
+
+- **Goal**: Move Marcia AI execution to **Marcia Omnichannel MCP** (Chat + SMS + Voice + WhatsApp + Email), while **CrestPetSystem** remains the product UI + source of truth for business data/actions.
+- **Current status (grounded)**:**MCP**: Orchestrator + tool registry + [http://Socket.IO](http://Socket.IO)  chat are implemented; SMS + voice handlers exist but **Express routes are still stubs** (`marcia-omnichannel-mcp/src/routes/channels.ts:12-52`). WhatsApp + Email are not implemented yet (see B7/B8).
+- **Infra**: Terraform provisions **SQS + a queue-consumer ECS service** (`infra/modules/mcp/sqs.tf`), but MCP does not currently ship a working queue consumer (and the MCP `Dockerfile` attempts to build a non-existent `src/queue/consumer.ts` ,  `marcia-omnichannel-mcp/Dockerfile:45-50`).
+- **CrestPetSystem integration**: MCP tools rely on `CrestDataService`, which currently calls `/api/...` endpoints that do not exist in CrestPetSystem as implemented today (see “Blockers” below).
+
+### Production blockers (must-fix to ship)
+
+- **B1 ,  Crest API contract mismatch (largest blocker)**:MCP tools call `CrestDataService` methods (29 tool files) which call paths like `/api/users/:id/...` (`marcia-omnichannel-mcp/src/data/crest-data-service.ts:77-347`).
+- CrestPetSystem controllers mount at **root paths** via `Controller(name)` (`crestpetsystem/server/src/openapi/decorators/api-controller.decorator.ts:20-21`), and the frontend calls paths like `/platform/users` (example: `crestpetsystem/client/src/app/platform/dashboard/users/components/WaitingListTable.tsx:52-55`).
+- **Result**: Without either (a) adding a Crest “MCP Internal API” matching MCP’s contract, or (b) changing MCP’s contract + tools, the MCP tool layer will fail in prod.
+**B2 ,  Voice webhook routing is path-mismatched**:
+
+- MCP voice handler is explicitly designed for **two endpoints**: `/voice/initiation` and `/voice/tool` (`marcia-omnichannel-mcp/src/channels/voice/handler.ts:5-9`).
+- Current router only exposes `/voice/webhook` and `/elevenlabs/webhook` stubs (`marcia-omnichannel-mcp/src/routes/channels.ts:21-52`).
+
+**B3 ,  MCP chat JWT secret selection will break Crest tokens**:
+
+- Socket auth uses `deps.config.BETTER_AUTH_SECRET ?? deps.config.JWT_SECRET` (`marcia-omnichannel-mcp/src/websocket.ts:103-105`).
+- In prod we will set `BETTER_AUTH_SECRET` (for service tokens), so MCP will try to verify Crest user JWTs with the wrong secret and reject all Crest chat connections.
+
+**B4 ,  SQS/queue-consumer is half-wired (infra + Dockerfile expect it; MCP app doesn’t ship it)**:
+
+- Infra provisions SQS + DLQ and a queue consumer service configured to run `bun run dist/queue/consumer.js` (`infra/modules/mcp/sqs.tf:12-138`).
+- MCP repo does not currently include `src/queue/consumer.ts` (but the Dockerfile tries to build it ,  `marcia-omnichannel-mcp/Dockerfile:45-50`), so a Docker build from this repo will fail and the queue-consumer task cannot start as configured.
+- SQS is also referenced in `infra/modules/mcp/main.tf:71`, `infra/modules/mcp/secrets.tf:22`, `infra/modules/mcp/iam.tf:100-112`, `infra/modules/mcp/cloudwatch.tf:15-45`, `infra/modules/mcp/outputs.tf:26-98`, plus environment outputs and setup docs.
+- **Decision required**: either (a) remove SQS/queue-consumer fully (Terraform + docs + Dockerfile + dependencies), or (b) implement and ship the queue consumer end-to-end.
+
+**B5 ,  Chat cutover data plane mismatch (conversations/messages)**:
+
+- Crest consumer Marcia UI currently reads/writes chat history via Crest OpenAPI endpoints (`crestpetsystem/client/src/app/consumer/dashboard/marcia/components/consumer-marcia-chat.tsx:20-25` → `chatbot/conversations` controller).
+- MCP chat persists messages to MCP’s own DB and rehydrates via `conversation_snapshot` (`marcia-omnichannel-mcp/src/websocket.ts:475-518`).
+- **Result**: If the browser socket moves to MCP but the UI still loads history from Crest, the conversation list/messages will drift or appear empty.
+
+**B6 ,  Chat file uploads/attachments not supported in MCP yet**:
+
+- Crest chat UI sends base64 files over [http://Socket.IO](http://Socket.IO)  (`crestpetsystem/client/src/lib/hooks/use-marcia-socket.ts:119-156`).
+- MCP [http://Socket.IO](http://Socket.IO)  payload currently declares `files?: unknown[]; // Ignoring file uploads for now` (`marcia-omnichannel-mcp/src/websocket.ts:22-27`).
+- **Result**: If you cut chat over to MCP without implementing file handling, attachments will silently not work (or will require UI disablement).
+
+**B7 ,  WhatsApp channel not implemented (but config exists)**:
+
+- Express route is stubbed only (`marcia-omnichannel-mcp/src/routes/channels.ts:32-41`).
+- MCP config already anticipates WhatsApp secrets/tokens (`marcia-omnichannel-mcp/src/services/config.ts:140-146`), but there is **no **`src/channels/whatsapp/` implementation yet.
+
+**B8 ,  Email channel not implemented (but config exists for outbound)**:
+
+- MCP channel enums include `email` (`marcia-omnichannel-mcp/src/http/schemas.ts:15`), but there is **no **`src/channels/email/` implementation yet.
+- MCP config includes SendGrid keys (`marcia-omnichannel-mcp/src/services/config.ts:148-151`), but MCP `EnvSchema` (Zod) does not currently include SendGrid/WhatsApp-Meta keys (`marcia-omnichannel-mcp/src/config/env.ts`).
+- **Result**: Implementing Email/WhatsApp cleanly requires aligning env validation + Terraform secret mappings to the actual variables used.
+
+## Recommended rollout strategy (ASAP but safe)
+
+**Phase 1 (ASAP)**: Cut over **Chat** to MCP behind a client-side switch (feature flag/env var). Deliver *minimum* Crest “MCP Internal API” endpoints required for tool-backed chat success.
+
+**Phase 2**: Enable **SMS** (Twilio webhook → MCP), once service token + internal API are stable.
+
+**Phase 3**: Enable **Voice** (ElevenLabs initiation + tool webhooks → MCP), after routing + raw-body signature validation are proven in prestaging.
+
+**Phase 4**: Enable **WhatsApp** (MCP as webhook receiver + sender) with strict request verification.
+
+**Phase 5**: Enable **Email** (MCP as inbound processor + sender) with strict request verification.
+
+This reduces blast radius while unblocking MCP in production quickly.
+
+## Production definition of done (DoD)
+
+### Chat (Web)
+
+**Client**: Crest frontend connects to MCP [http://Socket.IO](http://Socket.IO)  namespace `/marcia-chat` using a dedicated MCP base URL (not `commonConfig.api.baseUrl`).
+
+**Auth**: MCP accepts Crest JWT access tokens and enforces `userId` match on `join_conversation`.
+
+**Core loop**: `join_conversation` → `send_message` returns `message_response`, with `status_update` + `tool_execution` streaming.
+
+**Persistence**: Conversation transcript writes succeed (or fail gracefully) and message history endpoint returns messages.
+
+**Observability**: CloudWatch logs show traceable request/session IDs; errors are actionable.
+
+**Rollback**: Flip feature flag/env var to return chat to Crest backend in < 5 minutes.
+
+### SMS (Twilio)
+
+**Inbound**: Twilio webhook hits MCP `/channels/sms/webhook` and is validated (signature required in staging/prestaging/production).
+
+**Outbound**: MCP sends replies via Twilio API using `TWILIO_PHONE_NUMBER`.
+
+**Safety**: Webhook handler is idempotent enough to tolerate retries; PII logging is minimized/redacted.
+
+### Voice (ElevenLabs)
+
+**Routing**: ElevenLabs initiation webhook and tool webhook are both wired and return 200 responses:
+
+`/channels/voice/initiation` returns context
+
+`/channels/voice/tool` executes tools and returns results
+
+**Validation**: Signature validation is enabled in staging/prestaging/production and does not false-negative due to request body canonicalization.
+
+### Infra
+
+**Terraform**: `infra` applies cleanly with MCP enabled; **either** (a) SQS/queue-consumer resources are removed and no longer referenced, **or** (b) the queue consumer is implemented and the ECS queue-consumer service is healthy (no missing `dist/queue/consumer.js` failures).
+
+**Secrets**: Required secrets exist in Secrets Manager and are mapped into the ECS task definition.
+
+**Deploy**: ECS service is healthy behind ALB, `/health` is green, and logs/alarms are wired.
+
+### WhatsApp
+
+**Inbound**: WhatsApp provider webhook hits MCP and is **verified** (signature + verification token handshake).
+
+**Outbound**: MCP can send replies via the selected provider (Meta Cloud API or Twilio) using configured credentials.
+
+**Safety**: Rejects replay/invalid signatures; redacts PII; stores transcript entries with `channel: "whatsapp"`.
+
+### Email
+
+**Inbound**: Inbound email webhook/event is authenticated (recommended: AWS SES → internal Lambda → MCP with HMAC).
+
+**Outbound**: MCP can send replies using configured sender (SendGrid or SES).
+
+**Safety**: Rejects spoofed/untrusted payloads; stores transcript entries with `channel: "email"`.
+
+## Critical path (what must happen in what order)
+
+**Fix MCP auth correctness (B3)** so Crest chat can connect.
+
+**Decide/implement Crest ↔ MCP tool API contract (B1)** (this is the long pole).
+
+**Wire MCP channel routes (B2)** (SMS + Voice).
+
+**Resolve SQS/queue-consumer direction (B4)** (remove it cleanly, or implement it end-to-end) and add missing secrets.
+
+**Update Crest frontend to connect to MCP** (feature-flagged), deploy to prestaging.
+
+**Run prestaging smoke tests** (Chat first; then SMS; then Voice).
+
+**Production rollout** (canary + monitoring + rollback plan ready).
+
+## Implementation blueprint (detailed / copy-paste ready)
+
+This section is intentionally “how-to”. If someone picks up a task, they should not need to re-discover the system.
+
+### IB-0: Decisions to lock on Day 0 (otherwise you’ll thrash)
+
+**Decision 0.1 (recommended)**: Keep MCP’s current Crest API contract and build a **Crest “MCP Internal API”** under `/api/...` to match `marcia-omnichannel-mcp/src/data/crest-data-service.ts`.
+
+**Why**: fastest path to unblock 29 MCP tools without rewriting MCP.
+
+**Decision 0.2 (required)**: Choose the **source of truth for chat history** during the first production rollout:
+
+**Option A (ASAP MVP)**: MCP is realtime source-of-truth; Crest history UI becomes “best effort” (either disable history UI temporarily or rehydrate from MCP snapshots only).
+
+**Option B (recommended for a normal production bar)**: Ensure Crest UI history stays correct by either:
+
+(B1) making Crest UI consume MCP’s `conversation_snapshot` and stop calling Crest’s `chatbot/conversations/:id/messages`, or
+
+(B2) having MCP also write chat messages to Crest (internal endpoint), until the UI fully migrates.
+
+**Decision 0.3 (required)**: Decide whether MCP will use **SQS + a queue consumer** (and therefore must implement a queue consumer entrypoint), or stay **purely webhook-driven** (and remove SQS/queue-consumer infra + artifacts). Today, infra provisions SQS/consumer but MCP does not ship `src/queue/consumer.ts` (see B4).
+
+### IB-1: Fix MCP chat JWT secret selection (B3)
+
+**Goal**: Crest access tokens (HS256) authenticate to MCP [http://Socket.IO](http://Socket.IO) .
+
+**What to change**:
+
+In `marcia-omnichannel-mcp/src/websocket.ts` change the JWT verification secret selection:
+
+**Current**: `BETTER_AUTH_SECRET ?? JWT_SECRET` (breaks Crest JWTs in prod)
+
+**Required**: Use `JWT_SECRET` only for Crest JWT verification; reserve `BETTER_AUTH_SECRET` strictly for service tokens (`marcia-omnichannel-mcp/src/auth/service-tokens.ts`).
+
+**Config requirement**:
+
+Set MCP `JWT_SECRET` to the **same secret** Crest uses for JWT verification (`crestpetsystem/server/src/modules/portals/shared/auth/strategies/jwt.strategy.ts:29-30`).
+
+**Suggested code change (snippet):**
+
+```
+// marcia-omnichannel-mcp/src/websocket.ts
+// Try JWT verification first (for crestpetsystem tokens)
+const jwtResult = await authenticateJwtToken(deps.config.JWT_SECRET, token);
+```
+
+### IB-2: Wire MCP channels (SMS + Voice + WhatsApp + Email) correctly (B2/B7/B8)
+
+#### Route map (what must exist in MCP)
+
+**SMS** (Twilio → MCP)
+
+`POST /channels/sms/webhook` → `createSmsWebhookHandler(...)` (`marcia-omnichannel-mcp/src/channels/sms/handler.ts:40`)
+
+**Voice** (ElevenLabs → MCP)
+
+`POST /channels/voice/initiation` → `createVoiceInitiationHandler()` (`marcia-omnichannel-mcp/src/channels/voice/handler.ts:66`)
+
+`POST /channels/voice/tool` → `createVoiceToolHandler(...)` (`marcia-omnichannel-mcp/src/channels/voice/handler.ts:164`)
+
+**WhatsApp (recommended: Meta Cloud API)** (Meta → MCP)
+
+`GET /channels/whatsapp/webhook` → verification handshake (`hub.verify_token` must match `WHATSAPP_VERIFY_TOKEN`)
+
+`POST /channels/whatsapp/webhook` → inbound message processing (verify `X-Hub-Signature-256` using `WHATSAPP_APP_SECRET` + raw body)
+
+**Email (recommended: AWS SES inbound via Lambda)** (AWS → MCP)
+
+`POST /channels/email/inbound` → inbound email event ingestion (verify HMAC from our Lambda; do not expose to the public internet without a strong verifier)
+
+**Deprecate/remove** (avoid confusion)
+
+`/channels/voice/webhook` and `/channels/elevenlabs/webhook` stubs (`marcia-omnichannel-mcp/src/routes/channels.ts:21-52`)
+
+`/channels/whatsapp/webhook` current stub-only POST should be replaced with the GET/POST pair above (`marcia-omnichannel-mcp/src/routes/channels.ts:32-41`)
+
+#### Wiring pattern (important detail: per-request traceId)
+
+Both `createSmsWebhookHandler` and `createVoiceToolHandler` want a `createContext` function, but you usually want the **requestId** as the traceId.
+
+**Recommended pattern** in `marcia-omnichannel-mcp/src/routes/channels.ts`:
+
+Inside each route, read `const requestId = req.requestId ?? crypto.randomUUID()`
+
+Instantiate the handler **inside** the route so the closure captures `requestId` and passes it into `createToolContext(deps, requestId, sessionMeta)`
+
+**Suggested wiring pattern (snippet):**
+
+```
+// marcia-omnichannel-mcp/src/routes/channels.ts
+router.post("/sms/webhook", (req, res) => {
+  const requestId = req.requestId ?? crypto.randomUUID();
+  const handler = createSmsWebhookHandler({
+    toolRegistry: deps.toolRegistry,
+    createContext: (sessionMeta) => createToolContext(deps, requestId, sessionMeta),
+  });
+
+  return handler(req, res);
+});
+```
+
+#### Signature validation detail (ElevenLabs raw-body risk)
+
+ElevenLabs validation uses `timestamp + "." + body` (`marcia-omnichannel-mcp/src/channels/voice/elevenlabs-client.ts:135-139`), but the handler currently passes `JSON.stringify(req.body)` (`marcia-omnichannel-mcp/src/channels/voice/handler.ts:99-105,199-205`).
+
+**Implementation requirement**:
+
+Capture the **raw request body bytes** in Express middleware (for JSON) and validate against the raw body string.
+
+If you don’t, you will likely get false negatives in staging/prod where signature validation is required.
+
+**Suggested raw-body capture (snippet):**
+
+```
+// marcia-omnichannel-mcp/src/server.ts
+type RawBodyRequest = express.Request & { rawBody?: string };
+
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: RawBodyRequest, _res, buf) => {
+      // Attach rawBody for signature validation (ElevenLabs)
+      req.rawBody = buf.toString("utf8");
+    },
+  }),
+);
+```
+
+#### WhatsApp authentication (Meta Cloud API “perfect auth”)
+
+MCP already has config placeholders for Meta WhatsApp (`WHATSAPP_PHONE_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`) in `marcia-omnichannel-mcp/src/services/config.ts:142-146`, but the channel is not implemented.
+
+**Verification handshake (GET)**:
+
+Validate `hub.mode === "subscribe"`
+
+Validate `hub.verify_token === WHATSAPP_VERIFY_TOKEN`
+
+Respond with `hub.challenge` (plain text)
+
+**Signature validation (POST)**:
+
+Read `X-Hub-Signature-256`
+
+Compute HMAC-SHA256 over the **raw request body** using `WHATSAPP_APP_SECRET`
+
+Constant-time compare and reject invalid signatures
+
+**Payload integrity checks**:
+
+Validate payload contains the expected `phone_number_id` matching `WHATSAPP_PHONE_ID`
+
+Reject if mismatch (prevents cross-app spoofing)
+
+#### Email authentication (recommended “perfect auth” pattern)
+
+Because email providers vary and many inbound webhooks are difficult to strongly authenticate, the recommended production pattern is:
+
+**Inbound**: AWS SES → SNS/Lambda → MCP `POST /channels/email/inbound`
+
+**Auth**: Lambda signs its request to MCP with an HMAC header (shared secret), including a timestamp and nonce to prevent replay.
+
+**Reason**: This makes MCP trust only *our* AWS pipeline (IAM + internal signing), not random internet POSTs.
+
+### IB-3: Crest “MCP Internal API” + service-token auth (B1)
+
+#### Service token spec (what MCP sends)
+
+MCP mints HS256 JWTs in `marcia-omnichannel-mcp/src/auth/service-tokens.ts` with payload:
+
+`iss`: `marcia-mcp@{environment}`
+
+`aud`: `"crest-api"` (see `marcia-omnichannel-mcp/src/data/crest-api-client.ts:137-140`)
+
+`env`: `{environment}`
+
+`sub`: `"marcia-mcp"`
+
+`scopes`: `["crest:api"]` (default)
+
+`iat`, `exp`: epoch seconds
+
+MCP requests include:
+
+`Authorization: Bearer <token>`
+
+`X-Marcia-Env: <ENVIRONMENT>` (`marcia-omnichannel-mcp/src/auth/service-tokens.ts:126-129`)
+
+#### Crest implementation (guard + config)
+
+**Add config**: a single shared secret (same value as MCP `BETTER_AUTH_SECRET`).
+
+Suggested env var name: `MCP_SERVICE_TOKEN_SECRET`
+
+Suggested config key: `mcp.serviceTokenSecret` in `CommonConfigService`
+
+**Add a guard/strategy** that:
+
+Verifies HS256 signature with `MCP_SERVICE_TOKEN_SECRET`
+
+Validates **aud/sub/env/scopes** exactly:
+
+`aud === "crest-api"`
+
+`sub === "marcia-mcp"`
+
+`env` matches the Crest environment
+
+`scopes` includes `"crest:api"`
+
+**Controller posture**:
+
+Mark internal controllers as `@Public()` (bypass user JWT guard)
+
+Apply the MCP service token guard at the controller level
+
+#### Crest internal endpoint inventory (must match MCP today)
+
+These paths are required by `marcia-omnichannel-mcp/src/data/crest-data-service.ts` and must return the DTO shapes defined in:
+
+`marcia-omnichannel-mcp/src/mcp/contracts/index.ts`
+
+**Phase 1 minimum set (recommended to ship Chat MVP):**
+
+**User identity**
+
+`GET /api/users/:userId` → `CrestUserProfile`
+
+`GET /api/users/:userId/tenants` → `CrestTenantSummary[]`
+
+**Pets**
+
+`GET /api/users/:userId/pets` → `CrestPetSummary[]`
+
+`GET /api/users/:userId/pets/:petId` → `CrestPetDetail | null`
+
+**Clinics + availability**
+
+`GET /api/clinics` → `CrestClinic[]`
+
+`GET /api/clinics/:tenantSlug/services` → `CrestClinicService[]`
+
+`GET /api/clinics/:tenantSlug/services/:clinicServiceId/availability` → `CrestAvailabilitySlot[]`
+
+**Appointments**
+
+`GET /api/users/:userId/appointments?petId=...` → `CrestAppointment[]`
+
+`POST /api/users/:userId/appointments/cancel-step` → `{ status: string }`
+
+**Full inventory (current MCP expectations from **`CrestDataService`)
+
+> If you want MCP tools to “just work”, implement this entire surface as service-token-protected internal endpoints.
+
+**Users**
+
+`GET /api/users/:userId` → `CrestUserProfile`
+
+`GET /api/users/:userId/tenants` → `CrestTenantSummary[]`
+
+`GET /api/users/:userId/pets` → `CrestPetSummary[]`
+
+`GET /api/users/:userId/pets/:petId` → `CrestPetDetail | null`
+
+`POST /api/users/:userId/pets` → `CrestPetDetail | null` (body: `petData`)
+
+`PATCH /api/users/:userId/pets/:petId` → `CrestPetDetail | null` (body: `updates`)
+
+`POST /api/users/:userId/pets/:petId/archive` → `{ archived: boolean }`
+
+`POST /api/users/:userId/password` → `{ success: boolean }` (body: `{ newPassword }`)
+
+**Assessments**
+
+`GET /api/pets/assessment-types` → `CrestPetAssessmentType[]`
+
+`GET /api/users/:userId/pets/:petId/assessments` → `CrestPetAssessment[]`
+
+`POST /api/users/:userId/pets/:petId/assessments` → `CrestPetAssessment | null`
+
+`POST /api/users/:userId/pets/:petId/risk` → `Record<string, unknown> | null`
+
+**Clinics**
+
+`GET /api/clinics` → `CrestClinic[]`
+
+`GET /api/clinics/:tenantSlug/services` → `CrestClinicService[]`
+
+`GET /api/clinics/:tenantSlug/services/:clinicServiceId/availability` → `CrestAvailabilitySlot[]`
+
+**Appointments**
+
+`GET /api/users/:userId/appointments?petId=...` → `CrestAppointment[]`
+
+`POST /api/users/:userId/appointments/cancel-step` → `{ status: string }`
+
+**Health**
+
+`POST /api/users/:userId/health-records` → `CrestHealthRecord | null`
+
+`GET /api/users/:userId/pets/:petId/health-records` → `CrestHealthRecord[]`
+
+**Documents**
+
+`GET /api/users/:userId/pets/:petId/documents` → `CrestDocumentSummary[]`
+
+`POST /api/users/:userId/documents` → `CrestDocumentSummary | null`
+
+`GET /api/documents/:documentId/status` → `{ status: string }`
+
+`GET /api/documents/:documentId/analysis` → `CrestDocumentAnalysis | null`
+
+**Network**
+
+`GET /api/users/:userId/network/subscription` → `CrestNetworkSubscription | null`
+
+`GET /api/users/:userId/network/free-services` → `CrestFreeServiceUsage[]`
+
+`POST /api/users/:userId/network/subscription/:subscriptionId/cancel` → `{ cancelled: boolean }`
+
+`GET /api/users/:userId/invoices` → `CrestInvoice[]`
+
+**Diagnostics**
+
+`POST /api/users/:userId/pets/:petId/diagnostics/poop-scan` → `CrestDiagnosticResult | null` (body: `{ imageUrls: string[] }`)
+
+`POST /api/users/:userId/pets/:petId/diagnostics/tooth-scan` → `CrestDiagnosticResult | null` (body: `{ imageUrls: string[] }`)
+
+**MVP staging note**: If you only implement the Phase 1 minimum set initially, you must also prevent MCP from offering the missing tools (either by tool-registry gating or prompt/tool availability rules) so the model can’t invoke endpoints that don’t exist yet.
+
+#### Tenant-scoping note (do not ignore)
+
+Many existing Crest services require `tenantId` / tenant context (see e.g. consumer appointment controller requiring `@CurrentTenant` ,  `crestpetsystem/server/src/modules/portals/consumer/appointment/appointment.controller.ts:57-63`).
+
+To ship quickly without re-architecting Crest:
+
+**Recommended internal API behavior**:
+
+For “user-owned” reads (pets, appointments, documents), allow **no explicit tenant input** and implement queries that only return entities where:
+
+the entity is linked to the `userId`, and
+
+the entity’s tenant is one where the user is active (via `TenantUser` join).
+
+For “tenant-specific” operations, accept tenant identifiers explicitly (e.g. `tenantSlug` already appears in clinic routes).
+
+This avoids relying on `DomainContextService` (which normally comes from tenant host headers) while still enforcing tenant isolation.
+
+### IB-4: Chat cutover implementation details (B5/B6)
+
+#### What Crest UI currently does
+
+Creates and lists conversations via Crest OpenAPI:
+
+`POST /chatbot/conversations`
+
+`GET /chatbot/conversations`
+
+`GET /chatbot/conversations/:conversationId/messages`
+
+Evidence: `crestpetsystem/client/src/app/consumer/dashboard/marcia/components/consumer-marcia-chat.tsx:20-25`
+
+#### What MCP chat currently supports
+
+Rehydrates state via [http://Socket.IO](http://Socket.IO) :
+
+`conversation_snapshot` includes messages/status/toolExecutions (`marcia-omnichannel-mcp/src/websocket.ts:475-518`)
+
+Ignores attachments:
+
+`files?: unknown[]; // Ignoring file uploads for now` (`marcia-omnichannel-mcp/src/websocket.ts:22-27`)
+
+#### Minimum viable integration (two acceptable patterns)
+
+**Pattern 1 (fastest UI change)**:
+
+Keep conversation creation/list in Crest (so the UI can keep its sidebar).
+
+Update Crest UI to source messages from MCP:
+
+Subscribe to `conversation_snapshot`
+
+Stop calling `GET /chatbot/conversations/:id/messages` when the socket target is MCP
+
+Temporarily disable file upload UI when socket target is MCP (until MCP supports attachments).
+
+**Pattern 2 (best UX, more work)**:
+
+Make MCP the source of truth for both conversation list + messages:
+
+Add MCP HTTP endpoints for listing user conversations (backed by `ConversationIndexService.getUserConversations` in `marcia-omnichannel-mcp/src/identity/conversation-index-service.ts:41-50,210-228`)
+
+Provide an OpenAPI/Orval path to consume them (either by adding a second Orval target or proxying via Crest backend).
+
+#### Message shape mismatch (implementer heads-up)
+
+Crest UI message DTO is `MessageResponseDto` (from Crest OpenAPI), while MCP emits `{ role, content, createdAt }` in `conversation_snapshot`.
+
+If you take Pattern 1, implement a client mapping layer:
+
+`role === "user"` → `isUser: true`
+
+`createdAt` → `timestamp`
+
+attachments: **unsupported** until MCP implements file ingestion
+
+### IB-5: Terraform + Secrets Manager runbook (B4, D2)
+
+#### Decision (must be explicit)
+
+Choose ONE:
+
+**Option A (recommended for the current codebase)**: Remove SQS + queue-consumer from Terraform and remove queue-consumer artifacts from the MCP repo.
+
+**Option B**: Implement and ship `src/queue/consumer.ts`, keep SQS + queue-consumer, and ensure the ECS service is healthy.
+
+The steps below assume **Option A**.
+
+#### Terraform edits (Option A: remove SQS/queue-consumer)
+
+**Delete**: `infra/modules/mcp/sqs.tf` (removes SQS queues + DLQ + queue-consumer ECS task/service)
+
+**Remove SQS references** (minimum set):
+
+`infra/modules/mcp/main.tf:71` (remove `SQS_QUEUE_URL` from ECS task secrets)
+
+`infra/modules/mcp/secrets.tf:22` (remove `SQS_QUEUE_URL` from consolidated secret)
+
+`infra/modules/mcp/iam.tf:100-112` and `:144-145` (remove SQS perms + queue log group refs)
+
+`infra/modules/mcp/cloudwatch.tf:15-45` (remove queue log group + DLQ alarm)
+
+`infra/modules/mcp/outputs.tf:26-39`, `:73-98`, `:131-134` (remove queue-related outputs)
+
+`infra/environments/staging/outputs.tf:134-157` and `infra/environments/prestaging/outputs.tf:139-162` (remove SQS outputs)
+
+`infra/docs/MCP_SECRETS_SETUP.md` (remove SQS instructions/outputs)
+
+#### MCP repo cleanup required (Option A)
+
+**Fix Dockerfile**: remove the queue-consumer build step referencing a non-existent file (`marcia-omnichannel-mcp/Dockerfile:45-50`)
+
+**Remove unused dependency**: `@aws-sdk/client-sqs` (`marcia-omnichannel-mcp/package.json:29`)
+
+#### Required secret keys (must exist at runtime)
+
+MCP server (`marcia-omnichannel-mcp/src/server.ts`) reads and validates these env vars (see `marcia-omnichannel-mcp/src/config/env.ts`):
+
+**Core**
+
+`CREST_DB_URL`, `REDIS_URL`, `CREST_API_BASE_URL`
+
+`ANTHROPIC_API_KEY`
+
+`JWT_SECRET` (Crest user JWT verify)
+
+`BETTER_AUTH_SECRET` (service token minting)
+
+`BETTER_AUTH_SESSION_SECRET` (if sessions are used)
+
+**Twilio**
+
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_WEBHOOK_SECRET`
+
+**ElevenLabs**
+
+`ELEVENLABS_API_KEY`, `ELEVENLABS_WEBHOOK_SECRET`
+
+**WhatsApp (Meta Cloud API)**
+
+> These exist in MCP’s Effect config (`marcia-omnichannel-mcp/src/services/config.ts:142-146`) but are not currently in the Zod `EnvSchema`.
+
+`WHATSAPP_PHONE_ID`
+
+`WHATSAPP_ACCESS_TOKEN`
+
+`WHATSAPP_VERIFY_TOKEN`
+
+`WHATSAPP_APP_SECRET`
+
+**Email (outbound via SendGrid)**
+
+> These exist in MCP’s Effect config (`marcia-omnichannel-mcp/src/services/config.ts:148-151`) but are not currently in the Zod `EnvSchema`.
+
+`SENDGRID_API_KEY`
+
+`SENDGRID_FROM_EMAIL`
+
+**Email (inbound auth)**
+
+`EMAIL_INGEST_WEBHOOK_SECRET` (new; used to verify the Lambda → MCP POST signature)
+
+#### Post-apply checklist (because Terraform ignores secret updates)
+
+Terraform intentionally has `ignore_changes` for secrets and container definitions:
+
+`infra/modules/mcp/secrets.tf:31-33`
+
+`infra/modules/mcp/main.tf:101-103`
+
+So after `terraform apply`, you must:
+
+Trigger the MCP credential-sync Lambda once after initial deploy so `CREST_DB_URL` is no longer `PLACEHOLDER` (`infra/modules/mcp/credential-sync.tf`).
+
+Populate/update the consolidated secret in AWS Secrets Manager (`{project}/{env}/mcp`) with the non-auto values (API keys, JWT secret, etc).
+
+Force a new ECS deployment so the task re-reads secrets.
+
+Verify `/health` returns `{ status: "ok" }` and logs show successful startup.
+
+### IB-6: Prestaging smoke tests (Chat → Tools → SMS → Voice → WhatsApp → Email)
+
+#### Chat (Web)
+
+**Auth**:
+
+Load Crest consumer Marcia page and confirm socket connects (no “Authentication required” error).
+
+Verify MCP logs show “authenticated via JWT” and the userId matches.
+
+**Session**:
+
+Join a conversation and confirm `status_update` + `tool_execution` stream during a prompt that triggers tools.
+
+**History**:
+
+If using Pattern 1 from IB-4, confirm the UI uses `conversation_snapshot` (and does not call Crest message history when MCP mode is enabled).
+
+#### Tools
+
+Trigger at least one tool from each critical domain:
+
+Identity: “What pets do I have?”
+
+Clinics: “What clinics are near me?” / “Show me availability for {clinic}”
+
+Appointments: “Show my appointments” / “Cancel my next appointment step”
+
+#### SMS (Twilio)
+
+Provider config:
+
+Twilio Messaging Webhook URL → `<https://{mcp_domain}/channels/sms/webhook`>
+
+Ensure the proxy/ALB forwards `X-Twilio-Signature` and preserves the effective URL (MCP validates using `x-forwarded-proto` + `Host` + `originalUrl` in `marcia-omnichannel-mcp/src/channels/sms/handler.ts:74-80`).
+
+Send a test SMS to your Twilio number and confirm:
+
+MCP receives webhook at `/channels/sms/webhook`
+
+Signature validation succeeds in prestaging
+
+MCP sends a reply via Twilio API
+
+#### Voice (ElevenLabs)
+
+Provider config:
+
+initiation webhook → `<https://{mcp_domain}/channels/voice/initiation`>
+
+tool webhook → `<https://{mcp_domain}/channels/voice/tool`>
+
+Place a test call and confirm:
+
+initiation webhook hits `/channels/voice/initiation` and returns 200
+
+tool webhook hits `/channels/voice/tool` and returns 200
+
+#### WhatsApp (Meta Cloud API)
+
+Configure Meta:
+
+Webhook URL: `<https://{mcp_domain}/channels/whatsapp/webhook`>
+
+Verify token: set to `WHATSAPP_VERIFY_TOKEN`
+
+Subscribe to message events required for your use case
+
+Validate:
+
+GET verification succeeds (challenge echoed)
+
+POST requests include `X-Hub-Signature-256` and MCP rejects invalid signatures
+
+Sending a WhatsApp message results in MCP receiving the event and generating a reply via Meta Cloud API
+
+#### Email (recommended: AWS SES inbound + SendGrid outbound)
+
+Inbound:
+
+Send a test email to the configured inbound address/domain.
+
+Confirm SES → Lambda triggers and Lambda calls MCP `POST /channels/email/inbound`.
+
+Confirm MCP rejects unsigned/replayed requests and accepts correctly signed requests (HMAC using `EMAIL_INGEST_WEBHOOK_SECRET`).
+
+Outbound:
+
+Confirm MCP can send a reply email using `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` (or your chosen sender).
+
+### IB-7: Rollback plan (must be rehearsed before prod)
+
+**Chat rollback**:
+
+Use the frontend feature flag to route [http://Socket.IO](http://Socket.IO)  back to Crest backend (do not redeploy infra to roll back).
+
+**MCP service rollback**:
+
+Disable MCP routing by toggling `mcp_enabled` (if you used that for routing in the environment) and apply Terraform.
+
+## Timeline owners + dependencies
+
+> Assumes parallel staffing across **MCP backend + Crest backend + Crest frontend + Infra/Ops + QA**. If staffing is sequential, shift the whole plan right by ~1-2 weeks.
+
+| Window (business days) | Scope | Owner(s) | Depends on | Deliverable |
+| --- | --- | --- | --- | --- |
+| **Week 1 (D0-D5)** | Lock decisions (IB-0) + fix MCP chat auth (B3) + wire SMS/Voice routes (B2) + Terraform cleanup + secret plumbing (B4) | TBD | ,  | Chat can connect in prestaging; correct routes exist; `terraform plan` is clean; required secret keys defined |
+| **Week 2 (D5-D10)** | Crest service-token guard + internal API **Phase 1 minimum** (B1) + Crest frontend MCP feature-flag cutover + history/attachments decision (B5/B6) | TBD | Week 1 | MCP tools succeed end-to-end in prestaging; UI works in MCP mode with explicit attachment behavior |
+| **Week 3 (D10-D15)** | Provider cutovers + prestaging E2E smoke (IB-6) + production canary + rollback rehearsal (IB-7) | TBD | Week 2 | SMS + Voice verified; production rollout completed with monitoring + rollback proven |
+| **Week 4-6 (D15-D30)** | Implement WhatsApp + Email channels + provider/pipeline setup + production rollout for those channels | TBD | Week 1 foundation | WhatsApp + Email enabled with strict request verification and production monitoring |
+
+## Key risks and mitigations
+
+**R1 ,  API contract scope creep**: 29 tool calls → large endpoint surface.
+
+**Mitigation**: Phase the internal API (IB-3 Phase 1 minimum set first), feature-flag tool availability in MCP prompts/tools.
+
+**R2 ,  Tenant isolation**: Internal endpoints that accept `userId` risk cross-tenant access.
+
+**Mitigation**: Enforce tenant isolation either via explicit tenant identifiers or via `TenantUser` joins (IB-3). Add audit logs for `userId`, tenant identifiers (when present), and scopes.
+
+**R3 ,  Voice signature validation false negatives** (JSON stringify vs raw body).
+
+**Mitigation**: Capture raw request body for validation (or confirm ElevenLabs signing canonicalization); test in prestaging with signature required.
+
+**R4 ,  Rollback complexity** (client + server cutover).
+
+**Mitigation**: Single env flag to route chat socket to Crest backend; keep Crest gateway intact until MCP is stable.
+
+**R5 ,  Secrets drift** (Terraform ignores secret_string and container_definitions changes).
+
+**Mitigation**: Document manual secret update + “force new deployment” step; add runbook checklist.
+
+## Unique one off fixes
+
+**Auth route TODOs**: OAuth callback exchange + phone verification endpoints are incomplete (`marcia-omnichannel-mcp/src/routes/auth.ts:28,94,145`).
+
+**Audit log durability**: Audit logger still has an S3/audit-store TODO (`marcia-omnichannel-mcp/src/auth/audit-logger.ts:70`).
+
+**Local dev SQS remnants**: Localstack script still provisions SQS (`marcia-omnichannel-mcp/infra/localstack/init-sqs.sh`) and should be removed/updated after SQS is removed from prod infra.
+
+## Appendix ,  highest-signal file references
+
+### MCP
+
+**Channel route stubs**: `marcia-omnichannel-mcp/src/routes/channels.ts:12-52`
+
+**SMS handler**: `marcia-omnichannel-mcp/src/channels/sms/handler.ts:40-200`
+
+**Voice handlers + expected endpoints**: `marcia-omnichannel-mcp/src/channels/voice/handler.ts:5-9` and `:66-257`
+
+**WebSocket auth secret selection**: `marcia-omnichannel-mcp/src/websocket.ts:103-105`
+
+**Hardcoded Twilio sender (fix)**: `marcia-omnichannel-mcp/src/auth/phone-verification.ts:298`
+
+**Unused SQS dependency (remove)**: `marcia-omnichannel-mcp/package.json:29`
+
+**Dockerfile queue-consumer build step references missing file**: `marcia-omnichannel-mcp/Dockerfile:45-50`
+
+**Orphaned Queue errors (remove)**: `marcia-omnichannel-mcp/src/effects/errors.ts:79-101`
+
+**Env schema vs config mismatch (WhatsApp/SendGrid)**: `marcia-omnichannel-mcp/src/config/env.ts` vs `marcia-omnichannel-mcp/src/services/config.ts:142-151`
+
+**Tool → data service coupling**: `marcia-omnichannel-mcp/src/mcp/tools/**` calling `ctx.dataService.*`
+
+**Crest API calls (contract)**: `marcia-omnichannel-mcp/src/data/crest-data-service.ts`
+
+### CrestPetSystem
+
+**ApiController mounts at root**: `crestpetsystem/server/src/openapi/decorators/api-controller.decorator.ts:20-21`
+
+**Example client API call path (no **`/api` prefix): `crestpetsystem/client/src/app/platform/dashboard/users/components/WaitingListTable.tsx:52-55`
+
+**Socket base URL coupling**: `crestpetsystem/client/src/common/hooks/use-socket-connection.ts:151-156`
+
+### Infra
+
+**SQS/queue consumer (delete)**: `infra/modules/mcp/sqs.tf`
+
+**Credential sync Lambda (updates **`CREST_DB_URL`): `infra/modules/mcp/credential-sync.tf`
+
+**SQS secret mapping (remove)**: `infra/modules/mcp/main.tf:71`
+
+**Consolidated secret includes SQS (remove)**: `infra/modules/mcp/secrets.tf:22`
+
+**Environment outputs referencing SQS**: `infra/environments/staging/outputs.tf:134-157`, `infra/environments/prestaging/outputs.tf:139-162`
+
+**Secrets setup doc referencing SQS**: `infra/docs/MCP_SECRETS_SETUP.md`
+
+## Delivery summary (business view)
+
+### Likely duration (assuming parallel work)
+
+Assuming parallel execution with **MCP backend + Crest backend + Crest frontend + Infra** actively staffed:
+
+**ASAP production (Chat + tool-backed actions + SMS + Voice)**: **~2-3 weeks**
+
+Critical path is Crest **service-token guard + internal MCP API** (B1) and MCP auth + route wiring (B2/B3).
+
+**Full omnichannel (add WhatsApp + Email with strict auth)**: **~4-6 weeks total**
+
+WhatsApp requires implementing a new channel handler + provider setup (B7).
+
+Email requires new infra (SES inbound + Lambda) plus new channel handler (B8).
+
+If staffing is not parallel (single engineer driving everything), expect **~6-10 weeks**.
+
+### Key scope assumptions baked into the estimate
+
+Crest will expose a service-token-protected internal API matching MCP’s `CrestDataService` contract (IB-3).
+
+Chat history UX is resolved explicitly (IB-4 Pattern 1 or Pattern 2).
+
+WhatsApp uses **Meta Cloud API** with signature + verify-token handshake (IB-2).
+
+Email inbound uses **AWS SES → Lambda → MCP** with an HMAC-signed internal request (IB-2).
+
+## Jira ticket breakdown
+
+| Jira Issue Type | Ticket title | Owner (role) | Depends on | Est. effort | Definition of Done (acceptance) |
+| --- | --- | --- | --- | --- | --- |
+| Epic | MCP Production Cutover (Chat/SMS/Voice/WhatsApp/Email) | TBD | ,  | ,  | Epic contains all tickets below, with a single “go/no-go” checklist per environment |
+| Task | Crest frontend: add MCP socket base URL + feature flag and route `/marcia-chat` to MCP | TBD | MCP chat auth fix | 1-2d | In prestaging: feature flag flips [http://Socket.IO](http://Socket.IO)  from Crest → MCP and connects successfully |
+| Task | Fix MCP [http://Socket.IO](http://Socket.IO)  Crest JWT verification secret selection | TBD | ,  | 0.5-1d | Crest client can connect to MCP `/marcia-chat` using Crest access token in prestaging |
+| Task | Decide chat history source-of-truth + implement the chosen approach | TBD | MCP chat auth fix | 1-3d | Chat history UX works when MCP mode enabled; no “empty history” regressions |
+| Task | Attachments in MCP mode: disable or implement | TBD | Chat history decision | 1-4d | In MCP mode: either uploads are disabled with clear UX, or attachments are persisted + rendered |
+| Task | Wire MCP SMS webhook route to `createSmsWebhookHandler` | TBD | ,  | 0.5-1d | `POST /channels/sms/webhook` processes inbound SMS, validates signature in prestaging |
+| Task | MCP: fix hardcoded Twilio phone number in phone verification | TBD | Twilio secrets present | 0.5-1d | Phone verification sends from `TWILIO_PHONE_NUMBER` (no hardcoded sender) and works in prestaging |
+| Task | Ops: configure Twilio webhook cutover (SMS) | TBD | SMS route + MCP domain live | 0.5-1d | Twilio webhook hits MCP and signature validation passes in prestaging |
+| Task | Wire MCP Voice initiation/tool routes + raw-body signature validation | TBD | ,  | 1-2d | `POST /channels/voice/initiation` + `/channels/voice/tool` work end-to-end in prestaging with signature validation enabled |
+| Task | Ops: configure ElevenLabs initiation + tool webhooks (Voice) | TBD | Voice routes + MCP domain live | 0.5-1d | Test call hits both endpoints and signature validation passes in prestaging |
+| Task | MCP: align env validation with WhatsApp/SendGrid/email-ingest keys | TBD | ,  | 0.5-1.5d | `marcia-omnichannel-mcp/src/config/env.ts` includes WhatsApp + SendGrid + `EMAIL_INGEST_WEBHOOK_SECRET`; missing values fail fast |
+| Task | MCP: remove unused SQS artifacts (dependency + Dockerfile queue-consumer build step) | TBD | B4 decision | 0.5-1d | `@aws-sdk/client-sqs` removed; Dockerfile no longer tries to build missing `src/queue/consumer.ts`; queue error classes removed; build passes |
+| Task | Remove orphaned MCP SQS resources from Terraform | TBD | ,  | 0.5-1.5d | `terraform plan` removes SQS/queue-consumer without impacting MCP server ECS; docs/outputs updated |
+| Task | Add MCP Secrets Manager keys + ECS mappings (Twilio/ElevenLabs/JWT/BetterAuth/WhatsApp/SendGrid/Email ingest) | TBD | SQS removal | 1-2d | All required MCP secrets exist and are injected into ECS task; deploy reads them successfully |
+| Task | Infra: update MCP secrets setup runbook (`infra/docs/MCP_SECRETS_SETUP.md`) | TBD | SQS removal | 0.5-1d | Doc reflects no SQS and lists all required keys + deployment/refresh steps |
+| Task | Crest backend: implement MCP service-token auth guard (HS256) | TBD | ,  | 1-2d | Crest accepts MCP internal requests with correct claims (`aud/sub/env/scopes`) and rejects invalid tokens |
+| Epic | Crest MCP Internal API | TBD | Service-token guard | ,  | Internal endpoints exist, tenant-safe, and match MCP contracts |
+| Story | Crest MCP Internal API (Phase 1 minimum endpoints) | TBD | Service-token guard | 3-7d | MVP endpoints from IB-3 Phase 1 are implemented and verified by MCP tools |
+| Story | Crest MCP Internal API (Full `CrestDataService` surface) | TBD | Phase 1 endpoints | 5-12d | All endpoints listed in IB-3 “Full inventory” exist and pass smoke tests |
+| Task | MCP: implement WhatsApp channel handler (Meta Cloud API) + strict verification | TBD | Secrets present | 3-6d | GET verify handshake passes; POST signature validation enforced; inbound/outbound WhatsApp works in prestaging |
+| Task | Ops: configure WhatsApp Cloud API webhook + verify token | TBD | WhatsApp handler | 0.5-1d | Provider sends verified webhooks and MCP processes them end-to-end |
+| Task | Infra/Ops: implement SES inbound + S3 + Lambda → MCP pipeline | TBD | Secrets present | 3-8d | Real inbound email triggers Lambda and results in MCP processing; verified in prestaging |
+| Task | MCP: implement Email inbound endpoint with HMAC verification + outbound reply | TBD | Email infra ticket | 2-4d | MCP rejects unsigned/replayed requests; accepts Lambda-signed payloads; writes transcript + sends reply |
+| Task | QA: Prestaging end-to-end smoke test (Chat/SMS/Voice/WhatsApp/Email) | QA | All relevant channel tickets | 1-3d | Test report with pass/fail per channel; go/no-go decision logged |
+| Task | Production rollout (canary + monitoring + rollback rehearsal) | All | Prestaging pass | 1-2d | Canary succeeds; rollback is proven and documented; production monitoring dashboards/alarms checked |

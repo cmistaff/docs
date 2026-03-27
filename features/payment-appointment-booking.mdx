@@ -1,0 +1,153 @@
+---
+title: "Payment Flow in Appointment Booking Scheduler System"
+description: "Payment processing flow for appointment booking in the scheduler system."
+---
+
+## Overview
+
+This document outlines how **Stripe payments and payouts** are implemented in the appointment booking scheduler system.
+It covers the modules involved, appointment and payment flows, invoicing, fees, and payout distribution.
+The goal is to provide a **clear reference for both technical and non-technical team members**.
+
+---
+
+## Major Modules
+
+There are four main modules in the system:
+
+1. **Clinic**
+2. **Consumer**
+3. **Enterprise**
+4. **Super Admin**
+
+
+User can be a part of multiple **consumer portals** (e.g., *Paweasy*, *Vetcorp*).
+
+---
+
+## Consumer Portals & Pet Profiles
+
+- Within a consumer portal, a user sets up **pet profiles** (via documents or manual entries).
+- A user can share pet profiles with clinics.
+- Clinics can then create **appointments** against their services.
+
+
+---
+
+## Appointments & Steps
+
+- Each appointment can consist of **multiple appointment steps** (e.g., X-rays, CT-scans).
+- Each appointment step is **linked to a clinic service**.
+
+
+---
+
+## Service Payment Methods
+
+Clinics can define payment methods for services:
+
+- **Full Upfront** → Full service amount is shown and paid.
+- **Deposit** → Only the initial deposit is shown and paid upfront. Remaining deposit is paid later.
+- **Escrow** → Full service amount is shown, but payout is held in escrow until completion.
+
+
+---
+
+## Appointment Payment Flow
+
+1. When an appointment is booked, the **consumer portal** shows the appointment as pending payment.
+2. The consumer clicks **“Pay Now”**, opening the **payment page**.
+3. The **bill** includes:Service amount(s)
+4. Stripe fees
+5. For multiple steps, amounts are aggregated along with **dynamically calculated Stripe fees**.
+6. After successful payment:A **payment transaction** is created against the appointment.
+7. A **payout transaction** is created against the payment transaction.
+8. An **invoice entry** is generated in the DB.
+9. **Invoice line items** are created for:Each appointment step
+10. Stripe fees
+
+
+---
+
+## Due Dates & Late Fees
+
+- Clinics can configure **due dates** and **late fees** in their settings.
+- **Due date**: Any date between the current date and the appointment step date.
+- **Late fee**: Can be a fixed amount or a percentage.
+- If the due date is reached:The payment screen adds the late fee.
+- A new **invoice line item** is created for the late fee.
+
+
+---
+
+## Payout Distribution
+
+- Stripe deducts their processing fees.
+- **5% platform fee** is retained in the main account.
+- Remaining payout goes to the clinic’s **connected Stripe account**.
+
+
+---
+
+## Payment Method Scenarios
+
+### Full Upfront
+
+- Consumer pays the complete amount.
+- Funds are distributed immediately (minus Stripe + platform fees).
+
+### Deposit
+
+- Initial deposit is paid.
+- Appointment step is marked as **partially paid**.
+- When the clinic/doctor marks the appointment step as complete, the **final deposit** is automatically charged.
+
+### Escrow
+
+- Full amount is paid upfront.
+- Funds are held in escrow.
+- When the appointment step is marked as complete, or when the step’s end time is reached, the **escrow releases**.
+- Clinic receives payout (minus Stripe + platform fees).
+
+
+---
+
+## Currency Handling
+
+- Clinics select their **preferred currency** in settings.
+- A custom **currency conversion API** ensures:When creating a service step, the selected currency is converted into **USD**.
+- On the frontend, prices are shown in the clinic’s selected currency.
+
+**USD is the base currency** stored in the database.
+---
+
+## Post-Payment Appointment Updates
+
+- After an appointment is created and paid for:Doctors can add **new steps** to the existing appointment.
+- In the consumer portal, the appointment will again display a **“Pay Now”** button for unpaid steps.
+- On payment:The new step’s line item is added to the existing invoice.
+- The clinic’s **transactions screen** updates with the new step and overall payments.
+
+
+---
+
+## Transactions & Visibility
+
+- **Clinic module**: Clinics see all their payment and payout transactions.
+- **Consumer module**: Consumers see pending and completed payments for appointments.
+- **Super Admin (platform)**: Admin can view all transactions, including the 5% platform fee.
+- Clinics cannot create services or networks until **Stripe onboarding is complete**.
+
+
+---
+
+## Summary
+
+- Every appointment results in **one invoice**.
+- Each appointment step + Stripe fee generates **invoice line items**.
+- Payments follow different flows depending on **Full Upfront, Deposit, or Escrow**.
+- Stripe automatically handles deductions, while the platform fee (5%) is retained.
+- Late fees, currency conversions, and post-payment updates are fully supported.
+- All stakeholders (consumer, clinic, super admin) have visibility into their transactions.
+
+
