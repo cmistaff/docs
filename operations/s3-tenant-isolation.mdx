@@ -3,6 +3,10 @@ title: "S3 Tenant Isolation Audit"
 description: "S3 storage key audit for tenant isolation compliance and migration tracking."
 ---
 
+<Note>
+Status: **Reference** -- This is a reference document (audit findings and migration tracking).
+</Note>
+
 ## Executive Summary
 
 An audit of S3 file storage across the Crest Pet System revealed that **14 out of ~26 production code paths** that construct S3 object keys **do not include a **`tenantId`** prefix**. This means files from different tenants are stored in a flat or loosely organized namespace, creating three risks:

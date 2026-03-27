@@ -15,7 +15,7 @@ This guide covers everything a new developer needs to access PostgreSQL and Redi
 | --- | --- | --- |
 | AWS CLI v2 | AWS command-line interface | See below |
 | Session Manager Plugin | SSM session support | See below |
-| Node.js 18+ | Run helper scripts | brew install node |
+| Node.js 22+ | Run helper scripts | brew install node |
 | pnpm | Package manager | npm install -g pnpm |
 | jq | JSON parsing | brew install jq |
 | Git | Clone the infra repository | brew install git |
@@ -42,7 +42,7 @@ brew install jq
 # 6. Verify installations
 aws --version # Should show: aws-cli/2.x.x
 session-manager-plugin # Should show version info
-node --version # Should show: v18.x.x or higher
+node --version # Should show: v22.x.x or higher
 pnpm --version # Should show: 8.x.x or higher
 jq --version # Should show: jq-1.x
 ```
@@ -80,8 +80,8 @@ sudo ./aws/install
 curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
 sudo dpkg -i session-manager-plugin.deb
 
-# 3. Install Node.js 18+
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# 3. Install Node.js 22+
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # 4. Install pnpm and jq
@@ -599,7 +599,7 @@ ps aux | grep session-manager
 
 - **Slack:** #devops
 - **DevOps Team:** [devops@crest.pet](mailto:devops@crest.pet)
-- **Documentation:** [infra/docs/](https://github.com/crest-pet-health/infra/tree/main/docs)
+- **Documentation:** [infra/docs/](https://github.com/cmistaff/infra/tree/main/docs)
 
 ## 📚 Additional Resources
 
@@ -615,7 +615,7 @@ ps aux | grep session-manager
 
 - [ ] Install AWS CLI v2
 - [ ] Install Session Manager plugin
-- [ ] Install Node.js 18+ and pnpm
+- [ ] Install Node.js 22+ and pnpm
 - [ ] Install jq
 - [ ] Get added to SSO groups (contact team lead)
 - [ ] Configure AWS CLI with SSO (`aws configure sso`)
