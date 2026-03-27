@@ -128,7 +128,7 @@ The monorepo includes Docker Compose configurations for each context:
 
 ## Infrastructure as Code
 
-The production infrastructure is managed in a separate Terraform repository (`crestsystem/infra`). Key modules:
+The production infrastructure is managed in a separate Terraform repository ([`cmistaff/infra`](https://github.com/cmistaff/infra)). Key modules:
 
 - ECS cluster and service definitions
 - RDS instance configuration
@@ -142,7 +142,7 @@ The production infrastructure is managed in a separate Terraform repository (`cr
 
 ## Development Infrastructure
 
-Developer workstations are EC2 instances managed through a separate Terraform repository (`EC2DevsCrestPet`):
+Developer workstations are EC2 instances managed through a separate Terraform repository ([`cmistaff/EC2DevsCrestPet`](https://github.com/cmistaff/EC2DevsCrestPet)):
 
 - 20 EC2 boxes across Ohio (3), Mumbai (16), and Frankfurt (1)
 - Connected via Tailscale VPN mesh network
@@ -151,4 +151,4 @@ Developer workstations are EC2 instances managed through a separate Terraform re
 - Memory watchdog to prevent OOM issues
 - CloudWatch agent for CPU, network, and TCP metrics
 
-Self-hosted GitHub Actions runners (managed via `github-runners-infrastructure`) provide CI/CD capacity with Spot and on-demand ASGs.
+Self-hosted GitHub Actions runners (managed via [`cmistaff/github-runners-infrastructure`](https://github.com/cmistaff/github-runners-infrastructure)) provide CI/CD capacity with Spot and on-demand ASGs.

@@ -169,7 +169,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `${uuid}.${ext}` (flat)
 - **Proposed key:** Keep as-is (user-scoped, not tenant-scoped)
 - **DB model:** `ChatbotFiles.filepath`
-- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
+- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
 - **Code change:** **None required.** Accepted as user-scoped.
 
 ### 5. marcia-sms.service.ts
@@ -178,7 +178,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `${userId}/${conversationId}/${filename}`
 - **Proposed key:** Keep as-is (user-scoped, not tenant-scoped)
 - **DB model:** `SmsFiles.filepath`
-- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
+- **tenantId source:** N/A - tenant-agnostic feature. See [Special Cases - Chatbot & SMS](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#chatbot--sms-files)
 - **Code change:** **None required.** Accepted as user-scoped.
 
 ### 6. pet-photo.service.ts
@@ -205,7 +205,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `${userId}/${petId}/${uuid}.${ext}`
 - **Proposed key:** `${tenantId}/consumer-documents/${petId}/${uuid}.${ext}`
 - **DB model:** `Document.documentPath`
-- **tenantId source:** Derivable via Pet → PetTenant (see [Special Cases](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#document-model))
+- **tenantId source:** Derivable via Pet → PetTenant (see [Special Cases](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#document-model))
 - **Code change:** Replace userId with tenantId, add feature prefix
 
 ### 9. insurance-policy-document.service.ts
@@ -241,7 +241,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `networks/${networkId}/logo.png`
 - **Proposed key:** `${tenantId}/networks/${networkId}/logo.png`
 - **DB model:** `Network.networkLogoPath`
-- **tenantId source:** See [Special Cases - Networks](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#networks)
+- **tenantId source:** See [Special Cases - Networks](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#networks)
 - **Code change:** Add tenantId prefix (creator's tenantId)
 
 ### 13. referral-document.service.ts
@@ -250,7 +250,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `patient-referrals/${referralId}/${referrerId}/documents/${ts}-${idx}-${name}`
 - **Proposed key:** `${tenantId}/patient-referrals/${referralId}/documents/${ts}-${idx}-${name}`
 - **DB model:** `PatientReferralDocuments.documentPath`
-- **tenantId source:** See [Special Cases - Referrals](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#referral-documents)
+- **tenantId source:** See [Special Cases - Referrals](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#referral-documents)
 - **Code change:** Replace referrerId with originating clinic tenantId
 
 ### 14. sendgrid-inbound-processor.service.ts
@@ -259,7 +259,7 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 - **Current key:** `insurance-email-attachments/${ts}-${filename}`
 - **Proposed key:** `${tenantId}/insurance-email-attachments/${ts}-${filename}`
 - **DB model:** `InsuranceProviderContactRequest.emailAttachmentKeys` (has `tenantId` directly)
-- **tenantId source:** Resolve via `findMatchingRequest(emailFrom)` *before* upload. See [Special Cases - SendGrid](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/s3-tenant-isolation-migration.md#sendgrid-inbound-email-attachments)
+- **tenantId source:** Resolve via `findMatchingRequest(emailFrom)` *before* upload. See [Special Cases - SendGrid](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/s3-tenant-isolation-migration.md#sendgrid-inbound-email-attachments)
 - **Code change:** Reorder flow - resolve tenant first, then upload. Skip upload if no match (eliminates wasted S3 writes).
 
 ## Special Cases - Cross-Tenant & Ambiguous Data

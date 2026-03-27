@@ -277,7 +277,7 @@ model Pet {
 
 - Migration: `ALTER TABLE "Pet" ADD COLUMN "ownerId" TEXT;`
 - Code: New writes include `ownerId`; reads handle `null` with a fallback
-- Data: Backfill existing rows (see [Data Backfill Guidelines](https://file+.vscode-resource.vscode-cdn.net/Users/serhii.sierov/projects/cmistaff/crestpetsystem/docs/DATABASE-MIGRATION-SAFETY.md#data-backfill-guidelines))
+- Data: Backfill existing rows (see [Data Backfill Guidelines](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/DATABASE-MIGRATION-SAFETY.md#data-backfill-guidelines))
 
 
 **Deploy 2 (Contract):**
