@@ -1,0 +1,177 @@
+---
+title: "Authentication"
+description: "Authentication and authorization system -- Better Auth, JWT sessions, multi-portal auth flows, and RBAC."
+---
+
+# Authentication
+
+CrestPet uses [Better Auth](https://www.better-auth.com/) with a Prisma adapter for authentication. Sessions are managed via JWT tokens, and role-based access control (RBAC) is enforced through tenant-scoped permission tables.
+
+## Auth Architecture
+
+```
+Browser → Better Auth Client SDK → NestJS Auth Module → Better Auth Server
+                                                              │
+                                                    ┌────────┴────────┐
+                                                    │   PostgreSQL    │
+                                                    │  (Session,      │
+                                                    │   Account,      │
+                                                    │   User tables)  │
+                                                    └─────────────────┘
+```
+
+## Authentication Methods
+
+CrestPet supports multiple authentication methods:
+
+| Method | Description |
+|--------|-------------|
+| **Email + Password** | Standard credential-based login with email verification |
+| **Passkey / WebAuthn** | FIDO2 passwordless authentication via biometrics or hardware keys |
+| **OTP (Phone)** | One-time password sent via SMS (Twilio) |
+| **OTP (Email)** | One-time password sent via email |
+| **OAuth** | Third-party provider authentication via Better Auth accounts |
+
+## Session Management
+
+Sessions are stored in the `Session` database table with:
+
+- **Token**: Unique session identifier
+- **Expiry**: Automatic session expiration
+- **IP Address**: Client IP for audit purposes
+- **User Agent**: Browser/device identification
+
+The auth guard validates the session token on every request. Expired or invalid sessions return a 401 response.
+
+## Auth Flow
+
+### Login
+
+<Steps>
+  <Step title="User submits credentials">
+    The frontend calls the Better Auth sign-in endpoint with email/password or an alternative method.
+  </Step>
+  <Step title="Better Auth validates credentials">
+    Credentials are verified against the `Account` table (password hash) or via OTP/passkey validation.
+  </Step>
+  <Step title="Session created">
+    A new `Session` record is created with a unique token, expiry timestamp, and client metadata.
+  </Step>
+  <Step title="Token returned">
+    The session token is returned to the client and stored (typically in an HTTP-only cookie).
+  </Step>
+  <Step title="Subsequent requests">
+    Every API request includes the session token. The global auth guard validates it before the request reaches any controller.
+  </Step>
+</Steps>
+
+### Registration
+
+New user registration creates:
+1. A `User` record with name, email, and profile data
+2. An `Account` record with the authentication provider and credentials
+3. A `TenantUser` record linking the user to their tenant with a default role
+4. A `Verification` record for email verification
+
+### Password Reset
+
+The password reset flow uses `PasswordResetToken`:
+1. User requests a reset via email
+2. A unique token is generated and emailed
+3. User clicks the link and sets a new password
+4. Token is marked as used
+
+### Account Reactivation
+
+Soft-deleted accounts can be reactivated within 90 days using `AccountReactivationToken`.
+
+## Multi-Portal Auth
+
+Each portal has its own auth pages but shares the same underlying auth system:
+
+| Portal | Auth Location | Notes |
+|--------|---------------|-------|
+| Clinic | `/clinic/auth` | Staff login with clinic-specific roles |
+| Consumer | `/consumer/auth` | Pet owner self-registration and login |
+| Enterprise | `/enterprise/auth` | Enterprise admin login |
+| Platform | `/platform/auth` | Platform admin login (restricted) |
+| Referral | `/referral/auth` | Referral partner login |
+
+Users who belong to multiple tenants see a tenant selection screen after authentication.
+
+## Authorization (RBAC)
+
+### Role Model
+
+Roles are defined per-tenant, not system-wide. Each tenant can create custom roles with granular permissions:
+
+```
+TenantRole (per tenant)
+  └── TenantRolePermission[]
+        ├── resource: "appointments"  | accessLevel: WRITE
+        ├── resource: "billing"       | accessLevel: READ
+        ├── resource: "inventory"     | accessLevel: ADMIN
+        └── resource: "staff"         | accessLevel: WRITE
+```
+
+### Access Levels
+
+| Level | Description |
+|-------|-------------|
+| `READ` | View data only |
+| `WRITE` | Create, update, and delete data |
+| `ADMIN` | Full control including role management |
+
+### Backend Enforcement
+
+Tenant scoping is enforced in the service layer. The `@CurrentTenant` decorator extracts the tenant context, and every service method receives `tenantId` as an explicit parameter:
+
+```typescript
+// Controller
+@Get()
+async list(@CurrentTenant() tenant: TenantContext) {
+  return this.service.list(tenant.id);
+}
+
+// Service
+async list(tenantId: string) {
+  return this.repository.findMany({
+    where: { tenantId },
+    select: { ... },
+  });
+}
+```
+
+### Frontend Enforcement
+
+The frontend uses permission hooks and HOCs to conditionally render UI elements and protect routes:
+
+```typescript
+// Hook-based
+const canEdit = useHasWriteAccess("appointments");
+
+// HOC-based route protection
+export default withPermission("billing.view")(BillingPage);
+```
+
+## Security Decorators
+
+| Decorator | Purpose |
+|-----------|---------|
+| `@Public()` | Marks endpoint as publicly accessible (skips JWT guard) |
+| `@CurrentUser()` | Extracts authenticated user from session |
+| `@CurrentTenant()` | Extracts resolved tenant context |
+| `@CurrentSessionId()` | Extracts the current session ID |
+
+## Email Change Security
+
+Changing a user's email requires dual verification:
+
+1. An SMS code sent to the user's verified phone number
+2. An email code sent to the new email address
+
+Both must be verified before the change is applied. The `EmailChangeRequest` model tracks the state of this two-factor process.
+
+## Cloudflare Turnstile
+
+Public-facing forms (registration, password reset) are protected with Cloudflare Turnstile to prevent bot abuse. The `turnstile` third-party module validates tokens on the backend.

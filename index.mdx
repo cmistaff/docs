@@ -1,97 +1,77 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "CrestPet System -- a multi-tenant veterinary practice management platform built by Crest Advisory Group LLC."
 ---
 
-## Setting up
+# CrestPet System
 
-Get your documentation site up and running in minutes.
+CrestPet System is a comprehensive, multi-tenant veterinary practice management platform. It serves veterinary clinics, pet owners, enterprise organizations, and platform administrators through five dedicated portals, each tailored to a specific user group.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+## What CrestPet Does
+
+CrestPet provides a unified platform for managing every aspect of veterinary care:
+
+- **Appointment scheduling and management** with real-time availability, slot reservations, and video consultations
+- **Electronic health records** including consultation notes, dental charts, diagnostic requests, imaging, treatment sheets, and anesthetic sheets
+- **Pet wellness and health scoring** with AI-powered health assessments, wellness plans, and wellness reports with video summaries
+- **Inventory and purchasing** with stock tracking, lot management, low-stock alerts, auto-reorder, and vendor/purchase order workflows
+- **Billing and payments** with Stripe Connect integration, invoicing, insurance splits, cash payments, payout tracking, and staff commissions
+- **Multi-location enterprise management** with analytics dashboards, predictive analytics, performance monitoring, and centralized clinic oversight
+- **Consumer pet owner portal** with appointment booking, health records access, AI-powered symptom checking, medication tracking, and vaccination history
+- **Referral network** for inter-clinic patient referrals with availability-based scheduling
+- **WhatsApp integration** for client communication via Marcia, the AI veterinary assistant
+- **Document management** with DocuSign templates, consent forms, legal policies, and PDF certificate generation
+
+## The Five Portals
+
+CrestPet is organized into five portals, each accessed through a subdomain:
+
+<CardGroup cols={2}>
+  <Card title="Clinic Portal" icon="stethoscope">
+    The primary workspace for veterinary practices. Manages appointments, health records, billing, inventory, treatment sheets, whiteboards, and staff operations.
+  </Card>
+  <Card title="Consumer Portal" icon="paw">
+    A pet owner-facing portal for booking appointments, viewing pet health records, tracking medications and vaccinations, and communicating with clinics.
+  </Card>
+  <Card title="Enterprise Portal" icon="building">
+    Multi-location management for corporate veterinary groups. Provides analytics dashboards, staff management, subscription controls, and centralized clinic oversight.
+  </Card>
+  <Card title="Platform Portal" icon="shield">
+    Administrative control panel. Manages tenants, users, species data, feature policies, AI settings, revenue tracking, and platform-wide configuration.
+  </Card>
+</CardGroup>
+
+<Card title="Referral Portal" icon="share-nodes">
+  Handles inter-clinic patient referrals with availability-based scheduling and audit logging.
 </Card>
 
-## Make it yours
+## Tech Stack
 
-Design a docs site that looks great and empowers your users.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15 (App Router), React 19, TypeScript 5.8, Tailwind CSS 4 |
+| Backend | NestJS 11, TypeScript 5.8, Prisma 6 |
+| Database | PostgreSQL (RDS) |
+| Cache | Redis (ElastiCache) |
+| Auth | Better Auth + JWT + Prisma adapter, Passkey/WebAuthn support |
+| Runtime | Node.js 22, pnpm 10 |
+| Infrastructure | AWS ECS Fargate, RDS, ElastiCache, S3, CloudFront, ALB, WAF |
+| API Client | Orval (auto-generated from OpenAPI spec) |
+| Testing | Bun test runner (unit + E2E) |
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+## Quick Links
 
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/guides/getting-started">
+    Set up your local development environment
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Architecture Overview" icon="diagram-project" href="/architecture/overview">
+    Understand the system design
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Learn how auth works across portals
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore the REST API
   </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+</CardGroup>

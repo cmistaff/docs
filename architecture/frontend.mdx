@@ -1,0 +1,199 @@
+---
+title: "Frontend Architecture"
+description: "Next.js 15 App Router frontend -- portal structure, state management, API integration, and component patterns."
+---
+
+# Frontend Architecture
+
+The CrestPet frontend is a Next.js 15 application using the App Router, React 19, TypeScript 5.8 (strict mode), and Tailwind CSS 4. It serves five portals through subdomain-based routing.
+
+## Directory Structure
+
+```
+client/src/app/
+├── clinic/                    # Clinic portal
+│   ├── auth/                  # Login, registration, password reset
+│   ├── dashboard/             # 47+ sections (appointments, patients, billing, etc.)
+│   ├── components/            # Clinic-specific components
+│   ├── constants/             # Clinic constants
+│   ├── lib/                   # Clinic utilities
+│   └── tenants/               # Tenant selection/switching
+├── consumer/                  # Consumer (pet owner) portal
+│   ├── auth/                  # Consumer auth flows
+│   ├── dashboard/             # Pet management, health records, bookings
+│   ├── payment/               # Payment flows
+│   └── referrals/             # Referral acceptance
+├── enterprise/                # Enterprise portal
+│   ├── auth/                  # Enterprise auth flows
+│   └── dashboard/             # Analytics, clinic management, staff
+├── platform/                  # Platform admin portal
+│   ├── auth/                  # Admin auth flows
+│   └── dashboard/             # Tenant management, users, policies
+├── referral/                  # Referral portal
+├── marcia/                    # Marcia AI assistant interface
+├── vendor/                    # Vendor portal
+├── components/                # Shared components
+├── hooks/                     # Shared hooks
+├── api/                       # API route handlers
+└── common/api/openapi/        # Auto-generated API client (DO NOT EDIT)
+```
+
+## Clinic Dashboard Sections
+
+The clinic portal is the largest, with 47+ dashboard sections:
+
+| Category | Sections |
+|----------|----------|
+| **Scheduling** | Appointments, Video Consultations |
+| **Patient Care** | Patients, Pets, Health Records, Medical Records, Cases |
+| **Clinical** | Consultation Notes, Dental Chart, Diagnostic Requests, Imaging, Treatment Sheets, Anesthetic Sheets, Treatment Plans |
+| **Wellness** | Wellness Assessment, Wellness Plans, Wellness Reports |
+| **Operations** | Whiteboards, Staffing, Management, Clinic Settings |
+| **Financial** | Payments, Checkout, Cash Payments, Patients Debt, Pricing, Insurance |
+| **Inventory** | Inventory Management |
+| **Communication** | Consumer Chat, Marcia WhatsApp, Notification History |
+| **Documents** | Document Templates |
+| **Network** | Network Management, Referrals |
+| **Analytics** | Insights, Home Dashboard |
+
+## API Integration
+
+All API communication uses auto-generated Orval hooks and functions. Direct `fetch` or `axios` calls are prohibited.
+
+### Client-Side Rendering (CSR)
+
+Use Orval-generated `useGet*` hooks in `"use client"` components:
+
+```typescript
+"use client";
+
+import { useGetClinicAppointments } from "@/common/api/openapi";
+
+export function AppointmentsList() {
+  const { data, isLoading } = useGetClinicAppointments({
+    page: 1,
+    limit: 20,
+  });
+
+  if (isLoading) return <Spinner />;
+  return <AppointmentTable appointments={data.items} />;
+}
+```
+
+### Server-Side Rendering (SSR)
+
+Use Orval-generated `get*` functions in server components and pass data as `initialData`:
+
+```typescript
+import { getClinicAppointments } from "@/common/api/openapi";
+
+export default async function AppointmentsPage() {
+  const data = await getClinicAppointments({ page: 1, limit: 20 });
+  return <AppointmentsList initialData={data} />;
+}
+```
+
+### Mutations
+
+Use `useCreate*` / `useUpdate*` hooks and invalidate queries on success using Orval query keys:
+
+```typescript
+const { mutate } = useCreateClinicAppointment({
+  mutation: {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: getGetClinicAppointmentsQueryKey(),
+      });
+    },
+  },
+});
+```
+
+## State Management
+
+| Data Type | Tool | Usage |
+|-----------|------|-------|
+| Server data | React Query | All data fetched from the API |
+| Mutations | React Query | Create/update/delete operations |
+| UI state | Redux Toolkit | Modals, filters, sidebar state |
+| Forms | React Hook Form + Zod | Form validation and submission |
+| URL state | Next.js router | Page parameters, search filters |
+
+## Component Patterns
+
+### Server Components by Default
+
+Components are server components unless they need client-side interactivity. Add `"use client"` only for:
+- `useState`, `useEffect`, or other React hooks
+- Event handlers (onClick, onChange)
+- Browser APIs (localStorage, window)
+- Third-party client-only libraries
+
+### Timezone Handling
+
+All dates from the API are in UTC. The frontend converts to clinic-local time for display:
+
+```typescript
+import { toClinicTime } from "@/lib/utils/to-clinic-time.util";
+import { fromClinicTimeToUtc } from "@/lib/utils/from-clinic-time-to-utc.util";
+import { useClinicTimezone } from "@/hooks/use-clinic-timezone";
+
+// Display: UTC → clinic local
+const displayTime = toClinicTime(appointment.startAt, clinicTimezone);
+
+// Send to API: clinic local → UTC
+const utcTime = fromClinicTimeToUtc(localDateTime);
+```
+
+### RBAC Permission Checks
+
+Every clinic dashboard section enforces permission checks:
+
+```typescript
+import { useHasPermission, useHasWriteAccess } from "@/hooks/permissions";
+import { withPermission } from "@/components/with-permission";
+
+// Hook-based check
+const canViewBilling = useHasPermission("billing.view");
+const canEditBilling = useHasWriteAccess("billing");
+
+// HOC-based check
+export default withPermission("appointments.view")(AppointmentsPage);
+```
+
+### Forms
+
+All forms use Zod schemas with React Hook Form:
+
+```typescript
+import { useForm } from "react-hook-form";
+import { createZodResolver } from "@/lib/utils/create-zod-resolver";
+import { appointmentSchema } from "./schemas/appointment.schema";
+
+const form = useForm({
+  resolver: createZodResolver(appointmentSchema),
+  defaultValues: { ... },
+});
+```
+
+## Design System
+
+The UI follows a "SpaceX meets Apple" design philosophy using shadcn/ui components, with:
+
+- Clean spacing and minimal visual noise
+- Mobile-first responsive layouts
+- WCAG 2.1 AA accessibility compliance
+- Tailwind CSS 4 for all styling
+- Consistent dark blue (#1E3A5F) brand color
+
+## Code Generation
+
+After any backend API changes, regenerate the frontend API client:
+
+```bash
+pnpm api:generate
+```
+
+This runs `pnpm api:schema` (generates OpenAPI spec from NestJS decorators) followed by `pnpm api:client` (Orval generates React Query hooks and TypeScript types).
+
+All types in `@/common/api/openapi/models` are auto-generated. Never create frontend type definitions for API data manually.
