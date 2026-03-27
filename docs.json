@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "CrestPet System",
+  "name": "Crest Engineering Docs",
   "colors": {
     "primary": "#1E3A5F",
     "light": "#3B82F6",
@@ -11,7 +11,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "CrestPet Platform",
         "groups": [
           {
             "group": "Getting Started",
@@ -23,18 +23,7 @@
             ]
           },
           {
-            "group": "Operations",
-            "pages": [
-              "guides/deployment"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Architecture",
-        "groups": [
-          {
-            "group": "System Architecture",
+            "group": "Architecture",
             "pages": [
               "architecture/overview",
               "architecture/frontend",
@@ -42,16 +31,50 @@
               "architecture/database",
               "architecture/infrastructure"
             ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "guides/deployment"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction"
+            ]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Infrastructure",
         "groups": [
           {
-            "group": "API Documentation",
+            "group": "Infrastructure",
             "pages": [
-              "api-reference/introduction"
+              "infra/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Dev Workstations",
+        "groups": [
+          {
+            "group": "Dev Workstations",
+            "pages": [
+              "devbox/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Marcia Mobile",
+        "groups": [
+          {
+            "group": "Marcia Mobile App",
+            "pages": [
+              "mobile/overview"
             ]
           }
         ]

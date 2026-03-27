@@ -1,0 +1,54 @@
+---
+title: "Infrastructure Overview"
+description: "Production AWS infrastructure for CrestPet System, managed with Terraform."
+---
+
+# Infrastructure
+
+CrestPet's production infrastructure runs on AWS, managed entirely through Terraform. The `cmistaff/infra` repository contains all infrastructure-as-code definitions.
+
+## Environments
+
+| Environment | Purpose | Branch |
+|-------------|---------|--------|
+| Prestaging | Development and integration testing | `prestaging` |
+| Staging | QA and pre-release validation | `staging` |
+| Production | Live customer traffic | `production` |
+
+## Core Services
+
+<CardGroup cols={2}>
+  <Card title="Compute" icon="server">
+    ECS Fargate clusters running the Next.js frontend and NestJS backend as containerized services.
+  </Card>
+  <Card title="Database" icon="database">
+    RDS PostgreSQL with automated backups, point-in-time recovery, and read replicas.
+  </Card>
+  <Card title="Caching" icon="bolt">
+    ElastiCache Redis for session storage, rate limiting, and application caching.
+  </Card>
+  <Card title="Networking" icon="network-wired">
+    ALB with WAF rules, CloudFront CDN for static assets, and VPC with private subnets.
+  </Card>
+</CardGroup>
+
+## Architecture Diagram
+
+```
+Internet
+  |
+CloudFront (CDN)
+  |
+ALB + WAF
+  |
+ECS Fargate
+  ├── Frontend (Next.js)
+  └── Backend (NestJS)
+        ├── RDS PostgreSQL
+        ├── ElastiCache Redis
+        └── S3 (file storage)
+```
+
+<Note>
+  This is a placeholder page. Detailed infrastructure documentation will be pulled from the `cmistaff/infra` repository once a `docs/` folder is added there.
+</Note>
