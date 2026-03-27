@@ -34,7 +34,7 @@ crestpetsystem/
 │           ├── platform/            # ~18 modules (tenants, users, feature policies, etc.)
 │           ├── referral/            # ~5 modules (referrals, availability, etc.)
 │           ├── marcia/              # ~5 modules (chatbot, elevenlabs, sms, whatsapp)
-│           └── shared/              # ~78 modules (auth, payments, services, repositories)
+│           └── shared/              # ~76 modules (auth, payments, services, repositories)
 ├── packages/
 │   └── common/                      # Shared package (@repo/common)
 │       └── prisma/schema/           # Multi-file Prisma schema (88 files, ~11,300 lines)
@@ -56,7 +56,7 @@ Each portal maps to a subdomain and serves a distinct user role:
 | Platform | `taylor.localhost:3000` | 18 | Tenants, users, policies |
 | Referral | `referral.localhost:3000` | 5 | Referrals, availability |
 
-The **shared** portal layer (78 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
+The **shared** portal layer (76 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
 
 ## Request Flow
 
@@ -110,7 +110,7 @@ The backend integrates with external services through dedicated modules in `serv
 | **Twilio** | SMS notifications and OTP verification |
 | **WhatsApp** | Client communication via Marcia AI assistant |
 | **DocuSign** | Electronic signatures for agreements and consent forms |
-| **ElevenLabs** | AI voice for wellness report videos |
+| **ElevenLabs** | AI voice for wellness report videos (in `portals/marcia/elevenlabs/`, not `common/third-party/`) |
 | **Tavus** | AI video generation for wellness reports |
 | **Turnstile** | Bot protection on public-facing forms |
 | **LiveKit** | Real-time video consultations |

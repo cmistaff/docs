@@ -151,15 +151,19 @@ const utcTime = fromClinicTimeToUtc(localDateTime);
 Every clinic dashboard section enforces permission checks:
 
 ```typescript
-import { useHasPermission, useHasWriteAccess } from "@/hooks/permissions";
-import { withPermission } from "@/components/with-permission";
+import { useHasPermission } from "@/hooks/useHasPermission";
+import { useHasWriteAccess } from "@/hooks/useHasWriteAccess";
+import { withPermission } from "@/lib/hoc/withPermission";
+import { Permission, PermissionAction } from "@prisma/client";
 
-// Hook-based check
-const canViewBilling = useHasPermission("billing.view");
-const canEditBilling = useHasWriteAccess("billing");
+// Hook-based check (array of typed permission objects)
+const canViewBilling = useHasPermission([
+  { permission: Permission.CLINIC__PAYMENTS, actions: [PermissionAction.READ] },
+]);
+const canEditBilling = useHasWriteAccess(Permission.CLINIC__PAYMENTS);
 
-// HOC-based check
-export default withPermission("appointments.view")(AppointmentsPage);
+// HOC-based route protection (two arguments, not curried)
+export default withPermission(AppointmentsPage, Permission.CLINIC__APPOINTMENTS);
 ```
 
 ### Forms
