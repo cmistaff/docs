@@ -1,0 +1,46 @@
+---
+title: "Dev Workstations Overview"
+description: "EC2 developer workstations managed with Terraform and Packer, accessed via Tailscale VPN."
+---
+
+# Dev Workstations
+
+CrestPet development happens on standardized EC2 workstations managed through the `cmistaff/EC2DevsCrestPet` repository. Each developer gets a dedicated instance with a consistent environment.
+
+## Fleet Overview
+
+| Region | Count | Instance Type | Purpose |
+|--------|-------|---------------|---------|
+| US East (Ohio) | 3 | m6i.4xlarge | Core team, admin |
+| Asia Pacific (Mumbai) | 16 | m6i.4xlarge | Development team |
+| Europe (Frankfurt) | 1 | m6i.4xlarge | EU-based development |
+
+## How It Works
+
+<Steps>
+  <Step title="Provisioning">
+    Packer builds a golden AMI with all tooling pre-installed: Node.js 22, Docker, Claude Code, noVNC, monitoring agents, and security tools.
+  </Step>
+  <Step title="Deployment">
+    Terraform provisions EC2 instances from the golden AMI with consistent security groups, IAM roles, and EBS volumes.
+  </Step>
+  <Step title="Access">
+    Developers connect via Tailscale VPN using MagicDNS (`ssh ubuntu@dev-NAME`). Desktop access is available through noVNC at `http://dev-NAME:6080/vnc.html`.
+  </Step>
+  <Step title="Monitoring">
+    CloudWatch agent collects CPU, memory, network, and disk metrics. A health monitor runs every 5 minutes and posts alerts to Slack.
+  </Step>
+</Steps>
+
+## Key Features
+
+- **Tailscale VPN** with custom DERP relays in Ohio, Mumbai, and Frankfurt
+- **Mullvad VPN** for all developer traffic (40 licenses)
+- **SentinelOne EDR** endpoint protection
+- **Memory watchdog** to prevent OOM crashes (auto-kills runaway processes above 90% memory)
+- **Daily EBS backups** with 30-day retention and cross-region copies
+- **noVNC** for browser-based desktop access
+
+<Note>
+  This is a placeholder page. Detailed dev workstation documentation will be pulled from the `cmistaff/EC2DevsCrestPet` repository once a `docs/` folder is added there.
+</Note>

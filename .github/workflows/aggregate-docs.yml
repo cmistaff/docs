@@ -1,0 +1,43 @@
+name: Aggregate Mintlify Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Daily at 4 AM UTC to catch changes from source repos
+    - cron: '0 4 * * *'
+
+concurrency:
+  group: aggregate-mintlify-docs
+  cancel-in-progress: true
+
+jobs:
+  aggregate-docs:
+    runs-on: ubuntu-latest
+    name: Aggregate docs from source repos
+    steps:
+      - name: Clone base docs repo
+        uses: actions/checkout@v4
+
+      - name: Aggregate multi-repo docs
+        uses: mintlify/mintlify-multirepo-action@v0.15
+        with:
+          # PAT with read access to all cmistaff repos + write access to this repo.
+          # Must be added as a repo secret: Settings > Secrets > Actions > DOCS_DEPLOY_TOKEN
+          # Use the enterprise PAT (GITHUB_ENTERPRISE_PAT from Secrets Manager).
+          token: ${{ secrets.DOCS_DEPLOY_TOKEN }}
+          target-branch: docs
+          repos: |
+            - owner: cmistaff
+              repo: crestpetsystem
+              subdirectory: docs
+            - owner: cmistaff
+              repo: infra
+              subdirectory: docs
+            - owner: cmistaff
+              repo: EC2DevsCrestPet
+              subdirectory: docs
+            - owner: cmistaff
+              repo: AppCrestPetConsumer
+              subdirectory: docs
