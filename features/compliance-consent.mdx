@@ -33,7 +33,7 @@ It centralizes **policy versioning**, **user consents**, and **audit tracking** 
 
 ## 👑 Super Admin Flow
 
-{expand:title=Step 1 ,  Accessing Compliance Settings}
+**Step 1: Accessing Compliance Settings**
 
 - Navigate to **Admin Portal → Compliance Tab**
 - View a table of tenants with compliance stats:✅ % Users Compliant
@@ -43,11 +43,10 @@ It centralizes **policy versioning**, **user consents**, and **audit tracking** 
 📘 *Visual Mock Description:*
 
 > Super Admin opens **Compliance** tab → sees a color-coded dashboard (green for compliant, yellow for pending, red for non-compliant tenants).
-> {expand}
 
 ---
 
-{expand:title=Step 2 ,  Managing Policy Documents}
+**Step 2: Managing Policy Documents**
 
 - Upload or update **Terms of Service (ToS)** and **Privacy Policy**.
 - System automatically versions each upload.
@@ -56,11 +55,10 @@ It centralizes **policy versioning**, **user consents**, and **audit tracking** 
 💡 *Example:*
 
 > “ToS v2.1 uploaded ,  all users will be prompted to re-accept.”
-> {expand}
 
 ---
 
-{expand:title=Step 3 ,  Reviewing Consents}
+**Step 3: Reviewing Consents**
 
 - Searchable table for all users and consents:User ID / Email
 - Consent Type
@@ -69,24 +67,22 @@ It centralizes **policy versioning**, **user consents**, and **audit tracking** 
 - Status (Accepted / Revoked / Pending)
 
 Export compliance logs in **CSV** or **PDF** format.
-{expand}
 
 ---
 
-{expand:title=Step 4 ,  Enforcement & Alerts}
+**Step 4: Enforcement and Alerts**
 
 - Toggle enforcement policies:✅ Require consent before access
 - ⚠️ Allow temporary guest access
 - 🚫 Block non-compliant tenants entirely
 
 Send automated alerts to Tenant Admins when new policies are uploaded.
-{expand}
 
 ---
 
 ## 🏢 Tenant Flow
 
-{expand:title=Step 1 ,  Compliance Overview}
+**Step 1: Compliance Overview**
 
 - Tenant Admin → **Dashboard → Compliance Tab**
 - Sees:% of compliant users
@@ -96,56 +92,50 @@ Send automated alerts to Tenant Admins when new policies are uploaded.
 📘 *Visual Mock Description:*
 
 > Tenant sees a progress ring (e.g. 85% compliant). Clicking it shows a table of users missing certain consents.
-> {expand}
 
 ---
 
-{expand:title=Step 2 ,  Tenant Notifications}
+**Step 2: Tenant Notifications**
 
 - When Super Admin updates ToS or Privacy Policy:Tenant Admin receives a notification.
 - Tenant users are prompted for re-acceptance upon next login.
-  {expand}
-
+  
 ---
 
-{expand:title=Step 3 ,  Restricted Mode (Non-Compliant Tenants)}
+**Step 3: Restricted Mode (Non-Compliant Tenants)**
 
 - Tenants missing mandatory consents enter “Restricted Mode”:Can view dashboard
 - Cannot create/edit data until all users comply
-  {expand}
-
+  
 ---
 
 ## 👤 End User Flow
 
-{expand:title=Step 1 ,  Consent Prompt (Signup/Login)}
+**Step 1: Consent Prompt (Signup/Login)**
 
 - User sees checkboxes during sign-up/login:“I agree to Terms of Service (v2.1)”
 - “I agree to Privacy Policy (v2.1)”
 - Optional: “I consent to marketing communications”
 
 ✅ Mandatory consents are required to proceed.
-{expand}
 
 ---
 
-{expand:title=Step 2 ,  Consent History}
+**Step 2: Consent History**
 
 - Within profile → “Privacy & Consents” section shows:Current accepted policies
 - Option to revoke optional consents
 - Full timestamped history of consent versions
-  {expand}
-
+  
 ---
 
-{expand:title=Step 3 ,  Policy Update Handling}
+**Step 3: Policy Update Handling**
 
 If new ToS/Privacy Policy version released:
 
 User must re-accept before continuing.
 
 Old consent entry is archived with version reference.
-{expand}
 
 ---
 
