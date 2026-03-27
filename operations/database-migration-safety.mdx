@@ -2129,7 +2129,7 @@ This is actually the **safest failure mode**:
 | Option | Command |
 | --- | --- |
 | Fix the migration and re-deploy | Edit SQL, push, deploy |
-| Mark as rolled back and create a new one | pnpm prisma migrate resolve --rolled-back <migration_name> |
+| Mark as rolled back and create a new one | `pnpm prisma migrate resolve --rolled-back <migration_name>` |
 
 ### Scenario 3: Need to Roll Back After Successful Deploy
 
@@ -2306,7 +2306,7 @@ This is a separate engineering effort from the expand-contract documentation. Re
 
 | Command | Purpose |
 | --- | --- |
-| pnpm prisma:migration:create <name> | Create a new migration (generates SQL from schema diff) |
+| `pnpm prisma:migration:create <name>` | Create a new migration (generates SQL from schema diff) |
 | pnpm prisma:migration:run | Apply pending migrations (prisma migrate deploy) |
 | pnpm prisma:migration:generate | Regenerate Prisma client without migration |
 | pnpm prisma:migration:reset | Reset database and reapply all migrations |
