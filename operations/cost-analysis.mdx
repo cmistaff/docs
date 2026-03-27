@@ -3,6 +3,10 @@ title: "Cost Analysis"
 description: "External service cost analysis, tracking schema, vendor pricing, and optimization strategy."
 ---
 
+<Warning>
+Status: **In Progress** -- This feature is partially implemented. Check Linear for current status.
+</Warning>
+
 ## 1️⃣ Overview (What & Why)
 
 Our platform relies on multiple third-party services and infrastructure components such as:
@@ -312,7 +316,7 @@ enum ExternalVendor {
   TAVUS
   TAVILY
   TWILIO
-  RESEND
+  RESEND // DEPRECATED - migrated to AWS SES
   LIVEKIT
   DAILY
   GOOGLE
@@ -341,7 +345,7 @@ enum ExternalOperation {
 
   // Messaging
   SMS_SEND // Twilio
-  EMAIL_SEND // Resend
+  EMAIL_SEND // Resend (DEPRECATED - now AWS SES)
 
   // Location
   PLACES_SEARCH // Google
@@ -579,7 +583,9 @@ Keep entries short and deterministic. If billing/usage details are unknown, mark
 - **Tracking**: Record per send and persist Twilio message identifier (e.g., Message SID) for later lookup.
 - **Pricing**: Derive asynchronously from Twilio once available (region/carrier dependent): [https://www.twilio.com/en-us/sms/pricing/us](https://www.twilio.com/en-us/sms/pricing/us)
 
-## Resend
+## Resend (DEPRECATED)
+
+> **Note:** Resend has been deprecated and replaced by AWS SES for transactional email. The tracking schema retains the RESEND enum value for historical data, but new email sends use SES.
 
 - **Tracking**: Record per send and persist Resend message identifier (if available).
 - **Pricing**: Compute from an internal rate card based on our plan: [https://resend.com/pricing](https://resend.com/pricing)
@@ -639,7 +645,7 @@ In addition to cost, the key motivation is **billing centralization**: when usag
 | **ElevenLabs (Speech-to-Text)** | **Amazon Transcribe** | Pay-as-you-go per minute is straightforward to map to `AUDIO_SECONDS`. Feature parity depends on diarization, punctuation, language coverage, and accuracy on veterinary domain audio. See: [Amazon Transcribe pricing](https://aws.amazon.com/transcribe/pricing/) |
 | **ElevenLabs (Text-to-Speech)** (if/when used) | **Amazon Polly** | Polly is pay-as-you-go per character/voice tier. Voice quality/style controls may differ; ElevenLabs may remain better for “human-like” voices and cloning. See: [Amazon Polly pricing](https://aws.amazon.com/polly/pricing/) |
 | **Twilio (SMS)** | **Amazon SNS (SMS)** or **Amazon Pinpoint** | AWS SMS pricing varies by destination (like Twilio). AWS introduces its own origination identity requirements in some regions. For “send SMS + basic status”, SNS is often enough; for campaigns/audiences/journeys, Pinpoint is closer. See: [SNS SMS pricing](https://aws.amazon.com/sns/sms-pricing/), [Pinpoint pricing](https://aws.amazon.com/pinpoint/pricing/) |
-| **Resend (Email sending)** | **Amazon SES** | SES is low cost and pay-as-you-go. Trade-off is operational complexity (deliverability, DKIM/SPF/DMARC, dedicated IPs, warmup). Resend is simpler UX; SES is cheaper at scale. See: [Amazon SES pricing](https://aws.amazon.com/ses/pricing/) |
+| **Resend (Email sending)** | **Amazon SES** | **COMPLETED** - Migrated to AWS SES. SES is low cost and pay-as-you-go. See: [Amazon SES pricing](https://aws.amazon.com/ses/pricing/) |
 | **Google Places APIs** | **Amazon Location Service** | For places/search/geocoding/map tiles, Amazon Location Service can replace many Google Maps Platform SKUs. Feature parity differs by provider and data source; validate quality for our use cases. See: [Amazon Location Service pricing](https://aws.amazon.com/location/pricing/) |
 | **LiveKit (video calls / WebRTC infra)** (needs verification) | **Amazon Chime SDK** | Chime SDK provides meetings, messaging, and real-time audio/video with per attendee-minute pricing. Migration cost includes client SDK changes and server-side session orchestration. See: [Amazon Chime SDK pricing](https://aws.amazon.com/chime/chime-sdk/pricing/) |
 | **Daily (video calls / WebRTC)** (needs verification) | **Amazon Chime SDK** | Similar to LiveKit: Chime SDK is the most direct AWS-native replacement for “video meeting” functionality. See: [Amazon Chime SDK pricing](https://aws.amazon.com/chime/chime-sdk/pricing/) |
@@ -650,7 +656,7 @@ In addition to cost, the key motivation is **billing centralization**: when usag
 
 ### Practical migration ordering (lowest risk → highest risk)
 
-- **Email (Resend → SES)** and **SMS (Twilio → SNS/Pinpoint)** are often the most “commodity” migrations.
+- **Email (Resend → SES)** -- **COMPLETED**, already migrated to AWS SES. **SMS (Twilio → SNS/Pinpoint)** is often the most “commodity” migration remaining.
 - **Google Places → Amazon Location Service** is feasible but needs quality evaluation.
 - **OCR → Textract** is feasible when “extract text/tables/forms” meets needs.
 - **Video calling → Chime SDK** can be large surface-area change (clients + backend orchestration) but is a clean AWS-native alternative.
@@ -694,5 +700,5 @@ Both are valid for profitability, but they are not “true per-call invoice line
 - **AWS services** (Textract/Transcribe/Polly/SNS/SES/Chime SDK/Location): generally **pay-as-you-go**, which tends to map cleanly to per-event costing.
 - **DocuSign**: commonly subscription + included envelopes; pay-as-you-go may not be available depending on plan.
 - **Twilio**: usage-based for messaging, but pricing depends on destination/origination; pay-as-you-go exists but per-message pricing may still require async lookup for exact billed amount.
-- **Resend**: subscription tiers are common; moving to SES is the more “pure pay-as-you-go” alternative.
+- **Resend**: **COMPLETED** -- already migrated to AWS SES (pay-as-you-go).
 - **LiveKit/Daily**: pricing varies; if we use Chime SDK, attendee-minutes are pay-as-you-go and directly costable.
