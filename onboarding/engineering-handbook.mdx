@@ -465,18 +465,10 @@ Cursor uses MDC (Markdown Configuration) rules to guide AI assistance. Rules are
 
 **Global Rules:**
 
-- `.cursorrules` - Legacy global rules
-- `.cursor/rules/` - Critical rules, database migrations, development workflow, sub-agent orchestration
+- `.cursor/rules/` - 22 MDC topic-specific rule files (component-file-boundaries, prisma-migrations, nesting-depth-complexity, etc.)
 
 
-**Frontend Rules** (`client/.cursor/rules/`):
-
-- Next.js 15 patterns, React Query, Redux, OpenAPI integration, type safety, code organization
-
-
-**Backend Rules** (`server/.cursor/rules/`):
-
-- NestJS controller structure, database access (repository pattern), DTO organization, error handling, module conventions, testing conventions
+All Cursor rules are in the root `.cursor/rules/` directory. There are no per-app rule directories (`client/.cursor/rules/` and `server/.cursor/rules/` do not exist).
 
 #### Recommended Cursor Command: Deslop
 
@@ -505,12 +497,10 @@ Click the link below to add the "deslop" command to your Cursor installation. Th
 
 **Rule Locations:**
 
-- `CLAUDE.md` - Main project overview and critical rules
-- `AGENTS.md` - Subagent documentation and usage guide
-- `client/claude.md` - Frontend patterns guide
-- `server/claude.md` - Backend patterns guide
-- `packages/common/claude.md` - Shared code guide
-- `infra/claude.md` - Infrastructure guide
+- `CLAUDE.md` - Main project overview and critical rules (root only)
+- `AGENTS.md` - Subagent documentation and usage guide (root only)
+
+Note: Only `CLAUDE.md` and `AGENTS.md` exist at the root level. There are no sub-directory Claude rule files (`client/claude.md`, `server/claude.md`, `packages/common/claude.md`, and `infra/claude.md` do not exist).
 
 #### Claude Code Subagents (.claude/agents/)
 
@@ -531,7 +521,7 @@ We have 12 specialized Claude Code agents for different tasks:
 | pattern-auditor | Documentation drift detection |
 | architect | System design, technology decisions |
 
-**Automatic Agent Selection** (configured in `.cursor/rules/sub-agent-orchestration.md`):
+**Automatic Agent Selection** (pattern-based routing within `.claude/agents/`):
 
 - `client/src/components/**/*` → ui-component-architect
 - `server/src/*/controllers/**/*.ts` → api-contract-validator
@@ -712,7 +702,7 @@ We maintain three main environments with the following portal URLs:
 | Staging | creststaging.pet | creststaging.vet | creststaging.express |
 | Production | crest.pet | crest.vet | crest.express |
 
-**Note:** The platform has **6 portals** total (Clinic, Consumer, Enterprise, Platform, Referral, and Shelters). The table above shows the 3 main portals. See the **README** in the crestpetsystem repository for all portal URLs and localhost setup instructions.
+**Note:** The platform has **7 portals** total (Clinic, Consumer, Enterprise, Platform, Referral, Marcia, and Vendor). The table above shows the 3 main portals. There is no "Shelters" portal. See the **README** in the crestpetsystem repository for all portal URLs and localhost setup instructions.
 
 ### GitHub Enterprise Structure
 
@@ -1090,7 +1080,9 @@ The following automated reviewers must complete before a PR can be merged:
 | --- | --- |
 | SonarCloud | Code quality, bugs, vulnerabilities, coverage |
 | Devin | AI code review |
-| Bugbot | Bug detection |
+| Claude Code | AI code review (claude-code-review.yml) |
+| Amazon Q Developer | AI-assisted review |
+| Cursor Bot | AI-assisted review |
 | Codex | Code quality analysis |
 | Copilot | AI-assisted review |
 

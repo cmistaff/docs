@@ -3,6 +3,10 @@ title: "AWS Multi-Tenant Cost Tracking"
 description: "AWS cost tracking and allocation for multi-tenant infrastructure."
 ---
 
+<Warning>
+**Deprecated** -- This document describes a CloudWatch custom metrics approach to cost tracking that was **never implemented**. The actual implementation uses a Prisma-based `ExternalUsageEvent` model with per-vendor tracking services. See **cost-analysis.mdx** for the current, implemented approach.
+</Warning>
+
 ## Purpose
 
 This document explains how to track per-tenant resource usage and cost for the CrestPet System, a multi-tenant SaaS application on AWS.
