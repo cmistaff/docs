@@ -1,33 +1,143 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API Reference"
+description: "Introduction to the CrestPet System REST API."
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+# API Reference
 
-## Welcome
+The CrestPet backend exposes a RESTful API built with NestJS 11, documented via OpenAPI/Swagger decorators. The API is organized by portal, with each portal providing endpoints scoped to its user role.
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Base URL
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+| Environment | API Base URL |
+|-------------|-------------|
+| Prestaging | `https://api.prestaging.crestpet.com` |
+| Staging | `https://api.staging.crestpet.com` |
+| Production | `https://api.crestpet.com` |
+| Local | `http://localhost:8080` |
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API endpoints (except those marked `@Public()`) require a valid session token. Include the session token as a Bearer token in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer <session-token>" \
+  https://api.crestpet.com/clinic/appointments
+```
+
+Sessions are created through the Better Auth sign-in endpoints and return a token that should be included in all subsequent requests.
+
+## API Organization
+
+Endpoints are organized by portal prefix:
+
+| Prefix | Portal | Description |
+|--------|--------|-------------|
+| `/clinic/*` | Clinic | Veterinary practice management (appointments, patients, billing, inventory, etc.) |
+| `/consumer/*` | Consumer | Pet owner operations (bookings, health records, payments, wellness) |
+| `/enterprise/*` | Enterprise | Multi-location management (analytics, staff, subscriptions) |
+| `/platform/*` | Platform | System administration (tenants, users, feature policies, revenue) |
+| `/referral/*` | Referral | Inter-clinic referral management |
+| `/shared/*` | Shared | Cross-portal endpoints (auth, payments, tenant, user) |
+
+## Request Format
+
+### Query Parameters
+
+Paginated endpoints accept:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page` | number | Page number (1-based) |
+| `limit` | number | Items per page |
+| `sort` | string | Sort field |
+| `order` | string | Sort direction (`asc` or `desc`) |
+
+### Request Bodies
+
+POST and PUT requests accept JSON bodies. All request DTOs are validated at runtime using `class-validator` decorators. Invalid requests return a 400 response with field-level error details.
+
+## Response Format
+
+### Success Responses
+
+Successful responses return the requested data directly:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "items": [...],
+  "total": 42,
+  "page": 1,
+  "limit": 20
+}
 ```
+
+### Error Responses
+
+Error responses follow a consistent format:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "email",
+      "message": "email must be a valid email address"
+    }
+  ]
+}
+```
+
+### HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad request (validation error) |
+| 401 | Unauthorized (missing or invalid session) |
+| 403 | Forbidden (insufficient permissions) |
+| 404 | Not found |
+| 409 | Conflict (duplicate resource) |
+| 500 | Internal server error |
+
+## Tenant Scoping
+
+All endpoints automatically scope data to the authenticated user's current tenant. You cannot access data from other tenants through the API (except via platform admin endpoints).
+
+The tenant context is derived from the session token, not from request parameters. There is no `tenantId` query parameter.
+
+## OpenAPI Specification
+
+The full OpenAPI specification is generated from the NestJS codebase using Swagger decorators. Every controller, endpoint, and DTO is annotated with OpenAPI metadata.
+
+To generate the spec locally:
+
+```bash
+pnpm api:schema
+```
+
+This produces a JSON/YAML file that can be imported into tools like Postman, Insomnia, or used with Orval to generate typed API clients.
+
+## Auto-Generated Client
+
+The frontend uses Orval to generate a fully typed API client with React Query hooks. After any API changes:
+
+```bash
+pnpm api:generate
+```
+
+This generates:
+- TypeScript types for all request/response DTOs (`@/common/api/openapi/models`)
+- React Query hooks for all GET endpoints (`useGet*`)
+- Mutation functions for all POST/PUT/DELETE endpoints (`useCreate*`, `useUpdate*`, `useDelete*`)
+- Query key factories for cache invalidation
+
+## Rate Limiting
+
+The API enforces rate limits per authenticated session. Exceeding the limit returns a `429 Too Many Requests` response. Clients should implement exponential backoff when receiving 429 responses.
+
+## Timezone Header
+
+Endpoints returning appointment or scheduling data include the clinic's timezone in the response via the `X-Clinic-Timezone` header when the `@WithTimezone()` decorator is applied. The response body also includes `clinicTimezone` and `clinicTimezoneOffset` fields.

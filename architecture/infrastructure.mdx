@@ -1,0 +1,153 @@
+---
+title: "Infrastructure"
+description: "AWS infrastructure -- ECS Fargate, RDS, ElastiCache, CloudFront, and the three-environment deployment model."
+---
+
+# Infrastructure
+
+CrestPet System runs on AWS with infrastructure managed by Terraform. The production architecture uses ECS Fargate for compute, RDS PostgreSQL for the database, ElastiCache Redis for caching and job queues, and CloudFront for CDN delivery.
+
+## Architecture Diagram
+
+```
+                    ┌──────────────┐
+                    │  CloudFront  │
+                    │    (CDN)     │
+                    └──────┬───────┘
+                           │
+                    ┌──────┴───────┐
+                    │     WAF      │
+                    │  (Web ACL)   │
+                    └──────┬───────┘
+                           │
+                    ┌──────┴───────┐
+                    │     ALB      │
+                    │ (App Load    │
+                    │  Balancer)   │
+                    └──────┬───────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+       ┌──────┴──────┐    │     ┌──────┴──────┐
+       │  Next.js    │    │     │  NestJS     │
+       │  (Fargate)  │    │     │  (Fargate)  │
+       └─────────────┘    │     └──────┬──────┘
+                          │            │
+                     ┌────┴────┐  ┌────┴────┐
+                     │   S3    │  │  Redis  │
+                     │ (Files) │  │ (Cache) │
+                     └─────────┘  └─────────┘
+                                       │
+                                  ┌────┴────┐
+                                  │   RDS   │
+                                  │ (PostgreSQL)
+                                  └─────────┘
+```
+
+## AWS Services
+
+| Service | Purpose | Details |
+|---------|---------|---------|
+| **ECS Fargate** | Compute | Serverless containers for Next.js frontend and NestJS backend |
+| **RDS PostgreSQL** | Database | Managed PostgreSQL with automated backups and encryption |
+| **ElastiCache Redis** | Cache/Queue | Session storage, caching layer, BullMQ job queues, Socket.IO adapter |
+| **S3** | File Storage | Documents, images, scans, exports, uploaded files |
+| **CloudFront** | CDN | Static asset delivery, SSL termination |
+| **ALB** | Load Balancer | Application Load Balancer with path-based routing |
+| **WAF** | Security | Web Application Firewall with managed rule groups |
+| **Secrets Manager** | Secrets | API keys, database credentials, third-party tokens |
+| **SES** | Email | Transactional email delivery |
+| **CloudWatch** | Monitoring | Logs, metrics, alarms |
+
+## Three Environments
+
+CrestPet runs across three environments, each in AWS `us-east-1`:
+
+| Environment | Purpose | Deployment |
+|-------------|---------|------------|
+| **Prestaging** | Active development and feature testing. Developers deploy here for integration testing. | Automatic on push to `prestaging` branch |
+| **Staging** | Pre-production validation. Mirrors production configuration for final QA. | Manual promotion from prestaging |
+| **Production** | Live customer-facing environment. | Manual promotion from staging (never from CLI) |
+
+<Warning>
+  **Never run `terraform apply` for production from the CLI.** Production deployments go through the CI/CD pipeline only.
+</Warning>
+
+## Deployment Pipeline
+
+```
+Developer → Push to prestaging branch
+         → GitHub Actions CI
+            ├── Lint + Type Check
+            ├── Unit Tests
+            ├── E2E Tests (test containers)
+            ├── SonarCloud Analysis
+            ├── Build Docker Images
+            └── Deploy to ECS (prestaging)
+
+Promotion → Staging (manual trigger)
+         → Production (manual trigger, requires approval)
+```
+
+### Docker Configuration
+
+The monorepo includes Docker Compose configurations for each context:
+
+| File | Purpose |
+|------|---------|
+| `compose.db.yaml` | Local PostgreSQL + Redis containers |
+| `compose.dev.yaml` | Full development stack |
+| `compose.test.yaml` | Test containers (PostgreSQL + Redis + MinIO for S3) |
+| `compose.prod.yaml` | Production-like containers |
+
+## Networking
+
+- **Subdomain routing**: Each portal is served from a different subdomain (e.g., `clinic.crestpet.com`, `consumer.crestpet.com`)
+- **ALB routing**: Path-based rules route `/api/*` to the NestJS backend and all other paths to the Next.js frontend
+- **VPC**: All services run within a private VPC with NAT gateways for outbound internet access
+- **Security Groups**: Strict ingress/egress rules between services
+
+## Monitoring and Observability
+
+| Tool | Purpose |
+|------|---------|
+| **Sentry** | Error tracking and performance monitoring for both frontend and backend |
+| **CloudWatch** | Infrastructure metrics, container logs, custom alarms |
+| **SonarCloud** | Code quality and security analysis on every PR |
+
+## Security
+
+- **WAF** protects the ALB with managed rule groups (SQL injection, XSS, known bad inputs)
+- **Secrets Manager** stores all credentials -- no plaintext secrets in code or environment variables
+- **Encryption at rest** on RDS, S3, and EBS volumes
+- **Encryption in transit** via TLS everywhere (CloudFront, ALB, database connections)
+- **Turnstile** (Cloudflare) for bot protection on public-facing forms
+- **Secret scanning** and **push protection** enabled via GitHub
+- **Dependabot** for automated dependency vulnerability alerts
+
+## Infrastructure as Code
+
+The production infrastructure is managed in a separate Terraform repository (`crestsystem/infra`). Key modules:
+
+- ECS cluster and service definitions
+- RDS instance configuration
+- ElastiCache cluster
+- ALB listeners and target groups
+- CloudFront distributions
+- S3 buckets and policies
+- WAF web ACLs
+- IAM roles and policies
+- VPC, subnets, and security groups
+
+## Development Infrastructure
+
+Developer workstations are EC2 instances managed through a separate Terraform repository (`EC2DevsCrestPet`):
+
+- 20 EC2 boxes across Ohio (3), Mumbai (16), and Frankfurt (1)
+- Connected via Tailscale VPN mesh network
+- noVNC for browser-based desktop access
+- Standardized AMIs built with Packer
+- Memory watchdog to prevent OOM issues
+- CloudWatch agent for CPU, network, and TCP metrics
+
+Self-hosted GitHub Actions runners (managed via `github-runners-infrastructure`) provide CI/CD capacity with Spot and on-demand ASGs.

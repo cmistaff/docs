@@ -1,0 +1,114 @@
+---
+title: "Architecture Overview"
+description: "High-level architecture of the CrestPet System -- monorepo structure, portal model, and system boundaries."
+---
+
+# Architecture Overview
+
+CrestPet System is a monorepo containing a Next.js 15 frontend, a NestJS 11 backend, and shared packages. It uses a multi-tenant architecture where each veterinary clinic, enterprise, and consumer operates within an isolated tenant context.
+
+## Monorepo Structure
+
+The project uses pnpm workspaces to manage three workspace packages:
+
+```
+crestpetsystem/
+├── client/                          # Next.js 15 frontend (App Router)
+│   └── src/app/
+│       ├── clinic/                  # Clinic portal pages
+│       ├── consumer/                # Consumer portal pages
+│       ├── enterprise/              # Enterprise portal pages
+│       ├── platform/                # Platform admin pages
+│       ├── referral/                # Referral portal pages
+│       └── common/api/openapi/      # Auto-generated API client (Orval)
+├── server/                          # NestJS 11 backend
+│   └── src/modules/
+│       ├── app/                     # Bootstrap, health checks, filters
+│       ├── common/                  # Infrastructure (DB, email, SMS, AI, S3, Stripe)
+│       └── portals/                 # Business logic organized by portal
+│           ├── clinic/              # ~75 modules (appointments, billing, inventory, etc.)
+│           ├── consumer/            # ~38 modules (pet health, booking, wellness, etc.)
+│           ├── enterprise/          # ~19 modules (analytics, staff, subscriptions, etc.)
+│           ├── platform/            # ~18 modules (tenants, users, feature policies, etc.)
+│           ├── referral/            # ~5 modules (referrals, availability, etc.)
+│           └── shared/              # ~75 modules (auth, payments, services, repositories)
+├── packages/
+│   └── common/                      # Shared package (@repo/common)
+│       └── prisma/schema/           # Multi-file Prisma schema (88 files, ~11,300 lines)
+├── compose.db.yaml                  # Database containers (PostgreSQL + Redis)
+├── compose.dev.yaml                 # Development containers
+├── compose.test.yaml                # Test containers (PostgreSQL + Redis + MinIO)
+└── compose.prod.yaml                # Production containers
+```
+
+## Portal Architecture
+
+Each portal maps to a subdomain and serves a distinct user role:
+
+| Portal | Subdomain (local) | Backend Modules | Frontend Pages |
+|--------|-------------------|-----------------|----------------|
+| Clinic | `clinic.localhost:3000` | 75 | 47+ dashboard sections |
+| Consumer | `consumer.localhost:3000` | 38 | Dashboard, payments, referrals |
+| Enterprise | `enterprise.localhost:3000` | 19 | Analytics, clinic management |
+| Platform | `taylor.localhost:3000` | 18 | Tenants, users, policies |
+| Referral | `referral.localhost:3000` | 5 | Referrals, availability |
+
+The **shared** portal layer (75 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
+
+## Request Flow
+
+```
+Client (Browser) → CloudFront CDN → ALB → ECS Fargate
+                                           ├── Next.js (SSR + static)
+                                           └── NestJS API
+                                                ├── Auth Guard (JWT via Better Auth)
+                                                ├── Tenant Resolver (subdomain → tenantId)
+                                                ├── Controller (thin orchestration)
+                                                ├── Service (business logic)
+                                                └── Repository (Prisma → PostgreSQL)
+                                                     └── Redis (ElastiCache) for caching
+```
+
+Every request passes through:
+
+1. **Auth Guard** -- validates JWT session tokens via Better Auth
+2. **Tenant Resolution** -- resolves the current tenant from the subdomain or request context
+3. **Controller** -- extracts parameters via decorators (`@CurrentTenant`, `@Body`, `@Param`), validates DTOs
+4. **Service** -- executes business logic with explicit `tenantId` scoping
+5. **Repository** -- auto-generated Prisma repository with mandatory `where: { tenantId }` filtering
+
+## Key Design Principles
+
+<AccordionGroup>
+  <Accordion title="Multi-Tenant Isolation">
+    Every database query touching tenant data includes an explicit `tenantId` filter. The tenant context flows from the `@CurrentTenant` decorator through the service layer to the repository. Cross-tenant data access is impossible by design.
+  </Accordion>
+  <Accordion title="Type Safety">
+    Zero tolerance for `any`, type assertions (`as`), and non-null assertions (`!`). The codebase uses `unknown` with type guards, constrained generics, and discriminated unions. Prisma generates fully typed queries.
+  </Accordion>
+  <Accordion title="Code Generation">
+    The API client (Orval), Prisma repositories, and OpenAPI models are all auto-generated. Developers never write fetch calls, raw SQL, or frontend type definitions manually.
+  </Accordion>
+  <Accordion title="Portal Isolation">
+    Cross-portal imports are forbidden. The shared layer provides common functionality, but clinic code cannot import from enterprise, and platform code cannot import from consumer. Each portal is a self-contained domain.
+  </Accordion>
+</AccordionGroup>
+
+## Third-Party Integrations
+
+The backend integrates with external services through dedicated modules in `server/src/modules/common/third-party/`:
+
+| Integration | Purpose |
+|-------------|---------|
+| **AI** (Anthropic, Mistral) | Health assessments, wellness reports, symptom checking, conversation records |
+| **Stripe** | Payment processing, Connect for clinic payouts, invoicing |
+| **S3** | File storage (documents, images, scans) |
+| **SendGrid / SES** | Transactional email |
+| **Twilio** | SMS notifications and OTP verification |
+| **WhatsApp** | Client communication via Marcia AI assistant |
+| **DocuSign** | Electronic signatures for agreements and consent forms |
+| **ElevenLabs** | AI voice for wellness report videos |
+| **Tavus** | AI video generation for wellness reports |
+| **Turnstile** | Bot protection on public-facing forms |
+| **LiveKit** | Real-time video consultations |
+| **Google API** | Calendar and external service integrations |

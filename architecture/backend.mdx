@@ -1,0 +1,200 @@
+---
+title: "Backend Architecture"
+description: "NestJS 11 backend -- module structure, controller-service-repository pattern, guards, decorators, and error handling."
+---
+
+# Backend Architecture
+
+The CrestPet backend is a NestJS 11 application using TypeScript 5.8 (strict mode), Prisma 6 for database access, and Better Auth for authentication. It follows a strict Controller-Service-Repository pattern with mandatory tenant scoping.
+
+## Module Organization
+
+```
+server/src/modules/
+├── app/                    # Application bootstrap
+│   ├── app.module.ts       # Root module
+│   ├── app.controller.ts   # Health check endpoint
+│   ├── filters/            # Global exception filters
+│   ├── llm-router/         # AI model routing
+│   └── utils/              # App-level utilities
+├── common/                 # Infrastructure modules
+│   ├── bull/               # Job queues (BullMQ)
+│   ├── cache/              # Redis caching
+│   ├── config/             # CommonConfigService (centralized config)
+│   ├── currency/           # Currency formatting
+│   ├── data-cleanup/       # Data retention and cleanup
+│   ├── encryption/         # Field-level encryption
+│   ├── intl/               # Internationalization
+│   ├── logger/             # Structured logging
+│   ├── monitoring/         # Health checks, metrics
+│   ├── onesignal/          # Push notifications
+│   ├── prisma/             # PrismaService (database connection)
+│   ├── realtime/           # WebSocket/SSE infrastructure
+│   ├── repository/         # Base repository patterns
+│   ├── sentry/             # Error tracking
+│   ├── socket-io-adapter/  # Socket.IO Redis adapter
+│   ├── template/           # Email/PDF template rendering
+│   └── third-party/        # External service integrations
+│       ├── ai/             # Anthropic, Mistral AI
+│       ├── audio/          # Audio processing
+│       ├── docusign/       # Electronic signatures
+│       ├── email/          # SendGrid, SES
+│       ├── google-api/     # Google services
+│       ├── mistral/        # Mistral AI
+│       ├── s3-storage/     # AWS S3 file storage
+│       ├── sms/            # Twilio SMS
+│       ├── stripe/         # Stripe payments
+│       ├── tavus/          # AI video generation
+│       ├── tooth-scan-api/ # Dental scan processing
+│       ├── poop-scan-api/  # Fecal analysis
+│       ├── turnstile/      # Cloudflare bot protection
+│       └── whatsapp/       # WhatsApp Business API
+└── portals/                # Business logic by portal
+    ├── clinic/             # 75 modules
+    ├── consumer/           # 38 modules
+    ├── enterprise/         # 19 modules
+    ├── platform/           # 18 modules
+    ├── referral/           # 5 modules
+    └── shared/             # 75 cross-portal modules
+```
+
+## Controller-Service-Repository Pattern
+
+Every feature follows a strict three-layer architecture:
+
+```
+@Controller → @Injectable Service → Auto-generated Repository → Prisma → PostgreSQL
+```
+
+### Controllers (Thin Orchestration)
+
+Controllers handle HTTP concerns only. They extract parameters via decorators, validate via DTOs, and delegate to services:
+
+```typescript
+@ApiController("clinic/appointments")
+export class AppointmentController {
+  constructor(private readonly appointmentService: AppointmentService) {}
+
+  @Get()
+  @ApiOkResponse({ type: AppointmentListResponseDto })
+  async list(
+    @CurrentTenant() tenant: TenantContext,
+    @Query() query: AppointmentListRequestDto,
+  ): Promise<AppointmentListResponseDto> {
+    return this.appointmentService.list(tenant.id, query);
+  }
+}
+```
+
+### Services (Business Logic)
+
+Services receive `tenantId` explicitly and contain all business logic. They are stateless and inject repositories:
+
+```typescript
+@Injectable()
+export class AppointmentService {
+  constructor(
+    private readonly appointmentRepository: AppointmentRepository,
+    private readonly logger: Logger,
+  ) {}
+
+  async list(
+    tenantId: string,
+    query: AppointmentListRequestDto,
+  ): Promise<AppointmentListResponseDto> {
+    const appointments = await this.appointmentRepository.findMany({
+      where: { tenantId, status: query.status },
+      select: { id: true, startAt: true, pet: { select: { id: true, name: true } } },
+    });
+    return { items: appointments };
+  }
+}
+```
+
+### Repositories (Auto-Generated)
+
+Repositories are auto-generated from the Prisma schema via `pnpm prisma:generate:server`. They are never edited manually. Every query includes explicit `select` clauses (never `include`, never bare `findMany()`).
+
+## Authentication and Authorization
+
+### Auth Guard
+
+A global auth guard validates JWT session tokens via Better Auth on every request. Public endpoints use the `@Public()` decorator to bypass authentication.
+
+### Decorators
+
+| Decorator | Purpose |
+|-----------|---------|
+| `@CurrentTenant()` | Extracts the resolved tenant context from the request |
+| `@CurrentUser()` | Extracts the authenticated user from the session |
+| `@CurrentSessionId()` | Extracts the session ID |
+| `@Public()` | Marks an endpoint as publicly accessible (skips JWT guard) |
+| `@WithTimezone()` | Interceptor that merges clinic timezone into the response |
+
+### Tenant Scoping
+
+Multi-tenant security is enforced at every layer:
+
+```
+Controller (@CurrentTenant) → Service (tenantId param) → Repository (where: { tenantId })
+```
+
+Client-provided `tenantId` values are never trusted. The tenant is always resolved from the authenticated session context, except for platform admin endpoints protected by `PlatformAdminGuard`.
+
+## DTOs and Validation
+
+Request DTOs live in `dto/requests/`, response DTOs in `dto/responses/`. Every field has `@ApiProperty` for Swagger documentation and `class-validator` decorators for runtime validation:
+
+```typescript
+export class CreateAppointmentRequestDto {
+  @ApiProperty({ description: "Start time in UTC ISO 8601 format" })
+  @IsISO8601()
+  startAt: string;
+
+  @ApiProperty({ description: "Pet ID" })
+  @IsUUID()
+  petId: string;
+}
+```
+
+Paginated endpoints extend `BasePaginationRequestDto`.
+
+## Error Handling
+
+The backend uses typed error classes extending from `Client*Error` (400-503 status codes). A global exception filter handles logging and response formatting.
+
+Rules:
+- Controllers never use try/catch -- errors propagate to the global filter
+- `Client*Error` classes are for known business errors and are not logged as errors
+- Infrastructure/external service errors are logged via `this.logger.error()` before re-throwing
+
+## OpenAPI / Swagger
+
+Every controller, endpoint, and DTO is decorated with OpenAPI metadata:
+- `@ApiController` on controllers
+- `@ApiOkResponse` on endpoints
+- `@ApiProperty` on every DTO field
+- Custom `@ApiQuery` decorators from `@/openapi/decorators` (not `@nestjs/swagger`)
+
+The OpenAPI spec is generated via `pnpm api:schema` and used by Orval to generate the frontend API client.
+
+## Configuration
+
+All configuration is accessed through `CommonConfigService`, never through `process.env` directly. This provides type-safe, validated configuration with sensible defaults.
+
+## Realtime Features
+
+The backend supports real-time communication through:
+- **Socket.IO** with Redis adapter for WebSocket connections (clinic consumer chat, whiteboard collaboration)
+- **Server-Sent Events (SSE)** for audit log streaming
+- **LiveKit** for video consultations
+
+## Background Jobs
+
+BullMQ with Redis handles background processing for:
+- Email delivery
+- SMS sending
+- Push notifications
+- Data cleanup
+- Report generation
+- AI processing tasks

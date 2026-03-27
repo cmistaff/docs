@@ -1,0 +1,130 @@
+---
+title: "Deployment"
+description: "Deployment pipeline from prestaging through staging to production."
+---
+
+# Deployment
+
+CrestPet System uses a three-environment promotion model. Code flows from `prestaging` through `staging` to `production`, with automated CI/CD on GitHub Actions.
+
+## Environments
+
+| Environment | Branch | Region | Purpose |
+|-------------|--------|--------|---------|
+| **Prestaging** | `prestaging` | us-east-1 | Active development and integration testing |
+| **Staging** | `staging` | us-east-1 | Pre-production validation and QA |
+| **Production** | `main` | us-east-1 | Live customer-facing environment |
+
+## CI/CD Pipeline
+
+### On Every Pull Request
+
+When a PR is opened against `prestaging`:
+
+1. **Lint and Type Check** -- ESLint + Prettier + TypeScript strict mode
+2. **Unit Tests** -- Bun test runner for server unit tests
+3. **E2E Tests** -- Full integration tests with PostgreSQL, Redis, and MinIO containers
+4. **SonarCloud Analysis** -- Code quality, security hotspots, and coverage
+5. **Bot Reviews** -- Automated code review from multiple bots (Devin, Bugbot, Codex, Copilot, Augment)
+6. **Secret Scanning** -- Gitleaks check for exposed credentials
+
+### On Merge to Prestaging
+
+When a PR merges into `prestaging`:
+
+1. All CI checks re-run on the merged code
+2. Docker images are built for both frontend and backend
+3. Images are pushed to container registry
+4. ECS services are updated with the new task definitions
+5. Rolling deployment with health checks ensures zero downtime
+
+### Promotion to Staging
+
+Staging deployment is triggered manually:
+
+1. Create a PR from `prestaging` to `staging`
+2. QA team validates the changes
+3. Merge triggers the same build/deploy pipeline targeting staging infrastructure
+
+### Promotion to Production
+
+Production deployment requires explicit approval:
+
+1. Create a PR from `staging` to `main`
+2. Final review and sign-off required
+3. Merge triggers production deployment
+
+<Warning>
+  **Never deploy to production from the CLI.** All production changes must go through the GitHub Actions pipeline.
+</Warning>
+
+## Infrastructure Management
+
+Infrastructure changes are managed through Terraform in the separate `crestsystem/infra` repository:
+
+```
+infra/
+├── environments/
+│   ├── prestaging/    # Prestaging-specific variables
+│   ├── staging/       # Staging-specific variables
+│   └── production/    # Production-specific variables
+├── modules/
+│   ├── ecs/           # ECS cluster, services, task definitions
+│   ├── rds/           # PostgreSQL configuration
+│   ├── elasticache/   # Redis configuration
+│   ├── alb/           # Load balancer rules
+│   ├── cloudfront/    # CDN configuration
+│   ├── waf/           # Web Application Firewall
+│   └── ...            # VPC, IAM, S3, etc.
+└── main.tf            # Root module composition
+```
+
+<Warning>
+  Terraform changes to production infrastructure are applied through CI/CD only. Never run `terraform apply` for production from a local machine.
+</Warning>
+
+## Secrets Management
+
+Application secrets are stored in AWS Secrets Manager:
+
+- **Prestaging/Staging**: `prestaging/crest-pet/api` and `staging/crest-pet/api` in us-east-1
+- **Production**: `production/crest-pet/api` in us-east-1
+
+ECS tasks pull secrets at runtime from Secrets Manager. No secrets are baked into Docker images or stored in environment files.
+
+## Database Migrations
+
+Migrations run automatically during deployment:
+
+1. The ECS task definition includes an init container that runs `pnpm prisma:migration:run`
+2. Migrations apply before the application container starts
+3. If a migration fails, the deployment rolls back to the previous task definition
+
+For production, always verify migrations in prestaging and staging first. Destructive migrations (dropping columns, changing types) must be handled with multi-step deployment strategies.
+
+## Monitoring After Deployment
+
+After each deployment, verify:
+
+<Steps>
+  <Step title="Check ECS service health">
+    Confirm new tasks are running and old tasks have drained in the AWS console or via CLI.
+  </Step>
+  <Step title="Verify application health">
+    Hit the health check endpoint to confirm the API is responding.
+  </Step>
+  <Step title="Check Sentry">
+    Monitor Sentry for any new errors introduced by the deployment.
+  </Step>
+  <Step title="Verify SonarCloud">
+    Confirm the quality gate passed and no new security issues were introduced.
+  </Step>
+</Steps>
+
+## Rollback
+
+If a deployment introduces issues:
+
+1. **ECS auto-rollback**: If health checks fail during deployment, ECS automatically rolls back to the previous task definition
+2. **Manual rollback**: Revert the merge commit and push to trigger a new deployment with the previous code
+3. **Database rollback**: If a migration needs reverting, create a new migration that undoes the changes (Prisma does not support down migrations)

@@ -1,0 +1,203 @@
+---
+title: "Database Architecture"
+description: "Prisma 6 schema design, multi-tenancy model, and data organization across 88 schema files."
+---
+
+# Database Architecture
+
+CrestPet uses PostgreSQL as its primary database, accessed through Prisma 6 ORM. The schema is split across 88 files totaling approximately 11,300 lines, organized by feature domain.
+
+## Schema Organization
+
+The Prisma schema uses multi-file schema support (Prisma 6). Each file covers a specific domain:
+
+```
+packages/common/prisma/schema/
+├── _base.prisma              # Generator + datasource config
+├── tenant.prisma             # Tenant, TenantUser, TenantType, TenantStatus
+├── user.prisma               # User model (Better Auth compatible)
+├── auth.prisma               # Session, Account, Verification, Passkey, OTP
+├── appointments.prisma       # Appointment, AppointmentStep, SlotReservation
+├── consultations.prisma      # ConsultationTemplate, ConsultationNotes
+├── health-records.prisma     # HealthRecord, HealthAssessment
+├── treatments.prisma         # Treatment, TreatmentPlan
+├── treatment-sheets.prisma   # TreatmentSheet, TreatmentSheetTask, TreatmentSheetLog
+├── dental.prisma             # DentalChart, ToothRecord, DentalRecordCode
+├── anesthetic.prisma         # AnestheticSheet, AnestheticSheetItem
+├── imaging.prisma            # ImagingStudy, ImagingImage
+├── diagnostics.prisma        # DiagnosticRequest
+├── pet.prisma                # Pet, PetTenant, PetWeight
+├── vaccinations.prisma       # Vaccination, VaccinationAdministrationLog
+├── wellness-plans.prisma     # WellnessPlan, WellnessPlanItem, WellnessPlanSubscription
+├── wellness-assessment.prisma  # WellnessAssessment types
+├── wellness-reports.prisma   # ConsolidatedWellnessReport, WellnessReportVideo
+├── inventory.prisma          # InventoryProduct, InventoryLot, InventoryStock, InventoryMovement
+├── purchase-order.prisma     # PurchaseOrder, Vendor, ProductAutoReorder
+├── payments.prisma           # PaymentTransaction, Invoice, InvoiceInsuranceSplit
+├── stripe.prisma             # TenantStripeConnect, PayoutTransaction
+├── services.prisma           # ClinicService, ServiceStep, ServiceTemplate
+├── clinic-staff.prisma       # ClinicStaff, StaffInvitationToken
+├── clinic-rooms.prisma       # ClinicRoom, ClinicRoomGroup
+├── clinic-profile.prisma     # ClinicProfile
+├── notifications.prisma      # NotificationPreference, NotificationRule
+├── enterprise.prisma         # EnterpriseKpi, EnterprisePredictiveAnalytics
+├── referrals.prisma          # PatientReferral
+├── network.prisma            # NetworkOwnerTenants, NetworkClinic
+├── tenant-roles.prisma       # TenantRole, TenantRolePermission
+├── tenant-plans.prisma       # TenantPlan, PlanFeature, TenantPlanChangeRequest
+├── tenant-settings.prisma    # Dedicated settings tables (migrated from JSON)
+├── audit.prisma              # AuditLog
+├── documents.prisma          # File storage references
+├── erp.prisma                # ErpConfiguration, ErpSyncBatch
+├── insurance.prisma          # ClinicPetInsuranceProvider
+├── chatbot.prisma            # AI chatbot data
+├── marcia-training-data.prisma  # Marcia AI training data capture
+├── marcia-whatsapp.prisma    # WhatsApp message drafts and medical updates
+├── video-consultation.prisma # VideoConsultation, VideoConsultationQueue
+├── whiteboard.prisma         # Whiteboard, WhiteboardTask
+├── kennel.prisma             # Kennel management
+├── species.prisma            # Species data
+└── ...                       # 40+ additional domain files
+```
+
+## Multi-Tenancy Model
+
+CrestPet uses a **shared database, shared schema** multi-tenancy model. All tenants share the same PostgreSQL database and tables, with row-level isolation enforced through `tenantId` columns.
+
+### Tenant Model
+
+```prisma
+model Tenant {
+  id                  String       @id @default(uuid())
+  slug                String       // Subdomain identifier (e.g., "mars")
+  name                String       // Display name (e.g., "Mars Veterinary Clinic")
+  type                TenantType   // CLINIC, ENTERPRISE, CONSUMER, PLATFORM, REFERRAL_PORTAL
+  domain              String?
+  timezone            String       @default("UTC")
+  measurementSystem   String       @default("imperial")
+  status              TenantStatus @default(ACTIVE)  // ACTIVE, INACTIVE, SUSPENDED
+  ownedByEnterpriseId String?      // Enterprise ownership link
+
+  // ... 100+ relationships to domain models
+}
+```
+
+### Tenant Types
+
+| Type | Purpose |
+|------|---------|
+| `CLINIC` | Individual veterinary practice |
+| `ENTERPRISE` | Corporate entity owning multiple clinics |
+| `CONSUMER` | Pet owner tenant (auto-created) |
+| `PLATFORM` | System-wide admin tenant |
+| `REFERRAL_PORTAL` | Referral network tenant |
+
+### Enterprise-Clinic Ownership
+
+Enterprises own clinics through a self-referential relationship:
+
+```prisma
+model Tenant {
+  ownedByEnterprise Tenant?  @relation("EnterpriseOwnership", fields: [ownedByEnterpriseId], references: [id])
+  ownedClinics      Tenant[] @relation("EnterpriseOwnership")
+}
+```
+
+### User-Tenant Association
+
+Users are linked to tenants through `TenantUser`, which also carries role assignments:
+
+```prisma
+model TenantUser {
+  id           String     @id @default(uuid())
+  userId       String
+  tenantId     String
+  tenantRoleId String
+  isActive     Boolean    @default(true)
+  joinedAt     DateTime   @default(now())
+
+  user   User       @relation(...)
+  tenant Tenant     @relation(...)
+  role   TenantRole @relation(...)
+
+  @@unique([userId, tenantId])
+}
+```
+
+A single user can belong to multiple tenants with different roles.
+
+## Authentication Schema
+
+The auth schema follows Better Auth conventions with Prisma adapter support:
+
+| Model | Purpose |
+|-------|---------|
+| `Session` | Active user sessions with token, expiry, IP, and user agent |
+| `Account` | OAuth provider accounts (credentials, Google, etc.) |
+| `Verification` | Email/phone verification tokens |
+| `Passkey` | WebAuthn/FIDO2 credentials for passwordless auth |
+| `OtpCode` | Phone-based one-time passwords |
+| `EmailOtpCode` | Email-based one-time passwords |
+| `PasswordResetToken` | Password reset flow tokens |
+| `AccountReactivationToken` | Reactivation of soft-deleted accounts (90-day window) |
+| `EmailChangeRequest` | Two-factor email change verification (SMS + email) |
+
+## Role-Based Access Control
+
+Permissions are managed through dedicated tables rather than hardcoded roles:
+
+```prisma
+model TenantRole {
+  id          String                 @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  permissions TenantRolePermission[]
+  users       TenantUser[]
+}
+
+model TenantRolePermission {
+  id           String          @id @default(uuid())
+  tenantId     String
+  tenantRoleId String
+  resource     String          // e.g., "appointments", "billing"
+  accessLevel  RoleAccessLevel // READ, WRITE, ADMIN
+}
+```
+
+## Tenant Settings (Dedicated Tables)
+
+Tenant configuration has been migrated from a monolithic JSON `settings` field to dedicated tables:
+
+| Table | Configuration Area |
+|-------|-------------------|
+| `TenantBrandingSettings` | Logo, colors, custom CSS |
+| `TenantOrganizationSettings` | Business hours, contact info |
+| `TenantSecuritySettings` | Password policies, session timeouts |
+| `TenantNotificationSettings` | Notification preferences |
+| `TenantIntegrationSettings` | Third-party integrations |
+| `TenantPaymentSettings` | Payment configuration |
+| `TenantPortalSettings` | Portal-specific settings |
+
+The legacy `settings` JSON field is retained for backward compatibility but new features must use dedicated tables.
+
+## Key Conventions
+
+- **All dates stored in UTC.** Timezone conversion happens at the application layer.
+- **Soft deletes** via `deletedAt` fields where needed.
+- **UUID primary keys** on all models (`@default(uuid())`).
+- **Explicit `select` in all queries** -- never `include`, never bare `findMany()`.
+- **Indexes** on `tenantId`, `slug`, `type`, `deletedAt`, and frequently queried foreign keys.
+
+## Migrations
+
+Migrations are managed through Prisma:
+
+```bash
+pnpm prisma:migration:create <name>   # Create a new migration
+pnpm prisma:migration:run             # Apply pending migrations
+pnpm prisma:migration:reset           # Reset and re-apply all migrations
+pnpm prisma:generate                  # Regenerate Prisma client + server repositories
+```
+
+Migration files are never modified manually. The generated SQL is treated as immutable.

@@ -1,0 +1,186 @@
+---
+title: "Multi-Tenancy"
+description: "How CrestPet implements multi-tenant isolation -- shared database model, tenant resolution, and data scoping."
+---
+
+# Multi-Tenancy
+
+CrestPet uses a shared-database, shared-schema multi-tenancy model. All tenants (clinics, enterprises, consumers) share the same PostgreSQL database and tables, with row-level isolation enforced through `tenantId` columns at every layer of the application.
+
+## Tenancy Model
+
+### Shared Database, Shared Schema
+
+Rather than separate databases or schemas per tenant, CrestPet uses a single database with `tenantId` columns on all tenant-scoped tables. This approach:
+
+- Simplifies infrastructure (one database to manage, back up, and monitor)
+- Enables cross-tenant queries for platform admins
+- Reduces operational overhead at scale
+- Requires strict discipline in the application layer to prevent data leaks
+
+### Tenant Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| `CLINIC` | An individual veterinary practice | "Mars Veterinary Clinic" |
+| `ENTERPRISE` | A corporate entity that owns multiple clinics | "PetCare Corp" |
+| `CONSUMER` | A pet owner (auto-created on registration) | Individual user tenant |
+| `PLATFORM` | The system-wide admin tenant | Internal use only |
+| `REFERRAL_PORTAL` | A referral network tenant | Referral partner |
+
+### Enterprise-Clinic Hierarchy
+
+Enterprises own clinics through a self-referential relationship on the `Tenant` model:
+
+```
+Enterprise Tenant
+  └── Clinic Tenant A (ownedByEnterpriseId → Enterprise)
+  └── Clinic Tenant B (ownedByEnterpriseId → Enterprise)
+  └── Clinic Tenant C (ownedByEnterpriseId → Enterprise)
+```
+
+This allows enterprise portals to aggregate data across their owned clinics while maintaining per-clinic isolation for daily operations.
+
+## Tenant Resolution
+
+When a request arrives, the system resolves the tenant through the following process:
+
+<Steps>
+  <Step title="Subdomain extraction">
+    The request's subdomain identifies the portal type (clinic, consumer, enterprise, platform, referral).
+  </Step>
+  <Step title="Session validation">
+    The auth guard validates the JWT session token and loads the authenticated user.
+  </Step>
+  <Step title="Tenant context">
+    The `@CurrentTenant` decorator resolves the tenant from the user's session context. The user's `TenantUser` association determines which tenant they are operating within.
+  </Step>
+  <Step title="Request scoping">
+    The resolved `tenantId` is passed through the service layer to every repository query.
+  </Step>
+</Steps>
+
+## Data Isolation Enforcement
+
+### The Three-Layer Rule
+
+Tenant isolation is enforced at every layer:
+
+```
+Controller (@CurrentTenant)
+    → Service (tenantId as explicit parameter)
+        → Repository (where: { tenantId } in every query)
+```
+
+### Critical Rules
+
+<Warning>
+  **Violating tenant isolation is a catastrophic security issue.** Every query touching tenant data MUST include an explicit `tenantId` filter. There are no exceptions.
+</Warning>
+
+1. **Never trust client-provided tenantId** -- The tenant is always resolved from the server-side session context
+2. **Every query must filter by tenantId** -- No bare `findMany()` or `findUnique()` without tenant scoping
+3. **Cross-portal imports are forbidden** -- Shared code lives in `portals/shared/`, not copied between portals
+4. **Platform admin is the only exception** -- Platform-level endpoints protected by `PlatformAdminGuard` can access cross-tenant data
+
+### Example: Correct Tenant Scoping
+
+```typescript
+// Controller -- extracts tenant from session
+@Get("appointments")
+async list(@CurrentTenant() tenant: TenantContext) {
+  return this.appointmentService.list(tenant.id);
+}
+
+// Service -- receives tenantId explicitly
+async list(tenantId: string) {
+  return this.appointmentRepository.findMany({
+    where: { tenantId },      // REQUIRED on every query
+    select: {
+      id: true,
+      startAt: true,
+      status: true,
+    },
+  });
+}
+```
+
+### Example: What NOT to Do
+
+```typescript
+// BAD: No tenantId filter -- returns ALL tenants' data
+async list() {
+  return this.appointmentRepository.findMany({
+    select: { id: true, startAt: true },
+  });
+}
+
+// BAD: Trusting client-provided tenantId
+@Get("appointments")
+async list(@Query("tenantId") tenantId: string) {
+  return this.appointmentService.list(tenantId); // NEVER do this
+}
+```
+
+## User-Tenant Relationships
+
+A single user can belong to multiple tenants with different roles:
+
+```
+User (email: "dr.smith@example.com")
+  ├── TenantUser → Clinic A (role: Veterinarian, WRITE access)
+  ├── TenantUser → Clinic B (role: Consultant, READ access)
+  └── TenantUser → Enterprise X (role: Admin, ADMIN access)
+```
+
+The `TenantUser` join table carries:
+- `tenantRoleId` -- Which role the user holds in that tenant
+- `isActive` -- Whether the user's access to that tenant is active
+- `joinedAt` -- When the user joined the tenant
+- `maxPetsPerUserOverride` -- Per-user pet limit override
+
+## Tenant Settings
+
+Each tenant can configure behavior through dedicated settings tables:
+
+| Settings Table | What It Controls |
+|---------------|-----------------|
+| `TenantBrandingSettings` | Logo, colors, custom branding |
+| `TenantOrganizationSettings` | Business name, hours, contact info |
+| `TenantSecuritySettings` | Password policies, session timeouts |
+| `TenantNotificationSettings` | Notification preferences and channels |
+| `TenantIntegrationSettings` | Third-party integration configuration |
+| `TenantPaymentSettings` | Payment processing settings |
+| `TenantPortalSettings` | Portal-specific configuration |
+
+<Note>
+  New tenant settings must use dedicated tables. The legacy `settings` JSON column on the `Tenant` model is frozen and should not be extended with new fields.
+</Note>
+
+## Tenant Plans and Limits
+
+Tenants operate under a plan that controls feature access and resource limits:
+
+```
+TenantPlan
+  └── PlanFeature[]          # Feature flags per plan
+  └── TenantLimit[]          # Resource limits (max patients, max staff, etc.)
+  └── TenantPlanChangeRequest[]  # Plan upgrade/downgrade requests
+```
+
+The platform admin manages plans and can approve or deny plan change requests.
+
+## Timezone Handling
+
+Each tenant has a configured timezone:
+
+```prisma
+model Tenant {
+  timezone String @default("UTC")
+}
+```
+
+- **Database**: All dates stored in UTC
+- **Backend**: All business logic operates in UTC, timezone conversion only for display (notification emails, PDFs)
+- **Frontend**: Uses `toClinicTime()` and `fromClinicTimeToUtc()` utilities to convert between UTC and the tenant's timezone
+- **Never use browser timezone** for clinic data -- always use `currentTenant.timezone`

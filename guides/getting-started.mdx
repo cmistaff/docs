@@ -1,0 +1,200 @@
+---
+title: "Getting Started"
+description: "Set up your local development environment for CrestPet System."
+---
+
+# Getting Started
+
+This guide walks you through setting up the CrestPet System development environment on your workstation.
+
+## Prerequisites
+
+| Tool | Version | Notes |
+|------|---------|-------|
+| **Node.js** | 22.x | Managed via `nvm` on dev boxes |
+| **pnpm** | 10.15.0 | Exact version required (set in `packageManager` field) |
+| **Docker** | Latest | Required for PostgreSQL, Redis, and MinIO containers |
+| **Docker Compose** | v2+ | Bundled with Docker Desktop or installed separately |
+
+## Initial Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone git@github.com:cmistaff/crestpetsystem.git
+cd crestpetsystem
+```
+
+### 2. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 3. Configure Hosts File
+
+Add the following entries to `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts` on Windows) for subdomain-based portal routing:
+
+```
+127.0.0.1 clinic.localhost
+127.0.0.1 consumer.localhost
+127.0.0.1 enterprise.localhost
+127.0.0.1 taylor.localhost
+127.0.0.1 referral.localhost
+```
+
+### 4. Set Up Environment Variables
+
+Copy the example environment file and configure it:
+
+```bash
+cp server/.env.example server/.env
+```
+
+Your team lead or DevOps will provide the required values. At minimum you need:
+- `DATABASE_URL` -- PostgreSQL connection string (the local dev compose file provides this)
+- `DIRECT_URL` -- Direct PostgreSQL URL (same as DATABASE_URL for local dev)
+- `REDIS_URL` -- Redis connection string
+- `BETTER_AUTH_SECRET` -- JWT signing secret
+
+### 5. Start the Development Environment
+
+The fastest way to get everything running:
+
+```bash
+pnpm dev:local
+```
+
+This single command:
+1. Starts PostgreSQL and Redis containers (`compose.db.yaml`)
+2. Runs Prisma migrations
+3. Generates Prisma client and server repositories
+4. Builds shared packages
+5. Generates the API client (Orval)
+6. Starts both the Next.js dev server and NestJS dev server in watch mode
+
+### 6. Access the Portals
+
+Once running, access each portal at:
+
+| Portal | URL |
+|--------|-----|
+| Clinic | [http://clinic.localhost:3000](http://clinic.localhost:3000) |
+| Consumer | [http://consumer.localhost:3000](http://consumer.localhost:3000) |
+| Enterprise | [http://enterprise.localhost:3000](http://enterprise.localhost:3000) |
+| Platform | [http://taylor.localhost:3000](http://taylor.localhost:3000) |
+| Referral | [http://referral.localhost:3000](http://referral.localhost:3000) |
+
+The NestJS API server runs on port `8080` by default.
+
+## Common Commands
+
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev:local` | Full dev environment (containers + servers) |
+| `pnpm dev:native` | Run Next.js + NestJS without container orchestration |
+| `pnpm dev:https` | Dev with HTTPS (generates local certificates) |
+| `pnpm dev:up` | Start containers only (no app servers) |
+| `pnpm dev:down` | Stop all containers |
+| `pnpm kill-ports` | Kill processes on dev ports (3000, 8080) |
+
+### Code Generation
+
+| Command | Description |
+|---------|-------------|
+| `pnpm generate-all` | Regenerate Prisma client, server repositories, and API client |
+| `pnpm api:generate` | Regenerate API client only (after backend API changes) |
+| `pnpm prisma:generate` | Regenerate Prisma client + server repositories |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `pnpm prisma:migration:create <name>` | Create a new migration |
+| `pnpm prisma:migration:run` | Apply pending migrations |
+| `pnpm prisma:migration:reset` | Reset DB and re-apply all migrations |
+| `pnpm prisma:studio` | Open Prisma Studio (DB GUI) |
+
+### Testing
+
+| Command | Description |
+|---------|-------------|
+| `pnpm test:unit:local` | Run all unit tests |
+| `pnpm test:server:e2e:local` | Run server E2E tests (starts test containers) |
+| `cd server && bun test .unit.spec` | Run server unit tests only (fast, no DB) |
+| `cd server && bun test .e2e.spec` | Run server E2E tests (requires test containers) |
+
+### Linting
+
+| Command | Description |
+|---------|-------------|
+| `pnpm --filter client lint-fix:changed` | Lint and fix changed client files |
+| `pnpm --filter server lint-fix:changed` | Lint and fix changed server files |
+
+## Git Workflow
+
+<Steps>
+  <Step title="Create a branch">
+    Branch from `prestaging` using the format `PW-<jira-key>-<description>`:
+    ```bash
+    git checkout prestaging
+    git pull
+    git checkout -b PW-1234-add-appointment-reminders
+    ```
+  </Step>
+  <Step title="Make changes and commit">
+    Use conventional commit messages: `type(scope): description`
+    ```bash
+    git commit -m "feat(appointments): add reminder notifications"
+    ```
+  </Step>
+  <Step title="Lint before pushing">
+    ```bash
+    pnpm --filter client lint-fix:changed
+    pnpm --filter server lint-fix:changed
+    ```
+  </Step>
+  <Step title="Push and create PR">
+    Target the `prestaging` branch (never `main`):
+    ```bash
+    git push -u origin PW-1234-add-appointment-reminders
+    ```
+    Create a PR targeting `prestaging` on GitHub.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port 3000 or 8080 already in use">
+    Kill existing processes:
+    ```bash
+    pnpm kill-ports
+    ```
+  </Accordion>
+  <Accordion title="Prisma migration errors">
+    Reset the database and re-apply migrations:
+    ```bash
+    pnpm prisma:migration:reset
+    ```
+  </Accordion>
+  <Accordion title="TypeScript errors in auto-generated files">
+    Regenerate all auto-generated code:
+    ```bash
+    pnpm generate-all
+    ```
+  </Accordion>
+  <Accordion title="Client OOM during lint">
+    The `tsc` step in `lint-fix:changed` may run out of memory on the client (needs 8GB heap). ESLint and Prettier still run. CI catches type errors.
+  </Accordion>
+  <Accordion title="Docker containers not starting">
+    Ensure Docker is running, then:
+    ```bash
+    pnpm dev:down
+    docker network rm crestpetsystem-network 2>/dev/null
+    pnpm dev:local
+    ```
+  </Accordion>
+</AccordionGroup>
