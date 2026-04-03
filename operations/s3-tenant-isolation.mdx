@@ -60,6 +60,9 @@ Crest Pet System is a **multi-tenant SaaS platform**. The core security invarian
 | TREATMENT_PLANS | Treatment plan audio recordings | Single-feature |
 | CLINIC_DOCUMENTS | Consent forms, health records, clinic-uploaded documents | Multi-feature |
 | DIAGNOSTIC_REQUEST_FILES | Diagnostic request documents | Single-feature |
+| DENTAL_CHARTS | Dental chart and imaging files | Single-feature |
+| AI_NOTES | AI-generated clinical notes | Single-feature |
+| EMAIL_PDFS | Email PDF generation and storage | Single-feature |
 
 ### Code Paths - Already Correctly Prefixed (12)
 
@@ -99,7 +102,7 @@ ${tenantId}/${feature-prefix}/${additional-context}/${uuid}.${ext}
 
 ### Why feature-prefix is only needed in shared buckets
 
-Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds tooth scan images). In these buckets, the bucket name already provides the feature context, so a feature prefix in the key is redundant. Only the 4 shared buckets (`DOCUMENTS`, `MEDIA`, `CLINIC_DOCUMENTS`, `VET_ASSISTANT_FILES`) need a feature prefix to distinguish different types of files.
+Ten of our 14 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds tooth scan images). In these buckets, the bucket name already provides the feature context, so a feature prefix in the key is redundant. Only the 4 shared buckets (`DOCUMENTS`, `MEDIA`, `CLINIC_DOCUMENTS`, `VET_ASSISTANT_FILES`) need a feature prefix to distinguish different types of files.
 
 ### Examples
 
