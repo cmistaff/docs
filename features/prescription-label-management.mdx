@@ -1,0 +1,136 @@
+---
+title: "Prescription Label Management"
+description: "Clinic-configurable prescription label templates with per-drug dosing defaults and print-at-dispense workflow."
+icon: "prescription-bottle-medical"
+---
+
+**Feature:** Clinic-configurable prescription label templates with per-drug dosing defaults and print-at-dispense workflow.
+
+**Date:** 2026-03-31 | **Decisions finalised:** 2026-04-01
+
+---
+
+## Problem
+
+Veterinary clinics need standardised prescription labels when dispensing medications. Requirements vary by country (e.g. Singapore AVS mandates specific fields). The platform currently has no label generation, dosing standardisation, or print capability.
+
+## Goals
+
+- Comply with local prescription label regulations
+- Standardise dosing instructions across clinic staff
+- Auto-populate labels with pre-filled dosing templates
+- Print labels at the point of dispensing
+
+---
+
+## 3-Layer System
+
+### Layer 1: Clinic-Wide Label Template (`CLINIC__PRESCRIPTION_LABEL__TEMPLATE`)
+
+One template per clinic. Defines which fields appear on labels and in what order. Field toggle + drag-to-reorder, no custom field builder. Only clinic admin / practice manager can edit.
+
+### Layer 2: Per-Drug Dosing Template (`CLINIC__PRESCRIPTION_LABEL__DRUG_TEMPLATE`)
+
+One dosing template per product. Structured fields (dose, frequency, route, duration, indication) with placeholder variables (e.g. `{numberOfTablets}`). Pre-filled from Platform Drug Catalog when available. Head vet / authorised staff can CRUD.
+
+### Layer 3: Dispensing Label (`CLINIC__PRESCRIPTION_LABEL__DISPENSE`)
+
+At dispense time (during appointment or at checkout), the system generates a label by:
+
+<Steps>
+  <Step title="Pull template">
+    Pull the clinic's active template (field layout)
+  </Step>
+  <Step title="Pre-fill dosing">
+    Pre-fill structured dosing from the drug template (vet fills placeholder values)
+  </Step>
+  <Step title="Auto-populate details">
+    Auto-populate pet, client, product, and clinic details
+  </Step>
+  <Step title="Review and print">
+    Vet reviews, adjusts dosing, and prints (Letter format)
+  </Step>
+</Steps>
+
+Edit and reprint, no void workflow. Any vet / authorised dispenser with permission.
+
+---
+
+## Decisions
+
+### Template
+
+| # | Decision |
+| --- | --- |
+| 1.1 | **Field toggle + reorder** (Option A). No custom field builder |
+| 1.2 | **One template per clinic** |
+| 1.3 | Visual layout controls, **DEFERRED** |
+
+### Dispensing Workflow
+
+| # | Decision |
+| --- | --- |
+| 2.1 | **Either** during appointment or at checkout (Option C), same model |
+| 2.2 | **Reprint: Yes**, track `printedAt`, `printedBy`, `printCount` |
+| 2.3 | **Edit and reprint**, no void workflow |
+| 2.4 | Dispensing as separate action, **DEFERRED** |
+| 2.5 | Product-level `requiresLabel` flag, **DEFERRED** |
+
+### Dosing Templates
+
+| # | Decision |
+| --- | --- |
+| 3.1 | **Structured fields** (Option B), dose, frequency, route, duration, indication |
+| 3.2 | **Placeholders: Yes**, `{numberOfTablets}`, `{frequency}`, `{duration}` filled at dispense |
+| 3.3 | **One template per product**, species-specific dosing deferred |
+| 3.4 | **Pre-fill from Platform Drug Catalog: Yes**, auto-suggest from `PlatformDefinedDrugDosingRule` |
+| 3.5 | **Separate permission**, `DRUG_TEMPLATE` for dosing, `TEMPLATE` for label layout |
+
+### Auto-Populated Fields
+
+**Pet details** (togglable via template): Pet name, species, breed, weight, **age** (calculated, not DOB), microchip, gender. ~~Patient ID~~ excluded.
+
+**Client details:** Full name, phone, email. ~~Address~~, ~~client ID~~ excluded.
+
+**Clinic details:** Already a template field (toggle on/off).
+
+**Date of supply:** Configurable via template.
+
+**Product quantity:** Managed at Layer 2, adjustable at dispense time.
+
+### Printing
+
+| # | Decision |
+| --- | --- |
+| 5.1 | **Letter format** (standard printer), CSS `@media print` |
+| 5.2 | Configurable dimensions, **DEFERRED** |
+| 5.3 | **Batch printing: Yes**, all labels for a visit at checkout |
+| 5.4 | PDF download, browser "Save as PDF" suffices for Phase 1 |
+
+### Permissions
+
+| Permission | Who | What |
+| --- | --- | --- |
+| `CLINIC__PRESCRIPTION_LABEL__TEMPLATE` | Clinic admin / practice manager | Clinic-wide label template |
+| `CLINIC__PRESCRIPTION_LABEL__DRUG_TEMPLATE` | Head vet / authorised staff | Per-drug dosing template CRUD |
+| `CLINIC__PRESCRIPTION_LABEL__DISPENSE` | Any vet / authorised dispenser | Generate, fill, edit, print/reprint |
+
+<Note>
+Not restricted to licensed vets. Clinic admins assign permissions as needed.
+</Note>
+
+### Plan and Feature Gating
+
+- **Available on all plans**, no gating
+- **Per clinic**, no enterprise-level templates or cross-clinic sync
+
+### Regulatory
+
+- Singapore AVS first, other countries as clinics onboard
+- Label snapshots all field values at dispense time (audit trail via `updatedAt` + print history)
+- Controlled substances, **not scoped for Phase 1**
+
+### Consumer Visibility
+
+- Dispensing history on consumer portal, **configurable per clinic** (opt-in)
+- Medication model connection, **DEFERRED**, needs step-by-step plan

@@ -52,6 +52,7 @@
           {
             "group": "Engineering Onboarding",
             "pages": [
+              "onboarding/onboarding-checklist",
               "onboarding/engineering-handbook",
               "onboarding/devbox-setup",
               "onboarding/cicd-guide",
@@ -129,7 +130,8 @@
               "features/x-ray-imaging",
               "features/insurance",
               "features/docusign",
-              "features/compliance-consent"
+              "features/compliance-consent",
+              "features/prescription-label-management"
             ]
           },
           {
@@ -172,7 +174,8 @@
             "group": "Security and Storage",
             "pages": [
               "operations/s3-tenant-isolation",
-              "operations/owasp-audit"
+              "operations/owasp-audit",
+              "operations/supply-chain-audit"
             ]
           },
           {

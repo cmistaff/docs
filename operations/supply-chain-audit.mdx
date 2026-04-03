@@ -1,0 +1,130 @@
+---
+title: "Supply Chain Security Audit: Shai-Hulud 2.0 (Nov 2025)"
+description: "npm supply chain attack (Shai-Hulud 2.0) package version audit for the CrestPet platform."
+icon: "box-open"
+---
+
+<Warning>
+**Title Correction:** This document was previously titled "OWASP Security Audit Report" which was inaccurate. This is NOT an OWASP API Security Top 10 audit. It is a point-in-time npm supply chain security check against the Shai-Hulud 2.0 attack (Nov 2025) that verified installed package versions were not compromised.
+</Warning>
+
+**Date:** November 28, 2025
+**Auditor:** AI Security Check
+**Status:** ✅ **SAFE - No Compromised Versions Detected**
+
+## Executive Summary
+
+The Crest Pet System codebase was audited against the Shai-Hulud 2.0 npm supply chain attack that compromised ~700 packages between November 21-27, 2025.
+
+**Result:** All package versions in the project are **SAFE**. While some package names appear in the dependency tree, the specific versions installed are **NOT** the compromised versions.
+
+## Packages Checked
+
+- **Total compromised packages in attack:** 795
+- **Packages found in project:** 4
+- **Compromised versions detected:** 0
+
+## Detailed Analysis
+
+### Packages Found (All Safe Versions)
+
+| Package | Installed Version | Compromised Versions | Status | Location |
+| --- | --- | --- | --- | --- |
+| kill-port | 2.0.1 | 2.0.2, 2.0.3 | ✅ SAFE | Direct dependency (root) |
+| @asyncapi/specs | 6.10.0 | 6.9.1, 6.10.1, 6.8.3, 6.8.2 | ✅ SAFE | Transitive dependency |
+| get-them-args | 1.3.2 | 1.3.3 | ✅ SAFE | Transitive dependency |
+| shell-exec | 1.0.2 | 1.1.3, 1.1.4 | ✅ SAFE | Transitive dependency |
+
+## Why We're Safe
+
+The Shai-Hulud 2.0 attack targeted **specific versions** of npm packages published between November 21-24, 2025. The Crest Pet System uses:
+
+1. **Locked dependencies** via `pnpm-lock.yaml`
+2. **Older versions** that predate the attack
+3. **Exact version pinning** in package.json
+
+
+This means even though package names match, the actual code installed is from **safe, pre-attack versions**.
+
+## Attack Details (Reference)
+
+According to Wiz Security Research:
+
+- **Attack window:** November 21-24, 2025
+- **Packages compromised:** ~700 packages
+- **Attack method:** Maintainer account compromise
+- **Payload:** Credential exfiltration (GitHub tokens, AWS keys, GCP credentials)
+- **Impact:** 25,000+ repositories affected with stolen secrets published to GitHub
+
+### What the malware did:
+
+- Exfiltrated environment variables (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, etc.)
+- Scraped `.git/config` files
+- Uploaded stolen data to attacker-controlled GitHub repositories
+- Executed during `preinstall` phase (very broad attack surface)
+
+## Recommended Actions
+
+### Immediate (Optional)
+
+These are preventive measures since we're not compromised:
+
+- [ ] Review `kill-port` usage - Consider alternatives if not critical
+- [ ] Add `pnpm audit` to CI/CD pipeline
+- [ ] Enable Dependabot security alerts in GitHub
+
+### When Updating Dependencies
+
+Be cautious with these packages and verify versions:
+
+```bash
+# Check before updating
+pnpm why kill-port
+pnpm why @asyncapi/specs
+pnpm why get-them-args
+pnpm why shell-exec
+
+# After any update
+pnpm audit
+```
+
+### Ongoing Monitoring
+
+- Monitor security advisories for these packages
+- Keep `pnpm-lock.yaml` in version control (already done ✅)
+- Review dependency changes in PRs carefully
+
+## How This Check Was Performed
+
+1. Downloaded official IoC list from Wiz Security:
+```
+https://github.com/wiz-sec-public/wiz-research-iocs/blob/main/reports/shai-hulud-2-packages.csv
+```
+2. Checked against all `package.json` files:
+   - `./package.json`
+   - `./client/package.json`
+   - `./server/package.json`
+   - `./packages/common/package.json`
+3. Checked `pnpm-lock.yaml` for transitive dependencies
+4. Cross-referenced exact versions against compromised version list
+
+## Conclusion
+
+✅ **The Crest Pet System is NOT affected by the Shai-Hulud 2.0 attack.**
+
+The locked dependency versions and timing (our dependencies installed before the attack) protected the project. Continue following security best practices:
+
+- Keep dependencies locked
+- Review dependency updates carefully
+- Monitor security advisories
+- Run security audits regularly
+
+## References
+
+- [Wiz Security Blog: Shai-Hulud 2.0](https://www.wiz.io/blog/shai-hulud-2-0-ongoing-supply-chain-attack)
+- [GitHub IoC Repository](https://github.com/wiz-sec-public/wiz-research-iocs)
+- Compromised Packages CSV: `shai-hulud-2-packages.csv`
+
+
+**Report Generated:** November 28, 2025
+**Next Review:** After any major dependency updates

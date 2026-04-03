@@ -345,7 +345,74 @@ Atlassian tools are linked to your @creststaff.com email address via SAML. To ac
 
 ### Claude Code (Anthropic Teams)
 
-Claude Code is linked to your @creststaff.com email address. To access our Anthropic organization, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)). Access is managed via claude.ai Organization Settings - contact Michael Cammarata if you don't have access.
+Claude Code is linked to your **@creststaff.com** email address. To access our Anthropic organization, log in using your Google account (`you@creststaff.com`).
+
+Access is managed via claude.ai Organization Settings. Contact Michael Cammarata if you don't have access.
+
+<Warning>
+**Important:** When authenticating Claude Code CLI, select the **TEAM account, not API**. Do NOT set `ANTHROPIC_API_KEY` in your shell. API keys are billed separately and not covered by your team license.
+</Warning>
+
+### ChatGPT Codex (Team Plan)
+
+ChatGPT Codex is included in our team plan. To access:
+
+1. Go to [chatgpt.com/codex](https://chatgpt.com/codex)
+2. Log in with your **@creststaff.com Google account**
+3. Connect your GitHub account (Settings, then Connected Apps, then GitHub)
+4. Select the `cmistaff/crestpetsystem` repo
+
+Codex runs tasks in cloud sandboxes, connects to GitHub repos, and can create PRs. Use it for parallel tasks, code reviews, and second opinions.
+
+The Codex CLI is also pre-installed on your dev box. Authenticate with: `codex auth`
+
+<Warning>
+**Important:** Do NOT set `OPENAI_API_KEY` in your shell. API keys are billed separately. Use browser auth only.
+</Warning>
+
+### Marcia Code (Crest AI API)
+
+Marcia Code is our own AI API. To set up in Cursor:
+
+<Steps>
+  <Step title="Enable Override">
+    Cursor Settings, then Models, then enable "Override OpenAI Base URL"
+  </Step>
+  <Step title="Set Base URL">
+    Base URL: `https://api.marciacode.com/v1`
+  </Step>
+  <Step title="Get API Key">
+    API Key: Ask Michael for your key
+  </Step>
+  <Step title="Add Model">
+    Click "+ Add Model" and type: `marcia-code`
+  </Step>
+  <Step title="Verify">
+    Click Verify to test the connection
+  </Step>
+</Steps>
+
+Marcia Code works in Cursor's Chat panel.
+
+### AI Tools Workflow (Effective April 6, 2026)
+
+<Note>
+To optimize costs, we standardized which AI tools to use for which tasks. Cursor is restricted to Auto/Composite mode and Marcia Code only. Heavy AI work goes through Claude Code CLI or Codex CLI, which are already paid for with unlimited access.
+</Note>
+
+| Task | Use This |
+| --- | --- |
+| Tab completion / autocomplete | Cursor (Auto mode) |
+| Quick single-file edit | Cursor (Auto mode) |
+| Chat / ask a question | Cursor (Marcia Code) |
+| Multi-file refactor | Claude Code CLI |
+| Bug investigation | Claude Code CLI |
+| Write tests | Claude Code CLI |
+| PR review | ChatGPT Codex |
+| Run tasks in background | ChatGPT Codex |
+| Complex feature work | Claude Code CLI |
+
+Questions about developer tools? Ask **Bryant Parchinski** or email [help@creststaff.com](mailto:help@creststaff.com).
 
 ### Ngrok Access (Localhost Webhook Testing)
 
@@ -1080,9 +1147,7 @@ The following automated reviewers must complete before a PR can be merged:
 | --- | --- |
 | SonarCloud | Code quality, bugs, vulnerabilities, coverage |
 | Devin | AI code review |
-| Claude Code | AI code review (claude-code-review.yml) |
-| Amazon Q Developer | AI-assisted review |
-| Cursor Bot | AI-assisted review |
+| Bugbot | Bug detection |
 | Codex | Code quality analysis |
 | Copilot | AI-assisted review |
 

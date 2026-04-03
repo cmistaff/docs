@@ -1,131 +1,193 @@
 ---
-title: "Supply Chain Security Audit: Shai-Hulud 2.0 (Nov 2025)"
-description: "npm supply chain attack (Shai-Hulud 2.0) package version audit for the CrestPet platform."
+title: "OWASP API Security Top 10 Audit Report"
+description: "Comprehensive security audit of the CrestPet NestJS API against the OWASP API Security Top 10, covering 251 controllers and 834 services."
+icon: "shield-halved"
 ---
 
-<Warning>
-**Title Correction:** This document was previously titled "OWASP Security Audit Report" which was inaccurate. This is NOT an OWASP API Security Top 10 audit. It is a point-in-time npm supply chain security check against the Shai-Hulud 2.0 attack (Nov 2025) that verified installed package versions were not compromised.
-</Warning>
+**Scope:** NestJS API (251 controllers, 834 services) + Next.js frontend
 
-**Date:** November 28, 2025
-**Auditor:** AI Security Check
-**Status:** ✅ **SAFE - No Compromised Versions Detected**
+---
 
-## Executive Summary
+## Why OWASP API Security?
 
-The Crest Pet System codebase was audited against the Shai-Hulud 2.0 npm supply chain attack that compromised ~700 packages between November 21-27, 2025.
+OWASP API Security Top 10 is the industry standard for REST API threat modelling. It complements our existing perimeter defences (Cloudflare Access, Turnstile, AWS WAF) by auditing the **application layer**, where most breaches originate.
 
-**Result:** All package versions in the project are **SAFE**. While some package names appear in the dependency tree, the specific versions installed are **NOT** the compromised versions.
+---
 
-## Packages Checked
+## Existing Security Layers
 
-- **Total compromised packages in attack:** 795
-- **Packages found in project:** 4
-- **Compromised versions detected:** 0
+| Layer | Technology | What It Covers |
+| --- | --- | --- |
+| Zero-trust proxy | Cloudflare Access | Non-prod environment gating |
+| Bot protection | Cloudflare Turnstile | Consumer landing page CAPTCHA |
+| CDN / DDoS | CloudFront | Edge caching + volumetric attack absorption |
+| WAF | AWS WAF (external) | Request filtering at infrastructure level |
+| Auth | Better Auth + 8 global guards | Session management + guard chain |
+| RBAC | 152 permissions, CRUD flags | Function-level access control |
+| Tenant isolation | Middleware > Guards > Repository | Full-stack `tenantId` enforcement |
+| Encryption at rest | AES-256-GCM | National ID fields |
+| Audit trail | 407 action types | Business operation logging |
+| Log redaction | Pino structured logging | Auth headers, tokens, passwords |
+| Webhook verification | HMAC-SHA256/ECDSA per provider | Stripe, SendGrid, Twilio, Tavus, DocuSign |
 
-## Detailed Analysis
+<Note>
+These layers are strong but they protect the perimeter and business logic. The gaps below are inside the application layer, where perimeter defences cannot reach.
+</Note>
 
-### Packages Found (All Safe Versions)
+---
 
-| Package | Installed Version | Compromised Versions | Status | Location |
-| --- | --- | --- | --- | --- |
-| kill-port | 2.0.1 | 2.0.2, 2.0.3 | ✅ SAFE | Direct dependency (root) |
-| @asyncapi/specs | 6.10.0 | 6.9.1, 6.10.1, 6.8.3, 6.8.2 | ✅ SAFE | Transitive dependency |
-| get-them-args | 1.3.2 | 1.3.3 | ✅ SAFE | Transitive dependency |
-| shell-exec | 1.0.2 | 1.1.3, 1.1.4 | ✅ SAFE | Transitive dependency |
+## Audit Results
 
-## Why We're Safe
+### Scorecard
 
-The Shai-Hulud 2.0 attack targeted **specific versions** of npm packages published between November 21-24, 2025. The Crest Pet System uses:
+| # | OWASP Category | Status | Critical Gaps |
+| --- | --- | --- | --- |
+| API1 | Broken Object Level Authorization | Mostly Protected | 2 medium |
+| API2 | Broken Authentication | Well-Designed | **2 critical** |
+| API3 | Broken Object Property Level Auth | Well-Controlled | None |
+| API4 | Unrestricted Resource Consumption | **Partially Protected** | **2 critical** |
+| API5 | Broken Function Level Authorization | Well-Protected | None |
+| API6 | Unrestricted Access to Sensitive Flows | Partially Protected | 1 medium |
+| API7 | Server-Side Request Forgery | **2 risks found** | **1 high** |
+| API8 | Security Misconfiguration | **Multiple gaps** | **3 high** |
+| API9 | Improper Inventory Management | Well-Managed | None |
+| API10 | Unsafe Consumption of APIs | **1 critical risk** | **1 critical** |
 
-1. **Locked dependencies** via `pnpm-lock.yaml`
-2. **Older versions** that predate the attack
-3. **Exact version pinning** in package.json
+---
 
+### Critical and High Findings
 
-This means even though package names match, the actual code installed is from **safe, pre-attack versions**.
+#### 1. No Rate Limiting on Auth Endpoints (API2 + API4)
 
-## Attack Details (Reference)
+**Gap:** Better Auth login/signup endpoints bypass NestJS `ThrottlerModule` entirely. Password reset has no `@Throttle` decorator. No account lockout mechanism exists.
 
-According to Wiz Security Research:
+**Impact:** An attacker can brute-force credentials or flood password reset requests indefinitely.
 
-- **Attack window:** November 21-24, 2025
-- **Packages compromised:** ~700 packages
-- **Attack method:** Maintainer account compromise
-- **Payload:** Credential exfiltration (GitHub tokens, AWS keys, GCP credentials)
-- **Impact:** 25,000+ repositories affected with stolen secrets published to GitHub
-
-### What the malware did:
-
-- Exfiltrated environment variables (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, etc.)
-- Scraped `.git/config` files
-- Uploaded stolen data to attacker-controlled GitHub repositories
-- Executed during `preinstall` phase (very broad attack surface)
-
-## Recommended Actions
-
-### Immediate (Optional)
-
-These are preventive measures since we're not compromised:
-
-- [ ] Review `kill-port` usage - Consider alternatives if not critical
-- [ ] Add `pnpm audit` to CI/CD pipeline
-- [ ] Enable Dependabot security alerts in GitHub
-
-### When Updating Dependencies
-
-Be cautious with these packages and verify versions:
-
-```
-# Check before updating
-pnpm why kill-port
-pnpm why @asyncapi/specs
-pnpm why get-them-args
-pnpm why shell-exec
-
-# After any update
-pnpm audit
-
+```bash
+# No rate limit - attacker can send thousands of requests
+POST /api/auth/sign-in/email  { email: "victim@clinic.com", password: "attempt1" }
+POST /api/auth/sign-in/email  { email: "victim@clinic.com", password: "attempt2" }
+... (unlimited attempts, no lockout)
 ```
 
-### Ongoing Monitoring
+**Files:** `server/src/modules/app/app.module.ts`, `server/src/modules/portals/shared/auth/password-reset.controller.ts`
 
-- Monitor security advisories for these packages
-- Keep `pnpm-lock.yaml` in version control (already done ✅)
-- Review dependency changes in PRs carefully
+---
 
-## How This Check Was Performed
+#### 2. AI-Generated SQL Injection (API10)
 
-1. Downloaded official IoC list from Wiz Security:
+**Gap:** The insights module executes LLM-generated SQL via `$queryRawUnsafe` with no parameterisation, no read-only enforcement, and no connection role restriction.
+
+**Impact:** A compromised MCP secret or prompt injection attack allows arbitrary SQL: `UPDATE`, `DELETE`, `DROP TABLE`.
+
+```typescript
+// server/src/modules/portals/clinic/insights/services/natural-language/insights-sql-query.service.ts:67
+async executeSqlQuery(sql: string): Promise<string> {
+  const limitedSql = this.enforceRowLimit(sql); // regex only - no parameterisation
+  const result = await this.prismaService.$queryRawUnsafe(limitedSql); // ARBITRARY SQL
+}
 ```
-https://github.com/wiz-sec-public/wiz-research-iocs/blob/main/reports/shai-hulud-2-packages.csv
+
+---
+
+#### 3. No HTTP Security Headers (API8)
+
+**Gap:** Helmet.js is not installed. Neither NestJS nor Next.js sets CSP, X-Frame-Options, HSTS, X-Content-Type-Options, or Referrer-Policy.
+
+**Impact:** The application is vulnerable to clickjacking (iframe embedding), MIME-type sniffing attacks, and has no Content Security Policy to mitigate XSS.
 
 ```
-2. Checked against all `package.json` files:`./package.json`
-3. `./client/package.json`
-4. `./server/package.json`
-5. `./packages/common/package.json`
-6. Checked `pnpm-lock.yaml` for transitive dependencies
-7. Cross-referenced exact versions against compromised version list
+# Response headers (current)
+HTTP/1.1 200 OK
+Content-Type: application/json
+                              <- No X-Frame-Options
+                              <- No Content-Security-Policy
+                              <- No Strict-Transport-Security
+                              <- No X-Content-Type-Options
+```
 
-## Conclusion
+**Files:** `server/src/main.ts`, `client/next.config.ts`
 
-✅ **The Crest Pet System is NOT affected by the Shai-Hulud 2.0 attack.**
+---
 
-The locked dependency versions and timing (our dependencies installed before the attack) protected the project. Continue following security best practices:
+#### 4. File Upload Memory Exhaustion (API4)
 
-- Keep dependencies locked
-- Review dependency updates carefully
-- Monitor security advisories
-- Run security audits regularly
+**Gap:** `FileUploadInterceptor` has no multer `fileSize` limit. The 10MB JSON body parser limit does not apply to multipart uploads. File size is validated only after the entire file is buffered in memory.
 
-## References
+**Impact:** An attacker uploads a multi-GB file to any of 11+ upload endpoints. The server buffers the entire file in memory before the application-level `validateFile()` check fires, causing OOM and service disruption.
 
-- [Wiz Security Blog: Shai-Hulud 2.0](https://www.wiz.io/blog/shai-hulud-2-0-ongoing-supply-chain-attack)
-- [GitHub IoC Repository](https://github.com/wiz-sec-public/wiz-research-iocs)
-- Compromised Packages CSV: `shai-hulud-2-packages.csv`
+```bash
+# Attacker sends 5GB file - server buffers it all before rejecting
+POST /clinics/patients/123/documents  Content-Type: multipart/form-data
+Body: [5GB file]  ->  Server OOM before validateFile() runs
+```
 
+**File:** `server/src/decorators/file-upload/file-upload-interceptor.decorator.ts`
 
-**Report Generated:** November 28, 2025
-**Next Review:** After any major dependency updates
+---
 
+#### 5. SSRF via AI Image URL Fetching (API7)
+
+**Gap:** AI chatbot extracts image URLs from user messages and fetches them server-side via `getBase64File()` with no domain allowlist or private IP blocking.
+
+**Impact:** A crafted message containing `http://169.254.169.254/latest/meta-data/` triggers the server to fetch AWS instance metadata (IAM credentials, tokens).
+
+```
+User message: "Check this image http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+-> Server fetches AWS metadata endpoint
+-> IAM credentials returned to AI context
+```
+
+**Files:** `server/src/modules/common/utils/get-base64-file.utils.ts`, `server/src/modules/portals/shared/ai/utils/image-resolver.util.ts`
+
+---
+
+#### 6. CORS Regex Not Anchored (API8)
+
+**Gap:** `new RegExp("localhost:3000")` is used for CORS origin validation with `credentials: true`. The unanchored regex matches substrings.
+
+**Impact:** An attacker's domain `evilsite-localhost:3000.attacker.com` passes CORS validation, enabling cross-origin cookie theft.
+
+```typescript
+// server/src/main.ts:78
+app.enableCors({
+  origin: new RegExp(commonConfig.app.corsRegexp), // "localhost:3000" matches substring
+  credentials: true, // cookies sent cross-origin
+});
+
+// Attacker's domain passes:
+"https://evilsite-localhost:3000.attacker.com".match(/localhost:3000/) // matches
+```
+
+---
+
+#### 7. ValidationPipe Missing Whitelist (API8)
+
+**Gap:** The global `ValidationPipe` does not set `whitelist: true` or `forbidNonWhitelisted: true`. Undeclared properties in request bodies pass through to handlers silently.
+
+**Impact:** Mass assignment. An attacker injects fields not in the DTO (e.g., `isAdmin: true`, `tenantId: "other-tenant"`) that may be picked up by downstream processing.
+
+```typescript
+// POST /clinics/patients - DTO declares { name, email }
+// Attacker sends:
+{ "name": "John", "email": "john@test.com", "roleId": "admin-role-uuid" }
+// "roleId" passes through ValidationPipe unchecked
+```
+
+**File:** `server/src/config/app-pipes.config.ts`
+
+---
+
+#### 8. Password Reset Open Redirect (API2)
+
+**Gap:** The `baseUrl` field in password reset accepts any HTTPS URL. It is validated as a URL but not restricted to application domains.
+
+**Impact:** Attacker submits a reset request with `baseUrl: "https://attacker.com/phish"`. The victim receives a legitimate-looking reset email pointing to the attacker's domain.
+
+```typescript
+// POST /auth/password-reset/request
+{ "email": "victim@clinic.com", "baseUrl": "https://attacker.com/fake-reset" }
+// -> Victim gets email: "Click here to reset: https://attacker.com/fake-reset?token=abc123"
+```
+
+**File:** `server/src/modules/portals/shared/auth/dto/requests/request-password-reset.dto.ts`

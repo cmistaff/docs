@@ -1,25 +1,29 @@
 ---
 title: "Cursor Bot PR Review"
-description: "Configuration and usage guide for the Cursor AI bot automated PR review system."
+description: "Triage tracker for Cursor AI bot-generated PRs, grouped by similarity with review status and actions taken."
+icon: "robot"
 ---
 
 <Warning>
 **Point-in-time snapshot.** This is a PR triage tracker migrated from Confluence, not a process guide. It captures the state of open PRs at a specific date and will be immediately stale. For current PR status, check GitHub directly.
 </Warning>
 
-**Total Open PRs:** 46 **To Review:** 38 **Skipped (Infra/Docs):** 8 **Last Updated:** 2026-03-26
+**Total Open PRs:** 63 | **Pending Review:** 43 | **Last Updated:** 2026-03-30
+
+---
 
 ## Skipped PRs
 
-### Infra/CI (5 PRs)
+### Infra/CI (7 PRs)
 
 | PR | Title | Reason | Review Status |
 | --- | --- | --- | --- |
-| #4330 | fix(client): restore full prisma:generate in build script | Infra - build script | Skipped |
-| #3821 | fix(ci): increase SonarCloud Node.js heap to 4096 MB | Infra - no context | Skipped |
-| #3843 | security(ci): reduce secret exposure in build and kubectl | Infra - no context | Skipped |
-| #4261 | fix(security): prevent Sentry token persistence and CI install env leakage | Infra - no context | Skipped |
-| #3762 | fix(deploy): allow startup grace for migrations in ECS/EKS health checks | Infra - no context | Skipped |
+| #4372 | fix(ci): remove Sentry auth token from runtime EKS app secrets | Infra, removes SENTRY_AUTH_TOKEN from deploy-eks.yml EXTRA_KEYS | Skipped |
+| #4330 | fix(client): restore full prisma:generate in build script | Infra, build script | Skipped |
+| #3821 | fix(ci): increase SonarCloud Node.js heap to 4096 MB | Infra, no context | Skipped |
+| #3843 | security(ci): reduce secret exposure in build and kubectl | Infra, no context | Skipped |
+| #4261 | fix(security): prevent Sentry token persistence and CI install env leakage | Infra, no context | Skipped |
+| #3762 | fix(deploy): allow startup grace for migrations in ECS/EKS health checks | Infra, no context | Skipped |
 
 ### Docs (3 PRs)
 
@@ -29,59 +33,62 @@ description: "Configuration and usage guide for the Cursor AI bot automated PR r
 | #3760 | docs: architecture docs for pet weight, scheduler undo, measurement & currency | Docs only | Skipped |
 | #3746 | docs: add EKS deployment pipeline and update testing guide | Docs only | Skipped |
 
-## PRs To Review - Grouped by Similarity
+## PRs To Review, Grouped by Similarity
 
-### Group A: Playwright Test Skipping (7 PRs) - REVIEWED
+### Group A: Playwright Test Skipping (7 PRs), REVIEWED
 
 #### Sub-group A1: Flaky Test Skipping (5 PRs)
 
-All touch the same 2 files (`appointment-create-cancel.spec.ts`, `smart-availability-check.spec.ts`), same 2 tests. All just add `test.skip()` or `test.fixme()` - no actual fix. Duplicates of each other.
+All touch the same 2 files (`appointment-create-cancel.spec.ts`, `smart-availability-check.spec.ts`), same 2 tests. All just add `test.skip()` or `test.fixme()`, no actual fix. Duplicates of each other.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #4315 | fix(playwright): skip flaky clinic BrowserBase tests that consistently timeout | 2+0 | 2 | Closed - False Positive | Skipping tests is not a fix |
-| #4314 | fix(playwright): skip flaky clinic BrowserBase tests with test.fixme | 2+2 | 2 | Closed - False Positive | Duplicate of #4315 |
-| #4308 | fix(playwright): skip flaky clinic e2e tests hitting staging environment timeouts | 2+2 | 2 | Closed - False Positive | Duplicate of #4315 |
-| #4306 | fix(playwright): skip flaky clinic E2E tests | 2+2 | 2 | Closed - False Positive | Duplicate of #4315 |
-| #4303 | fix(e2e): skip flaky clinic Playwright tests hitting staging infra timeouts | 6+0 | 2 | Closed - False Positive | Duplicate of #4315 |
+| #4315 | fix(playwright): skip flaky clinic BrowserBase tests that consistently timeout | 2+0 | 2 | Closed, False Positive | Skipping tests is not a fix |
+| #4314 | fix(playwright): skip flaky clinic BrowserBase tests with test.fixme | 2+2 | 2 | Closed, False Positive | Duplicate of #4315 |
+| #4308 | fix(playwright): skip flaky clinic e2e tests hitting staging environment timeouts | 2+2 | 2 | Closed, False Positive | Duplicate of #4315 |
+| #4306 | fix(playwright): skip flaky clinic E2E tests | 2+2 | 2 | Closed, False Positive | Duplicate of #4315 |
+| #4303 | fix(e2e): skip flaky clinic Playwright tests hitting staging infra timeouts | 6+0 | 2 | Closed, False Positive | Duplicate of #4315 |
 
 **Action Taken:** All 5 PRs closed. Skipping tests is not a fix. Real issue is staging environment timeouts causing dropdown elements to not load (patient select stays disabled, service type options never appear). Root cause needs investigation: slow API, missing test data, or BrowserBase infra issue.
 
 #### Sub-group A2: Password Selector Fix (2 PRs)
 
-Different issue - strict mode violation on password input. One uses `input[name=password]`, the other uses `getByRole`. Duplicates of each other but actual fixes. Already fixed by @Thandra Siva Kumar.
+Different issue, strict mode violation on password input. One uses `input[name=password]`, the other uses `getByRole`. Duplicates of each other but actual fixes. Already fixed by @Thandra Siva Kumar.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #4301 | fix(e2e): use input[name=password] selector to avoid strict mode violation | 1+1 | 1 | Closed - Already Fixed | Fixed by @Thandra Siva Kumar |
-| #4300 | fix(playwright): use getByRole for password input to avoid strict mode violation | 1+1 | 1 | Closed - Already Fixed | Fixed by @Thandra Siva Kumar |
+| #4301 | fix(e2e): use input[name=password] selector to avoid strict mode violation | 1+1 | 1 | Closed, Already Fixed | Fixed by @Thandra Siva Kumar |
+| #4300 | fix(playwright): use getByRole for password input to avoid strict mode violation | 1+1 | 1 | Closed, Already Fixed | Fixed by @Thandra Siva Kumar |
 
 **Action Taken:** Both PRs closed. Fix was already implemented by @Thandra Siva Kumar.
 
-### Group B: Cross-Tenant Invitation Join Fixes (5 PRs)
+### Group B: Cross-Tenant Auth Enforcement (8 PRs)
 
-All attempt to fix cross-tenant invitation join authorization. Likely duplicates with overlapping changes.
+All attempt to fix cross-tenant authorization, invitation joins, payments, legal policies. Likely duplicates with overlapping changes.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
+| #4395 | fix(authz): enforce tenant-bound access for payments and legal policies | | | | NEW (Mar 29), payments + legal policies tenant binding |
+| #4391 | fix(auth): enforce checkout tenant visibility and payment-link RBAC | | | | NEW (Mar 28), checkout + payment-link RBAC |
+| #4339 | fix(auth): enforce enterprise tenant binding in payments and invitation join | 162+12 | 4 | | Touches enterprise payments controller + platforms service + 2 e2e tests |
 | #4268 | fix: enforce tenant-bound invitation joins for clinic/enterprise | 110+2 | 4 | | |
 | #4262 | Fix critical enterprise tenant auth gaps in payments and invitation join | 263+12 | 5 | | |
 | #3866 | fix: block cross-tenant invitation join tampering | 121+6 | 4 | | |
 | #3848 | fix(auth): prevent cross-tenant invitation join escalation | 142+6 | 4 | | |
 | #3803 | Fix cross-tenant invitation join authorization bypass | 331+4 | 6 | | |
 
-### Group C: PAN/PCI Log Redaction (6 PRs) - REVIEWED
+### Group C: PAN/PCI Log Redaction (6 PRs), REVIEWED
 
 All attempt to redact payment card data from HTTP logs. Consolidated into a single implementation on branch `PW-pci-log-redaction` with 7 layers of defense-in-depth: field-name exact keys (#4279), field-name regex patterns (#4279), Luhn-validated PAN in-place redaction (#4267), CVV/CVC pattern redaction (#3802), URL query stripping (#3802), payment route body suppression (#4260), and Stripe error hardening (#4279).
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #4279 | fix: harden payment logging sanitization for PCI data | 62+1 | 5 | Close - Consolidated | Field-name keys/patterns + Stripe error hardening taken |
-| #4271 | fix: redact PAN-like payload values from HTTP logs | 97+0 | 3 | Close - Consolidated | Whole-string redaction + as assertions (PR blocker); Luhn approach taken from #4267 instead |
-| #4267 | fix: redact PAN-like values from HTTP body/query logging | 80+3 | 3 | Close - Consolidated | Best Luhn implementation (in-place replacement), taken as primary approach |
-| #4260 | fix(logger): suppress payment request body logging to reduce PCI exposure | 86+0 | 4 | Close - Consolidated | Body skip concept taken, improved with segment matching over substring |
-| #3850 | fix(server): prevent raw PAN leakage in HTTP logs | 125+0 | 4 | Close - Consolidated | Duplicate of #4267 with weaker regex (no word-boundary) |
-| #3802 | fix(server): harden HTTP logging against PCI data leakage | 172+6 | 4 | Close - Consolidated | URL stripping + CVV redaction taken; broken test fixed |
+| #4279 | fix: harden payment logging sanitization for PCI data | 62+1 | 5 | Close, Consolidated | Field-name keys/patterns + Stripe error hardening taken |
+| #4271 | fix: redact PAN-like payload values from HTTP logs | 97+0 | 3 | Close, Consolidated | Whole-string redaction + as assertions (PR blocker); Luhn approach taken from #4267 instead |
+| #4267 | fix: redact PAN-like values from HTTP body/query logging | 80+3 | 3 | Close, Consolidated | Best Luhn implementation (in-place replacement), taken as primary approach |
+| #4260 | fix(logger): suppress payment request body logging to reduce PCI exposure | 86+0 | 4 | Close, Consolidated | Body skip concept taken, improved with segment matching over substring |
+| #3850 | fix(server): prevent raw PAN leakage in HTTP logs | 125+0 | 4 | Close, Consolidated | Duplicate of #4267 with weaker regex (no word-boundary) |
+| #3802 | fix(server): harden HTTP logging against PCI data leakage | 172+6 | 4 | Close, Consolidated | URL stripping + CVV redaction taken; broken test fixed |
 
 **Action Taken:** All 6 PRs consolidated into branch `PW-pci-log-redaction`. Close all after merge.
 
@@ -95,78 +102,142 @@ All fix the same S3 CopySource encoding issue. Likely duplicates.
 | #3836 | fix(server): encode S3 CopySource keys for migration safety | 26+1 | 1 | | |
 | #3835 | fix: encode s3 copy source keys for migration jobs | 76+1 | 2 | | |
 
-### Group E: Exception Filter Double Response (2 PRs)
+### Group D2: S3 Credentials and Migration Skip (14 PRs), REVIEWED
 
-Both fix headers-already-sent error in the global exception filter. Likely duplicates.
+All 14 PRs were created on 2026-03-27 as the bot iterated on the same underlying S3 production issue: the S3 client was not using configured static credentials in production, causing presigned URL failures and S3 migration credential errors. The bot created 14 near-identical attempts across 3 sub-problems. All are false positives / duplicates, the same 1-2 line fix repeated with minor comment variations.
 
-| PR | Title | Size | Files | Review Status | Notes |
-| --- | --- | --- | --- | --- | --- |
-| #3775 | fix(server): prevent headers-sent double response in exception filter | 98+0 | 2 | | |
-| #3774 | fix(server): prevent duplicate header writes in global exception filter | 53+0 | 2 | | |
+#### Sub-group D2a: S3 Client Static Credentials (4 PRs)
 
-### Group F: fireAndForget Refetch Fix (3 PRs) - REVIEWED
-
-All remove `fireAndForget()` wrapping on void-returning `refetch` props in inventory dialog components. `refetch` is typed as `() => void`, so `fireAndForget(refetch())` passes `void` to a function expecting `Promise<unknown> | void` - the wrapper does nothing. Removing it is a no-op cleanup.
-
-**6 files** fully remove the `fireAndForget` import. **3 files** (`create-movement-dialog.tsx`, `create-product-dialog.tsx`, `edit-product-dialog.tsx`) correctly keep it for legitimate `queryClient.invalidateQueries()` calls which return real Promises.
+All 4 modify `s3-storage.module.ts` with the exact same logic change: simplify `shouldPassCredentials` from a multi-condition check to just `hasStaticCredentials`. Diffs are identical except for comment wording. #4366 also adds a unit test file.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #3862 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 9+15 | 9 | ✅ Merged | Covers all 9 inventory dialog files. No breaking changes. Import correctly kept where fireAndForget wraps real Promises. |
-| #3863 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 1+2 | 1 | Closed - Duplicate | Subset of #3862 (only create-inventory-lot-dialog.tsx) |
-| #3861 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 1+2 | 1 | Closed - Duplicate | Subset of #3862 (only create-inventory-lot-dialog.tsx) |
+| #4368 | fix: stabilize S3 presigned URL generation with static credentials | 4+7 | 1 | Closed, Duplicate | Identical diff to #4356 |
+| #4366 | fix: ensure S3 client uses configured static credentials in production | 145+7 | 2 | Closed, Duplicate | Same fix + added test file |
+| #4361 | Fix S3 migration credential provider failures in production | 4+7 | 1 | Closed, Duplicate | Identical diff to #4356 |
+| #4356 | fix(server): honour configured S3 credentials in production | 4+7 | 1 | Closed, Duplicate | Earliest attempt |
+
+<Note>
+**Analysis:** The underlying concern (using static creds when available) may be valid, but these are unsolicited bot changes that modify production AWS credential handling without context on our deployment model (ECS Fargate uses task role, not static creds). Not safe to merge without human review of infra implications.
+</Note>
+
+#### Sub-group D2b: S3 Migration Skip/Defer (8 PRs)
+
+All attempt to skip or defer S3 key migration jobs when AWS credentials are unavailable or `SKIP_MIGRATIONS` is set. Multiple approaches tried: config flag (`skipMigrations` added to AppConfig or NodeConfig), credential probe (inject S3Client and test `credentials()`), catch `CredentialsProviderError`, module-level conditional registration. All touch `s3-migration.processor.ts` or `s3-migration-runner.service.ts`.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4365 | fix: suppress S3 migration retries when AWS credentials are unavailable | 49+2 | 1 | Closed, Duplicate | Credential probe via S3Client injection |
+| #4364 | fix(server): defer S3 key migrations when AWS creds unavailable | 20+0 | 1 | Closed, Duplicate | Catch CredentialsProviderError in runner service |
+| #4363 | fix(server): skip S3 migration bootstrap when SKIP_MIGRATIONS is true | 20+4 | 5 | Closed, Duplicate | Adds skipMigrations to NodeConfig + module conditional |
+| #4362 | fix: skip S3 migration job when AWS credentials are unavailable | 48+2 | 1 | Closed, Duplicate | Credential probe approach (same as #4365) |
+| #4361 | Fix S3 migration credential provider failures in production | 4+7 | 1 | Closed, Duplicate | (Also in D2a) |
+| #4360 | fix(server): skip S3 migration worker when migrations are disabled | 28+1 | 4 | Closed, Duplicate | Adds skipMigrations to AppConfig + processor check |
+| #4357 | fix(server): skip S3 key migrations when SKIP_MIGRATIONS=true | 21+1 | 4 | Closed, Duplicate | Same approach as #4360 (AppConfig skipMigrations) |
+
+<Note>
+**Analysis:** All adding config schema fields (`skipMigrations`) or probing credentials at runtime. These are overlapping attempts at the same thing. Config changes would conflict with each other. S3 migration already has error handling. No merge, all closed as duplicates.
+</Note>
+
+#### Sub-group D2c: AWS Config / Infra (2 PRs)
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4359 | fix(config): ignore AWS observer profile in production | 4+1 | 1 | Closed, False Positive | Changes compute config loader to skip AWS profile, not how our prod works |
+| #4358 | fix(eks): inject app AWS creds into API runtime secret | 15+2 | 1 | Closed, Infra/False Positive | Modifies deploy-eks.yml, unsolicited infra change, no context |
+
+<Note>
+**Analysis:** Bot attempted to fix the credential issue from the infra side too. Both are based on incorrect assumptions about our deployment model.
+</Note>
+
+#### Sub-group D2d: Legacy Branding S3 Paths (2 PRs)
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4371 | fix(settings): handle legacy branding static paths without S3 signing | 76+6 | 2 | Closed, Duplicate | Same fix as #4370, fewer files |
+| #4370 | fix(settings): handle legacy branding paths without S3 signing | 118+8 | 4 | Closed, Duplicate | Adds constants + interface + test, more complete but still unsolicited |
+
+<Note>
+**Analysis:** Both detect legacy static branding asset paths and skip S3 presigning for them. Related to the credential issue (presigning fails so the bot tries to avoid presigning). Duplicates of each other. Not safe to merge, branding URL handling needs human review.
+</Note>
+
+**Action Taken:** All 14 S3 PRs closed. The bot created an escalating chain of attempts to fix a production S3 credential issue, each time trying a slightly different approach. The root cause appears to be S3 `CredentialsProviderError` in a deployment where static creds are configured but the S3 client only uses them in dev/test mode. The fix (use static creds when available) may be valid but requires human infra review, not a bot merge candidate.
+
+### Group E: Exception Filter Double Response (2 PRs), REVIEWED
+
+Both fix headers-already-sent error in the global exception filter. #3775 already merged to prestaging. #3774 closed as duplicate.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #3775 | fix(server): prevent headers-sent double response in exception filter | 98+0 | 2 | Already Merged | `canWriteHttpResponse()` guard + unit test, already on prestaging |
+| #3774 | fix(server): prevent duplicate header writes in global exception filter | 53+0 | 2 | Closed, Duplicate | Inline approach, less complete than #3775 |
+
+**Action Taken:** #3775 already merged to prestaging (confirmed `canWriteHttpResponse` at `app.filter.ts:94-102,125-127`). #3774 closed as duplicate.
+
+### Group F: fireAndForget Refetch Fix (3 PRs), REVIEWED
+
+All remove `fireAndForget()` wrapping on void-returning refetch props in inventory dialog components. `refetch` is typed as `() => void`, so `fireAndForget(refetch())` passes `void` to a function expecting `Promise<unknown> | void`, the wrapper does nothing. Removing it is a no-op cleanup.
+
+6 files fully remove the `fireAndForget` import. 3 files (`create-movement-dialog.tsx`, `create-product-dialog.tsx`, `edit-product-dialog.tsx`) correctly keep it for legitimate `queryClient.invalidateQueries()` calls which return real Promises.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #3862 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 9+15 | 9 | Merged | Covers all 9 inventory dialog files. No breaking changes. Import correctly kept where fireAndForget wraps real Promises. |
+| #3863 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 1+2 | 1 | Closed, Duplicate | Subset of #3862 (only create-inventory-lot-dialog.tsx) |
+| #3861 | fix(client): remove fireAndForget wrapping void-returning refetch prop | 1+2 | 1 | Closed, Duplicate | Subset of #3862 (only create-inventory-lot-dialog.tsx) |
 
 **Action Taken:** #3862 merged. #3861 and #3863 closed as duplicates. Cluster fully resolved.
 
-### Group G: Duplicate Helper Imports (2 PRs)
+### Group G: Duplicate Helper Imports (2 PRs), REVIEWED
 
-Both remove duplicate helper imports causing build failure. Likely duplicates.
+Both delete the same `helpers/` directory (3 helper files + 2 import cleanups). The directory no longer exists on prestaging, fix already merged via another path.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #3818 | fix(client): remove duplicate helpers/ imports causing prestaging web build failure | 0+92 | 5 | | |
-| #3817 | fix(client): remove duplicate helper imports breaking web build | 0+92 | 5 | | |
+| #3818 | fix(client): remove duplicate helpers/ imports causing prestaging web build failure | 0+92 | 5 | Closed, Already Fixed | helpers/ directory no longer exists on prestaging |
+| #3817 | fix(client): remove duplicate helper imports breaking web build | 0+92 | 5 | Closed, Already Fixed | Identical diff to #3818 |
+
+**Action Taken:** Both closed, duplicate helper files already removed from prestaging.
 
 ### Group H: DocuSign Fixes (2 PRs)
 
-Two separate DocuSign-related fixes - may not be duplicates.
+Two separate DocuSign-related fixes, may not be duplicates.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | #3808 | fix(server): harden DocuSign private key parsing | 130+1 | 3 | | |
 | #3796 | fix(server): reduce DocuSign Sentry noise from multiline error logs | 171+25 | 3 | | |
 
-### Group I: Standalone Security / Auth Fixes (12 PRs)
+### Group I: Standalone Security / Auth Fixes (13 PRs)
 
-Individual fixes that don't have obvious duplicates.
+Individual fixes that don't have obvious duplicates. (Marcia AI OpenAI PRs moved to Group Q, PII/Logger PRs moved to Group R.)
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
+| #4374 | fix: harden critical auth boundaries for Marcia webhooks and tenant slug lookups | 224+113 | 12 | | Large: clinic/enterprise platforms + Marcia SMS/ElevenLabs + 4 e2e tests. Overlaps Group B. |
 | #4296 | fix: pet weight data corruption + hidden invoice items exposure | 150+7 | 4 | | |
 | #4280 | fix: enforce enterprise role-management authorization checks | 166+5 | 6 | | |
 | #4273 | fix(auth): block cross-tenant pet detail access in clinic check-in | 15+9 | 2 | | |
 | #4270 | fix(notification-rules): prevent ghost virtual rules from masking deactivated defaults | 203+10 | 3 | | |
+| #4321 | fix(late-fee): prevent silent data corruption when currency conversion API fails | | | | |
 | #3869 | fix: prevent webhook/CI secret exposure paths | 10+11 | 6 | | |
 | #3868 | fix(client): keep checkout QR generation first-party | 90+11 | 4 | | |
 | #3867 | fix(server): prevent raw fire-and-forget error payload logging | 45+7 | 2 | | |
 | #3847 | fix(server): redact S3 object keys from migration and signed-url logs | 17+25 | 16 | | |
 | #3794 | fix(security): reduce PII exposure across logs and webhooks | 249+148 | 28 | | |
-| #3834 | fix(server): ignore OpenAI quota-exceeded Sentry alerts | 98+0 | 4 | | |
-| #4321 | fix(late-fee): prevent silent data corruption when currency conversion API fails | | | | NEW |
-| #3842 | fix: fail over AI calls when OpenAI quota is exhausted | 139+2 | 1 | | |
 
 ### Group J: Client UI Fixes (2 PRs)
 
-Frontend component fixes - different areas, not duplicates.
+Frontend component fixes, different areas, not duplicates.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | #3955 | fix(clinic): remove conflicting bg-transparent class from dialog backdrop | 488+277 | 27 | | |
 | #3942 | fix(clinic): prevent wrong note fallback and keyboard event propagation | 424+185 | 27 | | |
 
-### Group K: Test-Only PRs (8 PRs)
+### Group K: Test-Only PRs (12 PRs)
 
-These PRs only add new test files - zero production code changes (additions only, no deletions).
+These PRs only add new test files, zero production code changes (additions only, no deletions).
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -177,14 +248,78 @@ These PRs only add new test files - zero production code changes (additions only
 | #4259 | test: 83 unit tests for recent high-risk changes | 931+4 | 9 | | |
 | #3865 | test(regression): slot holds, specialty staff, audit logging | 832+0 | 5 | | |
 | #3840 | test(regression): 114 unit tests for S3 utils, staff conflict, slot locking, MCP | 1237+0 | 11 | | |
-| #4318 | test: regression test coverage for 9 untested utilities (2026-03-25) | 1087+0 | 9 | | NEW |
+| #4318 | test: regression test coverage for 9 untested utilities (2026-03-25) | 1087+0 | 9 | | |
+| #4369 | test: cover billing gap AI utils, PAN/CVV redaction, and SSE tenant middleware (75 tests) | 970+0 | 7 | | |
+| #4334 | test(regression): unit tests for recently merged code (Mar 26) | 892+0 | 9 | | |
+| #4393 | test: add 89 regression tests for CTA computation, pet health score, ERP batch, and refund mapper | | | | NEW (Mar 29) |
+| #4388 | test(drug-catalog): add unit tests for Plumb's Drug Catalog helpers and service | | | | NEW (Mar 28) |
 
-### Group L: Feature / Refactor (2 PRs)
+### Group L: Feature / Refactor (4 PRs)
 
 Larger PRs that introduce new code or refactor existing modules.
 
 | PR | Title | Size | Files | Review Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| #4287 | [PW-4515] Plumb's Drug Catalog - Structured Veterinary Drugs and Dosing Rules | 8049+0 | 91 | | |
+| #4287 | [PW-4515] Plumb's Drug Catalog - Structured Veterinary Drugs and Dosing Rules | 8049+0 | 91 | Closed/Merged | No longer open, was merged or closed since last update |
 | #4284 | refactor(imaging): reduce code duplication in imaging module (SonarCloud) | 306+319 | 14 | | |
+| #4348 | fix(drug-catalog): routing fix + sidebar entry + feature demo videos [PW-4515] | 8054+0 | 91 | | Follow-up to #4287, adds clinic routing + platform sidebar entry |
+| #4382 | feat: Clinic Wellness Report, Feature Demo Recording | | | | NEW (Mar 27), feature demo |
 
+### Group M: Client Header Builder Guard (3 PRs), NEW
+
+All fix `globalThis.location` crash in `client/src/common/api/headers/build.ts` when location is unavailable (SSR context). #4352 and #4355 have identical diffs, both extract functions to separate util files. #4353 is a simpler approach using optional chaining (`location?.host`).
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4355 | fix: guard client host header reads when location is unavailable | 79+56 | 3 | | Identical to #4352, splits into build-api-client-headers.util.ts + build-api-server-headers.util.ts |
+| #4353 | Fix client header builder crash when location is unavailable | 3+2 | 1 | | Minimal fix, adds `?.` optional chaining, also adds eslint-disable comment |
+| #4352 | fix(client-auth): guard browser location access in header builder | 79+56 | 3 | | Identical to #4355, same file split refactor |
+
+### Group N: Video Consultation LiveKit Fix (2 PRs), NEW
+
+Both fix LiveKit disconnect/WebSocket issues in `LiveKitVideoConsultation.tsx`. Overlapping but slightly different approaches. #4350 adds an `isEffectDisposed` flag to disconnect after connect resolves; #4354 adds ref-based state tracking and `fireAndForget` for async disconnect. Both import `fireAndForget` and modify the cleanup effect.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4354 | fix: prevent websocket send during connecting teardown in video consultation | 29+13 | 1 | | Adds refs for session state + fireAndForget disconnect, more complete |
+| #4350 | fix(video-consultation): avoid LiveKit disconnect during connecting state | 13+7 | 1 | | isEffectDisposed flag + disconnect after connect, simpler approach |
+
+### Group O: CI Database URL Placeholders (2 PRs), REVIEWED
+
+Both modify `.github/actions/web-build/action.yml` to provide placeholder `DATABASE_URL` / `DIRECT_URL` for Next.js builds (`PrismaClient` constructor needs a parseable URL). Both use `postgresql://build:build@localhost:5432/build`. Duplicates of each other, and already fixed by #4346 (merged).
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4347 | fix(ci): provide placeholder DATABASE_URL and DIRECT_URL for web build | 5+4 | 1 | Already Fixed | #4346 merged with the same fix |
+| #4343 | fix(ci): use placeholder DATABASE_URL in web build to fix PrismaClient crash | 8+4 | 1 | Already Fixed | #4346 merged with the same fix |
+
+### Group P: Standalone Client / Misc Fixes (3 PRs)
+
+Individual PRs that don't cluster with other open PRs.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4376 | fix(client): prevent favicon head reconciliation removeChild errors | 9+22 | 1 | | Simplifies dynamic-favicon.tsx, removes createElement/appendChild, uses querySelectorAll to update existing links. Uses `as HTMLLinkElement` type assertion (PR blocker). |
+| #4381 | fix(client): guard non-array joined clinics before tenant selection | | | | NEW (Mar 27), guards against non-array joinedClinics before tenant selection |
+
+### Group Q: Marcia AI OpenAI Fallback (5 PRs), NEW
+
+All fix OpenAI error handling in Marcia AI, quota exhaustion, project access errors, response parsing. #4385 and #4383 are likely duplicates (both fix project-access auth errors). #4380 fixes response parsing. #3842 and #3834 handle quota exhaustion.
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4385 | fix(marcia-ai): fallback from OpenAI project access errors | | | | NEW (Mar 28), likely duplicate of #4383 |
+| #4383 | fix(marcia-ai): fallback on OpenAI project-access auth errors | | | | NEW (Mar 28), likely duplicate of #4385 |
+| #4380 | Fix Marcia AI OpenAI successful-response parsing fallback | | | | NEW (Mar 27), response parsing, different from #4385/#4383 |
+| #3842 | fix: fail over AI calls when OpenAI quota is exhausted | 139+2 | 1 | | Moved from Group I, quota fallback |
+| #3834 | fix(server): ignore OpenAI quota-exceeded Sentry alerts | 98+0 | 4 | | Moved from Group I, Sentry noise reduction |
+
+### Group R: PII / Logger Redaction, Round 2 (5 PRs), REVIEWED
+
+| PR | Title | Size | Files | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| #4394 | fix(security): redact consultation-note PII before billing-gap AI analysis | | | Closed, Duplicate | Duplicate of #4373 |
+| #4390 | fix: redact paymentMethodId values in logger sanitization | | | Closed, Already Implemented | Luhn-based PAN detection + sensitive field matching + payment route body suppression already in codebase with full test coverage |
+| #4389 | fix(logger): prevent PII exposure via logged query strings | | | Closed, Already Implemented | sanitizeQuery() in HTTP logging interceptor, 100+ sensitive field patterns, payment route URL stripping. Merged via PCI consolidation branch |
+| #4373 | fix(security): redact consultation-note PII before billing-gap AI prompts | 61+3 | 3 | Revived and Merged | Legitimate gap, consultation notes passed unredacted to matchProductMentionsHybrid() in billing-gap AI flow |
+| #4337 | fix(auth): redact email in verification throttle error logs | 84+1 | 3 | Skipped | Fix exists on cloudagent branch but not yet on prestaging |
