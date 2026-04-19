@@ -52,6 +52,7 @@
           {
             "group": "Engineering Onboarding",
             "pages": [
+              "onboarding/welcome-video",
               "onboarding/engineering-handbook",
               "onboarding/devbox-setup",
               "onboarding/cicd-guide",
