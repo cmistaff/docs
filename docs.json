@@ -3,11 +3,14 @@
   "theme": "mint",
   "name": "Crest Engineering Docs",
   "colors": {
-    "primary": "#1E3A5F",
-    "light": "#3B82F6",
-    "dark": "#1E3A5F"
+    "primary": "#06b6d4",
+    "light": "#22d3ee",
+    "dark": "#0891b2"
   },
-  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "light"
+  },
+  "favicon": "/favicon.png",
   "navigation": {
     "tabs": [
       {
@@ -239,8 +242,8 @@
     }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/peacock.png",
+    "dark": "/logo/peacock-dark.png"
   },
   "navbar": {
     "links": [
