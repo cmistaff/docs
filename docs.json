@@ -76,6 +76,12 @@
               "crest-corp/engineering-rules",
               "crest-corp/code-of-conduct"
             ]
+          },
+          {
+            "group": "Communication",
+            "pages": [
+              "crest-corp/slack-channels"
+            ]
           }
         ]
       },

@@ -1,0 +1,118 @@
+---
+title: "Slack Channels"
+description: "Reference list of every active public Slack channel and when to use it."
+---
+
+This page lists every active public Slack channel in the Crest workspace, grouped by prefix. Snapshot pulled from the Slack API on 2026-04-19. There are 37 active public channels (private channels and DMs are not listed here).
+
+Crest follows a loose prefix convention. The buckets below reflect what is actually in the workspace today, not an aspirational naming policy.
+
+- `crest-*` covers cross-team workspaces, alerts, and per-lead team rooms.
+- `crestpet-*` covers the main product (CrestPetSystem) day-to-day.
+- `dev-*` covers dev squads working a specific slice (bugs, features, UI, security).
+- `daily-*` covers recurring async standups and report drops.
+- `project-*` covers a single product or initiative.
+- `p-*` is reserved for automated project alert routing (Sentry, bugs).
+- `*-tips` is for tooling-specific Q&A (Cursor, Claude Code, Codex, Marcia CLI).
+
+If the channel you need is not here, it is probably private. Ask your manager or post in `#all-crest`.
+
+## Where to Ask for Help
+
+The five most useful channels for a new hire in their first week.
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#all-crest` | 30 | Company-wide announcements and any general question that does not have an obvious home. Read-mostly, but you can post here if you do not know where else to go. |
+| `#project-crestpetsystem` | 34 | Product questions about CrestPetSystem: features, behavior, "how does X work," PRs that need a second pair of eyes. Highest-traffic product channel. |
+| `#crestpet-onboarding` | 28 | Setup, environment, devbox, and "I cannot get the local stack running" questions. Look at pinned tips before posting. |
+| `#daily-updates` | 32 | Post your daily standup here using the format in the channel topic. Read other people's posts to see what the team is working on. |
+| `#bug-reports` | 34 | File bugs you find in the product or tooling. Tag `@channel` only if it is blocking production. |
+
+For private 1-to-1 questions (access, HR, payroll, paid time off, anything sensitive) DM your manager or Michael directly.
+
+## crest-* (cross-team and alerts)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#crest-alerts` | 34 | Shared infrastructure alerts: devbox health, deploy failures, monitoring noise from CloudWatch and PagerDuty. Auto-posted by the Crest app. Keep human chatter low. |
+| `#crest-alerts-ext` | 20 | External-facing alert routing (third-party webhooks, vendor notifications). Lower volume than `#crest-alerts`. |
+| `#crest-automation` | 14 | Discussion of cron jobs, automation scripts, and management-tools changes. Post here before you change a scheduled job. |
+| `#crest-loom-reviews` | 31 | Loom videos for async code or design review. Post a Loom, tag the reviewer, move on. |
+| `#crest-meetings` | 22 | Meeting recordings, agendas, and notes. Calendar invites and Zoom transcripts get dropped here. |
+| `#crest-off-notice` | 27 | Time off, late starts, sick days, anything that affects your availability. Post before you log off, not after. |
+| `#crest-ui-ux` | 17 | UI and UX design discussion across products. Designs, Figma links, screenshots for review. |
+| `#crest-affan-team` | 11 | Affan's team workspace. Coordination for that squad. Join only if you work with them. |
+| `#crest-ibrahim-team` | 14 | Ibrahim's team workspace. Same pattern as above. |
+| `#crest-talha-team` | 11 | Talha's team workspace. Same pattern as above. |
+
+## crestpet-* (CrestPetSystem product)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#crestpet-onboarding` | 28 | Onboarding tips for new devs working on CrestPetSystem. Pinned messages have the recurring fixes for local-dev problems. |
+| `#crestpet-review` | 28 | PRs that need review attention. If a merge is genuinely urgent, the channel topic says to text Michael directly rather than waiting on Slack. |
+
+## project-* and p-* (product and project alerts)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#project-crestpetsystem` | 34 | Primary product channel for CrestPetSystem. Status, decisions, asks, design discussion. The single most important channel for product engineers. |
+| `#p-bugs` | 2 | Automated bug routing for CrestPetSystem (linked from Sentry / bug-reporter). Bot posts only. |
+| `#p-sentry-issues` | 2 | Sentry alert routing for CrestPetSystem. Bot posts only. Triage in `#bug-reports` or the relevant `dev-*` channel. |
+
+## dev-* (developer squads)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#dev-bug-fixing-team` | 11 | Squad working bug-burn-down. Coordination, hand-off, and "who owns this ticket" questions. |
+| `#dev-features-team` | 12 | Squad working new product features. Roadmap and feature-flag discussion. |
+| `#dev-security-and-refactoring-team` | 9 | Squad working security hardening and large refactors. SonarCloud waves, OWASP cleanup, dependency upgrades. |
+| `#dev-ui-team` | 10 | Squad working frontend / UI implementation. Pairs with `#crest-ui-ux` for design review. |
+| `#dev-crest-updates-hubstaff` | 31 | Hubstaff task / PR updates. The channel topic asks you to always select your task or PR when starting a Hubstaff session, then post here. |
+
+## daily-* (recurring updates)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#daily-updates` | 32 | Async standup. Post your update at the start of your shift using the format in the channel topic. |
+| `#daily-argus-report` | 19 | Daily output from the Argus dev scorecard automation. Read-only for most people. |
+
+## *-tips (tooling Q&A)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#claude-code-tips` | 18 | Tips, prompts, and gotchas for Claude Code. Drop a useful prompt or workflow you found. |
+| `#codex-tips` | 18 | Same as above for OpenAI Codex / GPT coding tools. |
+| `#cursor-tips` | 18 | Same as above for Cursor. Settings, .cursorrules, MCP tips. |
+| `#marcia-cli-tips` | 18 | Same as above for Marcia CLI (Crest's internal CLI). |
+
+## Other (general purpose, infra, governance)
+
+| Channel | Members | When to use |
+| --- | --- | --- |
+| `#all-crest` | 30 | Company-wide announcements. Read every post here. Post here if you genuinely do not know where else to go. |
+| `#random` | 24 | Off-topic, social, memes, links. Keep work questions out of this channel. |
+| `#policy-updates` | 28 | Central source of truth for policy, rules, and compliance updates. Read-mostly. Posts here are authoritative. |
+| `#bug-reports` | 34 | File bugs found in the product or in tooling. Use `@channel` only for production-blocking issues. |
+| `#deployments` | 23 | Deploy announcements and post-deploy checks. Bot-driven plus human follow-ups. |
+| `#status` | 21 | Service status updates and incident comms. Watch this during an active incident. |
+| `#security-alerts` | 15 | Security findings: SentinelOne EDR, dependency CVEs, suspicious activity. Triage before alerting wider. |
+| `#devops` | 17 | Infra, Terraform, AWS, and CI discussion. Post here before changing shared infra. |
+| `#devbox` | 9 | Dev workstation troubleshooting (Tailscale, EC2 boxes, noVNC, SSH). Cross-post to `#crestpet-onboarding` if onboarding-related. |
+| `#docs` | 19 | Documentation work: Mintlify, this site, doc PRs, drift reports. |
+| `#linear-crest` | 15 | Linear automation, ticket routing, and workflow discussion. Not for filing tickets, do those in Linear directly. |
+
+<Tip>
+  **Channel owners: please add a purpose.** The Slack `purpose` field is empty for 33 of 37 active public channels, which makes new-hire onboarding harder than it needs to be. If you created or are the most active poster in one of the channels below, please add a one-sentence purpose in Slack via channel settings (Settings, then "Edit" next to Topic and Description).
+
+  Currently missing a purpose: `#bug-reports`, `#claude-code-tips`, `#codex-tips`, `#crest-affan-team`, `#crest-alerts`, `#crest-alerts-ext`, `#crest-automation`, `#crest-ibrahim-team`, `#crest-loom-reviews`, `#crest-meetings`, `#crest-off-notice`, `#crest-talha-team`, `#crest-ui-ux`, `#crestpet-review`, `#cursor-tips`, `#daily-argus-report`, `#daily-updates`, `#deployments`, `#dev-bug-fixing-team`, `#dev-crest-updates-hubstaff`, `#dev-features-team`, `#dev-security-and-refactoring-team`, `#dev-ui-team`, `#devbox`, `#devops`, `#docs`, `#linear-crest`, `#marcia-cli-tips`, `#p-bugs`, `#p-sentry-issues`, `#project-crestpetsystem`, `#random`, `#security-alerts`, `#status`.
+
+  Channels that already have a purpose set: `#all-crest`, `#crestpet-onboarding`, `#policy-updates`.
+</Tip>
+
+## How This Page Stays Fresh
+
+This page is a manual snapshot. There is no automation pulling channel changes back into the docs yet. If you create, archive, or rename a public channel, please open a PR against `cmistaff/docs/crest-corp/slack-channels.mdx` so the next new hire is not led astray.
+
+Last refreshed: 2026-04-19.
