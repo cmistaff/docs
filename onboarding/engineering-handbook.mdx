@@ -6,12 +6,18 @@ description: "Complete onboarding guide covering communication, tooling, devbox 
 Project Onboarding Video: [https://www.loom.com/share/0a6b6ce2ee2640468f01c65a4d0f5c66](https://www.loom.com/share/0a6b6ce2ee2640468f01c65a4d0f5c66)
 
 <Note>
-The team is migrating from Jira (PW project) to Linear (CPE team). Ticket references below may use either system during the transition.
+The team has migrated from Jira (PW project) to **Linear** (CPE for product, INF for infrastructure, MOB for mobile, DES for design, AI for ML, PCK for Peacock, SUP for support, CLI for the Marcia Code CLI fork, and CRC for internal access/ops). Linear and Jira remain two-way synced for legacy threads (PW↔CPE, UCPS↔DES, MARS↔SUP), but all new work is filed in Linear. See [Working in Linear at Crest](/onboarding/working-in-linear) for the full workflow.
 </Note>
 
 Welcome to the team. This document outlines the core processes, communication standards, tools, and development protocols you will follow as part of the Crest Pet System project.
 
 Please go through this entire guide. It serves as a long term reference for how we work.
+
+## Day Zero: Onboarding Portal
+
+Start at the onboarding portal: **[onboarding.crestadvisorygroup.com](https://onboarding.crestadvisorygroup.com)** (gated behind Cloudflare Access). Register with your @creststaff.com email to receive an OTP. After verification you get access to the onboarding video (6-minute walkthrough) and the printable reference PDF.
+
+Once you have completed the portal walkthrough, work through this handbook end-to-end. Then read [Engineering Rules (Security & Conduct)](/onboarding/engineering-rules) and [Working in Linear at Crest](/onboarding/working-in-linear) before opening your first PR.
 
 ---
 
@@ -155,12 +161,13 @@ Make sure you have access to the following tools. If anything is missing, notify
 
 | Tool | Company Email |
 | --- | --- |
+| Onboarding Portal ([onboarding.crestadvisorygroup.com](https://onboarding.crestadvisorygroup.com)) | |
+| Linear ([linear.app/crest-usa](https://linear.app/crest-usa)) | |
+| Mintlify ([crestadvisorygroup.mintlify.io](https://crestadvisorygroup.mintlify.io)) | |
 | Loom | |
 | Cursor | |
 | Slack | |
 | GitHub Repositories | |
-| Jira | |
-| Confluence | |
 | Twilio | |
 | AWS | |
 | Claude Code | |
@@ -187,7 +194,7 @@ We provide cloud-based EC2 development workstations for team members who need po
 - **Instance Type:** m6i.4xlarge (16 vCPU, 64GB RAM)
 - **Storage:** 150GB SSD
 - **OS:** Ubuntu 22.04 LTS
-- **Region:** ap-south-1 (Mumbai) for Asia/South Asia devs, us-east-2 (Ohio) for US devs, eu-central-1 (Frankfurt) for Europe devs
+- **Region:** us-east-2 (Ohio) for US devs and shared admin boxes, ap-south-1 (Mumbai) for Asia/South Asia devs, eu-central-1 (Frankfurt) for Europe devs
 - **Access:** Tailscale SSH (no public IP, fully private)
 
 ### Pre-Installed Tools
@@ -337,11 +344,21 @@ Always add ALL possible login identities for each user:
 
 Cursor is now linked to your @creststaff.com email address via SAML. To join our team on Cursor, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)) - no invite required.
 
-### Atlassian Access (Loom, Jira, Confluence)
+### Linear Access (Project Management)
 
-Atlassian tools are linked to your @creststaff.com email address via SAML. To access Loom, Jira, and Confluence, simply log in using your Google account ([you@creststaff.com](mailto:you@creststaff.com)) - no invite required.
+Linear ([linear.app/crest-usa](https://linear.app/crest-usa)) replaced Jira as the primary engineering tracker. Sign in with your @creststaff.com Google account. If you do not see your team (CPE/INF/MOB/DES/AI/PCK/SUP/CLI/CRC), file a CRC ticket or DM Michael Cammarata. See [Working in Linear at Crest](/onboarding/working-in-linear) for the full workflow.
 
-**Note:** Some Jira project boards may require special invites. If you're not seeing a certain project board, contact **Hassaan Elahi** to request access.
+### Loom Access
+
+Loom remains in the Atlassian SAML group. Sign in at [loom.com](https://loom.com) with your @creststaff.com Google account. No invite required.
+
+### Mintlify (Engineering Docs)
+
+Long-lived engineering docs live in Mintlify at [crestadvisorygroup.mintlify.io](https://crestadvisorygroup.mintlify.io). The source repo is `cmistaff/docs`. To propose edits, open a PR against `cmistaff/docs` rather than editing the rendered site.
+
+### Confluence (Sunset)
+
+Confluence is being decommissioned. The remaining ~15 pages are being migrated into Mintlify and tracked under [CRC-1](https://linear.app/crest-usa/issue/CRC-1). Do not create new Confluence pages.
 
 ### Claude Code (Anthropic Teams)
 
@@ -406,9 +423,10 @@ If you don't have access to Google Voice, contact **Michael Cammarata** to reque
 
 **Task Naming Convention:**
 
-- Once you begin working on Jira tickets, update your Hubstaff task to match the ticket number: **PW-`<number>`** (e.g., `PW-1258`)
-- This is required so we can accurately assign hours to specific Jira tickets
-- When switching tickets, always update your Hubstaff task to reflect the new PW ticket number
+- Once you begin working on Linear tickets, update your Hubstaff task to match the ticket key: **`<TEAM-KEY>-<number>`** (e.g., `CPE-2104`, `INF-58`, `MOB-310`)
+- This is required so we can accurately assign hours to specific Linear tickets
+- When switching tickets, always update your Hubstaff task to reflect the new ticket key
+- Legacy Jira PW tickets remain valid until the prestaging cutover; both prefixes are accepted during the transition
 
 
 **Daily Requirement:**
@@ -424,7 +442,7 @@ If you don't have access to Google Voice, contact **Michael Cammarata** to reque
 You can double-check that Hubstaff is properly tracking by watching the **#dev-crest-jira-updates** channel in Slack. When you start and stop tracking, you'll see automated messages like:
 
 > **HubstaffAPP** 8:07 AM
-> @yourname started working on CrestPetSystem - PW-1258: Change the Staff availability UI
+> @yourname started working on CrestPetSystem - CPE-2104: Clinic search empty state
 
 > **HubstaffAPP** 8:28 AM
 > @yourname stopped working
@@ -663,18 +681,32 @@ These leads guide architecture decisions, code reviews, sprint planning, and ove
 
 ## 4. Project Management and Sprints
 
-We use **Jira** for planning, tracking, and managing the entire project.
+We use **Linear** ([linear.app/crest-usa](https://linear.app/crest-usa)) for planning, tracking, and managing all engineering work. See [Working in Linear at Crest](/onboarding/working-in-linear) for the canonical workflow document.
 
-### Epics and Tasks
+### Branch Naming
 
-- Major modules are grouped as **Epics**
-- Each Epic contains detailed **subtasks**
-- Tasks are assigned along with **story points**
+All branches follow `<TEAM-KEY>-<NUMBER>-<short-description>`. The team key prefix is what triggers the Linear git automation. Examples:
+
+- `CPE-2104-clinic-search-empty-state` (product work)
+- `INF-58-derp-frankfurt-ip-forward` (infrastructure)
+- `MOB-310-marcia-push-token-refresh` (mobile)
+- `DES-92-onboarding-empty-state` (design)
+- `AI-145-judge-llm-fallback` (Marcia LLM)
+- `CRC-1-confluence-migration` (internal access/ops)
+
+Legacy `PW-XXXX` branches remain valid during the Jira→Linear cutover; either prefix works.
+
+### Initiatives, Projects, Cycles
+
+- Major themes are grouped as **Initiatives** (multi-quarter outcomes) or **Projects** (multi-week deliverables)
+- Each Project breaks down into **Issues** (the daily unit of work)
+- Issues are scoped, estimated (T-shirt or points), and assigned
 
 ### Sprint Cycle
 
-- We follow a **two week** sprint
-- Sprint starts on **Tuesday** and ends on **Monday** two weeks later
+- CPE and MOB run a **two-week cycle starting Monday**
+- INF, AI, and PCK run **continuous flow** (merge to main → Done)
+- Other teams default to two-week cycles unless their lead overrides
 
 ### Sprint Planning
 
@@ -1070,24 +1102,22 @@ GitHub secret scanning is enabled on all organizations. If you accidentally comm
 - You must remove the secret from your commit history before pushing
 - If a secret was already pushed, **rotate it immediately** and notify Michael Cammarata
 
-### Bot Review Checks
+### AI Review Pipeline
 
-
-The following automated reviewers must complete before a PR can be merged:
-
+Every PR runs through a **six-bot AI review pipeline** before a human reviewer is tagged. SonarCloud (a deterministic quality gate) runs alongside the bots but is counted separately.
 
 | Bot | What It Checks |
 | --- | --- |
-| SonarCloud | Code quality, bugs, vulnerabilities, coverage |
-| Devin | AI code review |
-| Claude Code | AI code review (claude-code-review.yml) |
-| Amazon Q Developer | AI-assisted review |
-| Cursor Bot | AI-assisted review |
-| Codex | Code quality analysis |
-| Copilot | AI-assisted review |
+| Devin | Holistic AI review, regressions, missing tests |
+| Bugbot | Bug-class detection (Cursor) |
+| Codex | Code-quality analysis, refactor suggestions |
+| Copilot | AI-assisted review focused on style and obvious issues |
+| Claude Code | AI code review (`claude-code-review.yml`) |
+| Augment | Architectural and pattern compliance |
 
+**Approval requirement:** at least **5 of 6** AI bots must approve (or the unresolved comments must be specifically addressed in PR comments) before you tag a human reviewer to merge into prestaging. This is in addition to the SonarCloud quality gate.
 
-Do not merge until all bots have completed their review and all comments are resolved.
+For the full pipeline description, false-positive dismissal flow, and workflow file locations, see [AI Review Pipeline](/onboarding/ai-review-pipeline).
 
 
 ---
