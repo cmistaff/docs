@@ -5,7 +5,13 @@ description: "AWS infrastructure -- ECS Fargate, RDS, ElastiCache, CloudFront, a
 
 # Infrastructure
 
-CrestPet System runs on AWS with infrastructure managed by Terraform. The production architecture uses ECS Fargate for compute, RDS PostgreSQL for the database, ElastiCache Redis for caching and job queues, and CloudFront for CDN delivery. An EKS (Kubernetes) module is provisioned in Terraform for a future multi-region active-active deployment path, but EKS is not currently serving production traffic -- all production workloads run on ECS Fargate.
+CrestPet System runs on AWS with infrastructure managed by Terraform. The compute model differs by environment:
+
+- **Prestaging:** EKS multi-region active-active stack live, with Singapore (`ap-southeast-1`) as the primary region and `us-east-1` as the secondary. Aurora Global Database and Redis Global Datastore replicate across both regions.
+- **Staging:** Same EKS multi-region active-active topology as prestaging (Singapore primary + `us-east-1` secondary, Aurora Global + Redis Global).
+- **Production:** Still single-region ECS Fargate in `us-east-1`, fronted by RDS PostgreSQL, ElastiCache Redis, ALB, WAF, and CloudFront. The multi-region cutover is not yet scheduled.
+
+For the operator's guide to the multi-region stack (failover runbooks, replication health, region-specific endpoints), see [Multi-Region Architecture](/operations/multi-region-architecture).
 
 ## Architecture Diagram
 
@@ -144,8 +150,11 @@ The production infrastructure is managed in a separate Terraform repository ([`c
 
 Developer workstations are EC2 instances managed through a separate Terraform repository ([`cmistaff/EC2DevsCrestPet`](https://github.com/cmistaff/EC2DevsCrestPet)):
 
-- 20 EC2 boxes across Ohio (3), Mumbai (16), and Frankfurt (1)
-- Connected via Tailscale VPN mesh network
+- 22 EC2 boxes (21 running, 1 stopped) across three regions:
+  - **Ohio (`us-east-2`):** 3 instances -- `dev-dylan` (m6i.4xlarge, stopped), `dev-bryant` (m6i.12xlarge, running), `dev-michael` (m6i.12xlarge, running)
+  - **Mumbai (`ap-south-1`):** 18 instances, all m6i.4xlarge
+  - **Frankfurt (`eu-central-1`):** 1 instance -- `dev-serhii` (m6i.4xlarge)
+- Connected via Tailscale VPN mesh network with custom DERP relays in Ohio (`derp.crestbrain.com`, region 900) and Mumbai (`derp-mumbai.crestbrain.com`, region 901). Frankfurt routes via the Mumbai relay.
 - noVNC for browser-based desktop access
 - Standardized AMIs built with Packer
 - Memory watchdog to prevent OOM issues
