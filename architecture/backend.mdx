@@ -49,14 +49,14 @@ server/src/modules/
 │       ├── poop-scan-api/  # Fecal analysis
 │       ├── turnstile/      # Cloudflare bot protection
 │       └── whatsapp/       # WhatsApp Business API
-└── portals/                # Business logic by portal
-    ├── clinic/             # 75 modules
-    ├── consumer/           # 38 modules
-    ├── enterprise/         # 19 modules
-    ├── platform/           # 18 modules
-    ├── referral/           # 5 modules
+└── portals/                # Business logic by portal (7 backend portal namespaces)
+    ├── clinic/             # 81 modules
+    ├── consumer/           # 39 modules
+    ├── enterprise/         # 20 modules
     ├── marcia/             # 5 modules (chatbot, elevenlabs, sms, whatsapp) -- ElevenLabs lives here, not under common/third-party/
-    └── shared/             # ~76 cross-portal modules
+    ├── platform/           # 25 modules
+    ├── referral/           # 5 modules
+    └── shared/             # 87 cross-portal modules
 ```
 
 ## Controller-Service-Repository Pattern
