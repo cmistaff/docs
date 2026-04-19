@@ -174,7 +174,8 @@
           {
             "group": "Infrastructure",
             "pages": [
-              "infra/overview"
+              "infra/overview",
+              "infra/onboarding-portal"
             ]
           }
         ]

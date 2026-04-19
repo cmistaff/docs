@@ -1,0 +1,257 @@
+---
+title: "Onboarding Portal"
+description: "Cloudflare-Access-gated staff onboarding site that delivers the welcome video, engineering rules, and Linear workflow guide to incoming hires before they have a creststaff.com identity."
+---
+
+The Onboarding Portal is a single Cloudflare Worker that gates every page of `onboarding.crestadvisorygroup.com` behind a Cloudflare Access one-time-PIN screen. Staff and incoming hires verify their email through Access, complete a one-time profile form, and unlock the welcome video, engineering rules, Linear workflow guide, and Crest handbook. Built 2026-04-18 with a same-day pivot from a custom Turnstile + 6-digit OTP design (v1) to fully managed Cloudflare Access auth (v2) after a Turnstile hostname-rejection bug surfaced on `*.workers.dev` previews.
+
+<Note>
+  Production DNS cutover to `onboarding.crestadvisorygroup.com` is **pending Michael's approval**. The portal currently serves only the preview hostname `onboarding-portal.mc-45d.workers.dev`. See [Open items](#open-items).
+</Note>
+
+## Architecture
+
+```
+Browser
+  |
+  v
+Cloudflare Access  (One-Time-PIN login screen, IdP managed by Cloudflare)
+  |  CF_Authorization cookie (JWT signed by team JWKS)
+  v
+Cloudflare Worker  (onboarding-portal)
+  |   1. Validate JWT against JWKS (cached in KV for 1h)
+  |   2. Extract email from claims
+  |   3. D1 lookup: registered?
+  |        yes -> /welcome  (video + nav cards)
+  |        no  -> /profile  (full_name, company, phone form)
+  |   4. On profile submit -> insert row, fire Slack DM to Michael (DayOps), redirect
+  v
+D1: onboarding-portal       (registrations, verification_events, access_events)
+KV: JWKS_CACHE              (1h cached Access JWKS)
+Slack: bot DM to U0AP9PJ5LF7 ("DayOps" persona)
+```
+
+<Note>
+  Cloudflare Access fronts **every** request to the registered hostnames, including `/api/health` and `/api/admin/registrations`. The Worker performs a second JWT verification for defense-in-depth, so even a misconfigured Access app cannot leak the gated content.
+</Note>
+
+## Stack
+
+<CardGroup cols={2}>
+  <Card title="Cloudflare Worker" icon="cloud">
+    Single-file `src/index.js`. No build step. Deployed via wrangler.
+  </Card>
+  <Card title="Cloudflare Access" icon="shield-halved">
+    Managed One-Time-PIN IdP. Replaces v1 custom Turnstile + OTP + SendGrid stack.
+  </Card>
+  <Card title="D1" icon="database">
+    SQLite-on-edge for registrations and audit events.
+  </Card>
+  <Card title="KV" icon="bolt">
+    1-hour JWKS cache for JWT verification, avoids cold-start fetches.
+  </Card>
+</CardGroup>
+
+| Component | Identifier / Value |
+|-----------|-------------------|
+| Worker name | `onboarding-portal` |
+| D1 database | `onboarding-portal` (id `1002f64d-92a3-450c-9405-76049fe70ece`) |
+| KV namespace | `JWKS_CACHE` (id `b9a565e661c745eca60d45feee559772`) |
+| CF Access app | `Onboarding Portal` (id `8309e4bc-c865-4541-84cc-4873d25c5546`) |
+| CF Access AUD | `b6157f1cc825f55a13b6ac58bfd8e66548d0676c7bd4fffa28f20922a70a44f6` |
+| Team domain | `cammarata.cloudflareaccess.com` |
+| Notification target | Slack bot DM to `U0AP9PJ5LF7` (Michael), signed `DayOps` |
+| SendGrid | **Not used** — Access handles all OTP delivery. SendGrid is reserved for downstream notifications only. |
+| Repo | [cmistaff/onboarding-portal](https://github.com/cmistaff/onboarding-portal) |
+
+## Routes
+
+All routes except `/api/health`, `/logo.png`, and `/api/admin/registrations` require a valid Cloudflare Access JWT. Cloudflare Access fronts every hostname registered to the app, so even the unauthenticated routes above are reachable only through Access from a browser context. Service automation must use a CF Access service token to bypass the login screen.
+
+| Path | Method | Auth | Purpose |
+|------|--------|------|---------|
+| `/api/health` | GET | Access (token) | `{status:"ok",ts}` heartbeat. |
+| `/logo.png` | GET | Access (token) | Inline base64 PNG, 86400s cache. |
+| `/api/admin/registrations` | GET | Bearer `ADMIN_KEY` (also Access) | JSON dump of registrations + events. |
+| `/api/access-debug` | GET | Access JWT | Echo email + JWT claims for verification debugging. |
+| `/` | GET | Access JWT | Redirects to `/welcome` (or `/profile` for first-timers). |
+| `/profile` | GET | Access JWT | Form: `full_name`, `company`, `phone`. Skipped if already registered. |
+| `/api/profile` | POST | Access JWT | Insert D1 row, fire Slack DM, redirect to `/welcome`. |
+| `/welcome` | GET | Access JWT + D1 row | Onboarding video + nav cards. |
+| `/rules` | GET | Access JWT + D1 row | Engineering Rules (snapshot of Linear doc). |
+| `/workflow` | GET | Access JWT + D1 row | Working in Linear at Crest (snapshot of Linear doc). |
+| `/handbook` | GET | Access JWT + D1 row | 302 to `https://crestadvisorygroup.mintlify.io`. |
+| `/contact` | GET | Access JWT + D1 row | Contact pointers (who to ask). |
+
+## D1 schema
+
+Three tables track registrations and downstream activity. Schema is idempotent — apply via `wrangler d1 execute onboarding-portal --file=schema.sql --remote`.
+
+<CodeGroup>
+```sql registrations
+CREATE TABLE IF NOT EXISTS registrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  company TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  ip TEXT,
+  user_agent TEXT,
+  cf_country TEXT,
+  cf_ray TEXT,
+  created_at TEXT NOT NULL,
+  verified_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reg_email ON registrations(email);
+CREATE INDEX IF NOT EXISTS idx_reg_created ON registrations(created_at);
+CREATE INDEX IF NOT EXISTS idx_reg_status ON registrations(status);
+```
+
+```sql verification_events
+CREATE TABLE IF NOT EXISTS verification_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  event TEXT NOT NULL,
+  detail TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  cf_country TEXT,
+  cf_ray TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ve_session ON verification_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_ve_created ON verification_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_ve_event ON verification_events(event);
+```
+
+```sql access_events
+CREATE TABLE IF NOT EXISTS access_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  page TEXT NOT NULL,
+  ip TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ae_session ON access_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_ae_created ON access_events(created_at);
+```
+</CodeGroup>
+
+Common queries:
+
+```bash
+# Recent verified registrations
+node node_modules/.bin/wrangler d1 execute onboarding-portal --remote --command \
+  "SELECT verified_at, full_name, company, email FROM registrations WHERE status='verified' ORDER BY id DESC LIMIT 20"
+
+# Page hit distribution
+node node_modules/.bin/wrangler d1 execute onboarding-portal --remote --command \
+  "SELECT page, COUNT(*) AS hits FROM access_events GROUP BY page ORDER BY hits DESC"
+```
+
+## Deployment
+
+<Tabs>
+  <Tab title="Standard deploy">
+    ```bash
+    cd ~/management-tools/scripts && source ./load-env.sh
+    cd ~/Crest/GitHub/onboarding-portal
+
+    # ALWAYS dry-run first to confirm no untracked drift
+    git status
+    node node_modules/.bin/wrangler deploy --dry-run
+
+    # Ship it
+    node node_modules/.bin/wrangler deploy
+    ```
+
+    Required env from `load-env.sh`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+  </Tab>
+  <Tab title="Production cutover (pending)">
+    Currently the Access app + Worker only serve `onboarding-portal.mc-45d.workers.dev`. To cut over to `onboarding.crestadvisorygroup.com`:
+
+    1. Update the Access app to add the production hostname and set it as the primary `domain` (Access redirects post-OTP to whichever hostname is `domain`, so it must be live in DNS first).
+    2. Add the proxied CNAME via `cloudflare_api.py add-record crestadvisorygroup.com CNAME onboarding onboarding-portal.mc-45d.workers.dev --proxied`.
+    3. Uncomment the `routes` block in `wrangler.toml`.
+    4. `node node_modules/.bin/wrangler deploy`.
+    5. Smoke test through the production hostname.
+  </Tab>
+  <Tab title="Rollback">
+    ```bash
+    node node_modules/.bin/wrangler deployments list
+    node node_modules/.bin/wrangler rollback <version-id>
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  No CI/CD pipeline yet. Deploys are manual via `wrangler deploy` from the repo root. CRC follow-up will wire a GitHub Action once the production hostname is live.
+</Note>
+
+## Updating the embedded video
+
+The welcome page video is sourced from the `VIDEO_URL` env var in `wrangler.toml`. The current value points at the v4 cut hosted in S3:
+
+```
+VIDEO_URL = "https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v4-20260418.mp4"
+```
+
+To swap the video:
+
+1. Upload the new MP4 to the `crest-video-previews` S3 bucket (us-east-2). The bucket is public and serves `Accept-Ranges: bytes` so HTML5 inline playback works without re-encoding.
+2. Edit `VIDEO_URL` in `wrangler.toml` to point at the new key.
+3. `node node_modules/.bin/wrangler deploy`.
+4. Hard-refresh `/welcome` and confirm playback.
+
+Use the `crest-onboarding-vN-YYYYMMDD.mp4` naming pattern so old cuts remain accessible for rollback.
+
+## Notification flow
+
+Every successful profile submission fires a Slack DM to Michael (`U0AP9PJ5LF7`) via the Crest bot, signed `DayOps`:
+
+```
+New onboarding registration: <full_name> (<company>) <email> verified
+— DayOps
+```
+
+<Note>
+  Per the personal-ops rule, low-volume registration signals route to Michael's DM, **never** `#crest-alerts`. The bot uses `NOTIFY_SLACK_TOKEN` (Crest app `xoxe.xoxb-...`), not the MCP Slack tool.
+</Note>
+
+## Security
+
+<AccordionGroup>
+  <Accordion title="Cloudflare Access JWT validation">
+    Every Access-gated handler calls `requireAccessUser(env, request)`, which:
+
+    1. Reads the `CF_Authorization` cookie (or `Cf-Access-Jwt-Assertion` header for service tokens).
+    2. Fetches the JWKS from `https://cammarata.cloudflareaccess.com/cdn-cgi/access/certs`, cached in KV for 1h.
+    3. Verifies signature, `iss`, `aud` (must equal `CF_ACCESS_AUD`), and `exp`.
+    4. Extracts `email` from claims and uses it as the canonical user identity.
+  </Accordion>
+  <Accordion title="Per-page gating">
+    `/welcome`, `/rules`, `/workflow`, `/handbook`, and `/contact` additionally require a matching D1 `registrations` row. First-time visitors are 302'd to `/profile`; only after `POST /api/profile` succeeds is the user allowed past the form.
+  </Accordion>
+  <Accordion title="Admin endpoint">
+    `/api/admin/registrations` requires a bearer `ADMIN_KEY` header (32-byte hex, stored in `admin-tools/api-keys` as `ONBOARDING_PORTAL_ADMIN_KEY`). It is also fronted by Cloudflare Access on the registered hostnames, so external callers need a CF Access service token in addition to the bearer key.
+  </Accordion>
+  <Accordion title="Worker secrets">
+    Set with `wrangler secret put`. Only two:
+
+    - `ADMIN_KEY` — bearer auth for the admin endpoint.
+    - `NOTIFY_SLACK_TOKEN` — Crest bot token (`xoxe.xoxb-...`) for DM fan-out.
+
+    Never commit `.dev.vars` (already in `.gitignore`).
+  </Accordion>
+</AccordionGroup>
+
+## Open items
+
+- **Production DNS cutover** — pending Michael approval. CNAME, Access app `domain` field, and `routes` block in `wrangler.toml` all need to flip together.
+- **Health/admin endpoint accessibility** — `/api/health` and `/api/admin/registrations` are fronted by Cloudflare Access. External uptime monitoring or admin CLI calls require either a CF Access service token or a bypass policy. Decision pending.
+- **Linear content drift** — `/rules` and `/workflow` are static snapshots of Linear documents. CRC follow-up will sync nightly into KV.
+- **Logo fidelity** — currently a base64-embedded 96x96 PNG (~7KB). Higher-resolution version should move to R2 with `/logo.png` rewriting.
+- **CI/CD** — no GitHub Action yet; deploys are manual. Will be added once production hostname is live.
