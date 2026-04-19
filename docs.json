@@ -54,6 +54,8 @@
             "pages": [
               "onboarding/welcome-video",
               "onboarding/engineering-handbook",
+              "onboarding/working-in-linear",
+              "onboarding/engineering-rules",
               "onboarding/devbox-setup",
               "onboarding/cicd-guide",
               "onboarding/data-access",

@@ -1,0 +1,106 @@
+---
+title: "Working in Linear at Crest"
+description: "Linear-specific conventions for engineering at Crest: requirements, branch naming, workflow states, git automations, sprint cadence."
+---
+
+<Note>
+**Canonical source of truth.** The Linear copy at [linear.app/crest-usa/document/working-in-linear-at-crest-29d8e3d2524f](https://linear.app/crest-usa/document/working-in-linear-at-crest-29d8e3d2524f) mirrors this page. Please file edits as PRs against [`cmistaff/docs`](https://github.com/cmistaff/docs).
+</Note>
+
+This document covers Linear-specific conventions. For broader onboarding (devbox, Slack, Cursor, Claude Code, code review), see the [Engineering Onboarding Handbook](/onboarding/engineering-handbook).
+
+## Requirements (not optional)
+
+These are the minimum bars. Missing any of these is grounds for a PR being rejected.
+
+1. **Every piece of work has a Linear ticket.** No PR should exist without a corresponding ticket. If you start work and there's no ticket yet, create one in your team (CPE for product work) before you push your first commit. Spike, hotfix, "quick fix", and refactor all count.
+2. **Branch names must reference the ticket.** `<TEAM-KEY>-<NUMBER>-<short-description>` is the only valid format. The team key prefix is what triggers the git automation. Branches without a ticket prefix won't auto-link.
+3. **Push a DRAFT PR as soon as you start coding.** Even if it's empty or one commit. Leadership tracks PRs in real time, not just tickets. Draft PRs let PMs, managers, and team leads see your progress without asking. Convert to "Ready for Review" only when the work is actually ready.
+4. **PR descriptions must reference the ticket.** Include `CPE-1234` (or your team's equivalent) in the PR title or body. The Linear GitHub integration uses this to attach the PR and trigger status transitions.
+5. **Update the ticket continuously, with detail.** Specifically:
+   - Comment on scope changes, ambiguity, or blockers - don't keep them in Slack only.
+   - Be detailed enough that our AI systems can summarize your progress without asking. "Fixed the bug" is not enough. "Found the root cause was a missing await in `clinicService.ts:142` causing a race condition with the booking webhook; added the await plus a regression test" is.
+   - If you're blocked, move the ticket back to **Todo** with a "blocked by" comment naming the blocker (person, ticket, or external dependency).
+   - When you open the PR, paste the PR link as a comment if the GitHub integration didn't auto-attach it.
+   - If you split the work, create the sub-tickets and link them as `Related to` or `Blocks`.
+6. **If you're sick or out, keep your ticket moving.** Before you sign off:
+   - Comment with current state ("paused at PR ready-for-review pending design clarification").
+   - Reassign to a backup or your team lead so it doesn't sit dormant.
+   - Move to a state that signals handoff (typically back to **Todo** with a "handoff: see comment" note).
+
+   The team is global. A ticket sitting unassigned for two days because you're sick is a coordination failure.
+7. **Update the docs alongside the code.** If your PR changes user-visible behavior, an API contract, or a public function signature, the Mintlify handbook (or the relevant Linear doc) gets updated in the same PR. Doc-drift is a bug.
+8. **Keep PRs under 500 lines of code.** Larger changes get split into multiple PRs using the stacked-PR workflow. 500-line PRs get reviewed in 30 minutes. 2,000-line PRs don't get reviewed - they get rubber-stamped, which is how regressions ship.
+9. **Pass at least 5 of 6 AI reviewers before requesting human review.** Our AI bot review pipeline includes Devin, Bugbot, Codex, Copilot, Claude Code, and Augment. At least 5 of 6 must approve (or the unresolved comments must be specifically addressed in PR comments) before you tag a human reviewer to merge into prestaging. Human reviewers' time is the most expensive thing on the team - don't burn it on issues the bots could have caught.
+10. **End-of-day check.** Before signing off, every ticket you touched today should reflect reality: correct status, current comment thread, blockers visible. The `#daily-update` Slack post is a summary, not the source of truth. Linear is.
+
+The reason: leadership reads Linear, not Slack. Our AI systems read Linear. Future-you reading the ticket six months from now reads Linear. If your work isn't tracked in Linear with detail, it didn't happen for sprint planning, status reports, sprint reviews, or AI-assisted analysis.
+
+## What goes in Linear vs other tools
+
+| Tool | What lives there |
+| --- | --- |
+| **Linear** | All actionable engineering work: tickets, sprints, bugs, PR-linked tasks |
+| **Mintlify** | Long-lived technical docs (handbook, architecture, runbooks) |
+| **Slack** | Real-time discussion, daily updates, PR coordination |
+| **Notion** | Strategy, partner/client material, executive context |
+
+If a piece of work has an owner and a deliverable, it belongs in Linear.
+
+## Teams you may be added to
+
+| Team | Key | Use it for |
+| --- | --- | --- |
+| CrestPet Engineering | CPE | Main product work (everyone) |
+| Design | DES | UI/UX tickets |
+| AI & Machine Learning | AI | Marcia LLM, CrestBrain |
+| Mobile | MOB | Marcia mobile app |
+| Infrastructure | INF | Terraform, AWS, DevOps |
+| Peacock | PCK | Peacock client project |
+| Support | SUP | Customer triage (replaces MARS JSM) |
+| Marcia Code CLI | CLI | CLI fork work |
+| CrestCorp | CRC | Internal ops: access, IAM, onboarding/offboarding, key rotation |
+
+If you need access to a customer issue or platform change, file it in **CRC**.
+
+## Workflow states (CPE / DES / MOB)
+
+`Backlog → Todo → In Progress → In Review → Devbox → Prestaging → Staging → Production`
+
+Also: `Canceled`, `Duplicate`.
+
+INF / AI / PCK use a simpler flow: merge to `main` → `Done`.
+
+## Git automations (do not move tickets manually)
+
+These transitions happen automatically *only if* your branch and PR reference the ticket key correctly (see Requirements #2 and #4). Do not click them manually. That's a sign the integration didn't catch the link, which means others can't see your work via the standard views.
+
+- Create a branch named `CPE-1234-short-description` → ticket moves to **In Progress**
+- Open a PR referencing `CPE-1234` → moves to **In Review**
+- Merge to `prestaging` → **Prestaging**
+- Merge to `staging` → **Staging**
+- Merge to `main` → **Production**
+
+## Branch naming
+
+`<TEAM-KEY>-<NUMBER>-<short-description>`
+
+Examples: `CPE-2104-clinic-search-empty-state`, `INF-58-derp-frankfurt-ip-forward`.
+
+The team key prefix is what triggers the git automation, so it must match the ticket's team.
+
+## Sprint cadence
+
+CPE and MOB run **two-week cycles starting Monday**. Other teams run continuous flow.
+
+## Common gotchas
+
+- `assignee="me"` API queries saturate at 50 results and hide tickets on quieter teams. Always cross-check by team.
+- Linear and Jira are still two-way synced (PW↔CPE, UCPS↔DES, MARS↔SUP). Do not edit the same ticket in both tools simultaneously.
+- Branch naming is still being migrated from `PW-XXXX` to `CPE-XXXX`. Either prefix works during the transition.
+
+## Who to ask
+
+- Linear access / team membership: Michael Cammarata
+- MARS / customer support access: Karen
+- Workflow state changes or new automation: Michael Cammarata
