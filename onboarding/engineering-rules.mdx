@@ -1,0 +1,57 @@
+---
+title: "Engineering Rules (Security & Conduct)"
+description: "Non-negotiable security and conduct rules for engineering at Crest. Violations are grounds for access revocation and contract termination."
+---
+
+<Note>
+**Canonical source of truth.** The Linear copy at [linear.app/crest-usa/document/engineering-rules-security-and-conduct-8f247f54a7ce](https://linear.app/crest-usa/document/engineering-rules-security-and-conduct-8f247f54a7ce) mirrors this page. Please file edits as PRs against [`cmistaff/docs`](https://github.com/cmistaff/docs).
+</Note>
+
+These rules are non-negotiable. Violations are grounds for access revocation and, depending on severity, contract termination. If a rule conflicts with your judgment, ask before acting. There is no "I didn't know" exception.
+
+## Source Code
+
+1. **Source code never leaves the dev box.** Do not clone Crest repos to your personal laptop, desktop, phone, USB drive, personal cloud (iCloud, Dropbox, Google Drive, GitHub personal), or any device that is not a company-issued dev box.
+2. **No copying snippets out of the codebase** to personal notes, ChatGPT-style external chat tools (other than the company-provisioned Claude Code / Cursor on your dev box), pastebins, gists, or screenshots posted publicly.
+3. **No forking Crest repos to personal GitHub accounts.** All work happens on branches under the `cmistaff`, `CrestCorp`, `CrestLabsHQ`, or other approved org.
+4. **No public posts of internal screenshots, designs, code, or architecture diagrams.** This includes Twitter/X, LinkedIn posts, blog write-ups, conference talks, and portfolio sites. If you want to publish anything that references Crest work, it must be approved in writing first.
+
+## Secrets and Credentials
+
+5. **Never commit secrets.** API keys, tokens, passwords, connection strings, certs, and `.env` files do not go into git. Pre-commit hooks catch most cases, but the responsibility is yours.
+6. **Never share API keys in Slack, email, Loom, screenshots, or DMs.** Even temporarily. Even to a teammate. Even masked. If someone asks you for a key, point them to AWS Secrets Manager.
+7. **Use AWS Secrets Manager for everything.** Local `.env` files on your dev box should be populated from `aws secretsmanager get-secret-value` (commands are in the [Engineering Onboarding Handbook](/onboarding/engineering-handbook)). Do not type secrets in by hand from a doc.
+8. **Never paste secrets into AI tools** (ChatGPT, Claude.ai web, Cursor, Copilot, etc.) even on your personal account. Once it's in the prompt, it's in the provider's logs.
+9. **Never use a single key across personal and work projects.** If you need a key for personal experimentation, get your own under your own account. Crest keys are for Crest work only.
+
+## Access and Identity
+
+10. **Use @creststaff.com for everything.** Slack, GitHub (linked to creststaff email), Cursor, Claude Code, Loom, AWS, all SaaS. Personal-email logins to work tools are forbidden and will be terminated.
+11. **No social-engineering for access.** Do not ask teammates, IT, or admins to grant you access to repos, AWS accounts, Linear teams, or production systems "just to take a look." Access is granted by ticket (`CRC` team) with a stated business reason. If you genuinely need it, file the ticket; if you don't, don't ask.
+12. **Do not use someone else's session.** No shared logins, no "borrowed" credentials, no remote-controlling another dev's box. If your access is broken, file a CRC ticket.
+13. **2FA is required on every personal account that touches a work tool.** GitHub, Google, AWS console (if you have console access), Atlassian, Linear. No exceptions.
+
+## Equipment and Workspace
+
+14. **Work happens on the dev box.** Code editing, builds, browser sessions for work tools, AI tool sessions. Local machine is for SSH/Tailscale and video calls. This is what makes Tailscale-only access, audit logs, and EDR work.
+15. **No personal projects on the dev box.** The dev box is a Crest-owned compute resource. Don't run side-business code, crypto miners, training jobs, scrapers, or personal SaaS workloads on it. Cycles, disk, and outbound bandwidth are monitored.
+16. **No personal phone numbers for work.** Use Google Voice (`voice.google.com` with @creststaff.com). Calls and texts to clients, candidates, vendors all go through Google Voice.
+17. **Hubstaff is required during all paid work hours.** Desktop app, not web. CrestPetSystem project, correct task. If Hubstaff isn't running, you're not on the clock.
+
+## Conduct
+
+18. **Camera on for all Zoom meetings.** No exceptions for daily standup, code review walkthroughs, or client calls.
+19. **Do not record meetings with personal note-takers, AI assistants, or transcription services.** Zoom transcripts are auto-provided to your @creststaff.com account by the project's official note-takers.
+20. **Marcia / Crest IP is confidential.** Do not disclose the underlying models (Kimi, K2.5, DeepSeek, Moonshot, Fireworks, etc.) to clients, prospects, candidates, or in any public material. Marcia is the product; the substrate is trade secret.
+21. **Decisions go in public Slack channels, not DMs.** Use DMs for direct questions only. Anything that affects the team's understanding of the work belongs in the channel.
+22. **All work product belongs to Crest.** Code, designs, documents, models, prompts, datasets, and any derivative produced during paid hours or using Crest resources is Crest's IP under your contract. This is not negotiable.
+
+## When you leave
+
+23. **Notify before, not after.** Two weeks notice minimum for planned departures. Same-day notice for emergencies is fine, but tell your team lead first, not in `#general`.
+24. **Hand off all in-flight tickets** with comments naming who picks them up.
+25. **Do not delete branches, commits, or tickets** during your last week. Leave the audit trail intact.
+
+## Reporting concerns
+
+If you suspect a security incident (leaked key, compromised account, unauthorized access, lost device, phishing attempt that succeeded): tell Michael immediately. Direct DM. Do not wait until the next standup, do not file a ticket first. Speed of disclosure determines blast radius.
