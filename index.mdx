@@ -4,51 +4,209 @@ description: "CrestPet System -- a multi-tenant veterinary practice management p
 mode: "wide"
 ---
 
+{/* ============== HERO ============== */}
 <div style={{
-  background: "linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(34, 211, 238, 0.04) 100%)",
-  borderRadius: "16px",
-  padding: "2.5rem 2rem",
-  marginBottom: "2.5rem",
-  border: "1px solid rgba(6, 182, 212, 0.15)"
+  position: "relative",
+  background: "linear-gradient(135deg, #0e7490 0%, #06b6d4 45%, #22d3ee 100%)",
+  borderRadius: "20px",
+  padding: "4rem 3rem",
+  marginBottom: "3rem",
+  overflow: "hidden",
+  boxShadow: "0 25px 60px -20px rgba(6, 182, 212, 0.45), 0 10px 30px -10px rgba(8, 145, 178, 0.3)",
+  border: "1px solid rgba(34, 211, 238, 0.4)"
 }}>
-  <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem", alignItems: "center", justifyContent: "space-between" }}>
-    <div style={{ flex: "1 1 400px" }}>
-      <h1 style={{ fontSize: "2.75rem", fontWeight: 800, lineHeight: 1.1, margin: 0, marginBottom: "0.75rem" }}>
-        <span style={{ color: "#06b6d4" }}>Crest</span> Engineering
+  {/* Peacock watermark */}
+  <img
+    src="/logo/peacock.png"
+    alt=""
+    aria-hidden="true"
+    style={{
+      position: "absolute",
+      right: "-60px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      height: "115%",
+      opacity: 0.08,
+      pointerEvents: "none",
+      filter: "brightness(0) invert(1)"
+    }}
+  />
+  {/* Gradient orb accent */}
+  <div style={{
+    position: "absolute",
+    top: "-100px",
+    left: "-100px",
+    width: "400px",
+    height: "400px",
+    background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)",
+    pointerEvents: "none"
+  }} />
+
+  <div style={{ position: "relative", display: "flex", flexWrap: "wrap", gap: "3rem", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ flex: "1 1 480px", color: "white" }}>
+      <div style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        padding: "0.4rem 0.9rem",
+        borderRadius: "999px",
+        background: "rgba(255, 255, 255, 0.18)",
+        backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255, 255, 255, 0.25)",
+        color: "white",
+        fontSize: "0.78rem",
+        fontWeight: 600,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        marginBottom: "1.5rem"
+      }}>
+        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#86efac", boxShadow: "0 0 12px #86efac" }} />
+        Internal Engineering Docs
+      </div>
+      <h1 style={{
+        fontSize: "4.5rem",
+        fontWeight: 900,
+        lineHeight: 1,
+        margin: 0,
+        marginBottom: "1.25rem",
+        color: "white",
+        letterSpacing: "-0.03em",
+        textShadow: "0 4px 20px rgba(0,0,0,0.15)"
+      }}>
+        Crest<br/>
+        <span style={{
+          background: "linear-gradient(90deg, #ffffff 0%, #cffafe 100%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          backgroundClip: "text"
+        }}>Engineering</span>
       </h1>
-      <p style={{ fontSize: "1.15rem", color: "#475569", margin: 0, marginBottom: "1.25rem", lineHeight: 1.5 }}>
-        Multi-tenant veterinary practice management, built by <strong>Crest Advisory Group LLC</strong>.
+      <p style={{
+        fontSize: "1.35rem",
+        color: "rgba(255, 255, 255, 0.92)",
+        margin: 0,
+        marginBottom: "2rem",
+        lineHeight: 1.5,
+        maxWidth: "520px",
+        fontWeight: 400
+      }}>
+        Multi-tenant veterinary practice management. Eight portals, one platform, one team.
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>8 Portals</span>
-        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>Next.js 15 + NestJS 11</span>
-        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>AWS Multi-Region</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
+        <a href="/onboarding/welcome-video" style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.85rem 1.5rem",
+          borderRadius: "10px",
+          background: "white",
+          color: "#0e7490",
+          fontWeight: 700,
+          fontSize: "0.95rem",
+          textDecoration: "none",
+          boxShadow: "0 6px 20px -6px rgba(0,0,0,0.25)",
+          transition: "transform 0.15s"
+        }}>
+          Start onboarding &rarr;
+        </a>
+        <a href="/architecture/overview" style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.85rem 1.5rem",
+          borderRadius: "10px",
+          background: "rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(8px)",
+          color: "white",
+          fontWeight: 600,
+          fontSize: "0.95rem",
+          textDecoration: "none",
+          border: "1px solid rgba(255, 255, 255, 0.3)"
+        }}>
+          Architecture
+        </a>
       </div>
     </div>
-    <div style={{ flex: "0 1 360px", minWidth: "280px" }}>
-      <Frame caption="Engineering onboarding (v5)">
+    <div style={{ flex: "0 1 420px", minWidth: "300px" }}>
+      <div style={{
+        position: "relative",
+        borderRadius: "14px",
+        padding: "6px",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)",
+        boxShadow: "0 20px 50px -15px rgba(0,0,0,0.4)"
+      }}>
         <video
           controls
           playsInline
           preload="metadata"
-          style={{ width: "100%", borderRadius: "8px", display: "block" }}
+          style={{ width: "100%", borderRadius: "10px", display: "block", background: "#0e7490" }}
           src="https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v5-20260418.mp4"
         />
-      </Frame>
+        <div style={{
+          position: "absolute",
+          bottom: "16px",
+          left: "16px",
+          padding: "0.3rem 0.7rem",
+          borderRadius: "6px",
+          background: "rgba(14, 116, 144, 0.85)",
+          backdropFilter: "blur(6px)",
+          color: "white",
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          pointerEvents: "none"
+        }}>
+          6-min walkthrough &middot; v5
+        </div>
+      </div>
     </div>
+  </div>
+</div>
+
+{/* ============== BY THE NUMBERS ============== */}
+<div style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: "1rem",
+  marginBottom: "3.5rem"
+}}>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>8</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>Portals</div>
+  </div>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>22</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>BullMQ Processors</div>
+  </div>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>9</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>WebSocket Gateways</div>
+  </div>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>3</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>AWS Regions</div>
+  </div>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>36</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>GH Actions Workflows</div>
+  </div>
+  <div style={{ padding: "1.5rem 1.25rem", borderRadius: "14px", background: "linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.02) 100%)", border: "1px solid rgba(6, 182, 212, 0.15)", textAlign: "center" }}>
+    <div style={{ fontSize: "2.6rem", fontWeight: 800, lineHeight: 1, color: "#06b6d4", marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>6</div>
+    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Bot Reviewers</div>
   </div>
 </div>
 
 ## Where do you want to go?
 
 <CardGroup cols={3}>
-  <Card title="New to Crest?" icon="sparkles" href="/onboarding/welcome-video" horizontal>
+  <Card title="New to Crest?" icon="sparkles" iconType="duotone" color="#06b6d4" href="/onboarding/welcome-video" horizontal>
     Start the engineering onboarding flow
   </Card>
-  <Card title="Building features?" icon="hammer" href="/architecture/overview" horizontal>
+  <Card title="Building features?" icon="hammer" iconType="duotone" color="#06b6d4" href="/architecture/overview" horizontal>
     Architecture and API reference
   </Card>
-  <Card title="Operating the platform?" icon="server" href="/infra/overview" horizontal>
+  <Card title="Operating the platform?" icon="server" iconType="duotone" color="#06b6d4" href="/infra/overview" horizontal>
     Infrastructure and runbooks
   </Card>
 </CardGroup>
@@ -58,28 +216,28 @@ mode: "wide"
 A unified platform for every aspect of veterinary care.
 
 <CardGroup cols={2}>
-  <Card title="Appointments and Scheduling" icon="calendar-check">
+  <Card title="Appointments and Scheduling" icon="calendar-check" iconType="duotone" color="#06b6d4">
     Real-time availability, slot reservations, video consultations, and referral booking.
   </Card>
-  <Card title="Electronic Health Records" icon="clipboard-list">
+  <Card title="Electronic Health Records" icon="clipboard-list" iconType="duotone" color="#06b6d4">
     Consultation notes, dental charts, diagnostic requests, imaging, treatment and anesthetic sheets.
   </Card>
-  <Card title="Pet Wellness" icon="heart-pulse">
+  <Card title="Pet Wellness" icon="heart-pulse" iconType="duotone" color="#06b6d4">
     AI-powered health scoring, wellness plans, and video summaries delivered to pet owners.
   </Card>
-  <Card title="Payments and Billing" icon="credit-card">
+  <Card title="Payments and Billing" icon="credit-card" iconType="duotone" color="#06b6d4">
     Stripe Connect, invoicing, insurance splits, payouts, and staff commissions.
   </Card>
-  <Card title="Inventory and Purchasing" icon="boxes-stacked">
+  <Card title="Inventory and Purchasing" icon="boxes-stacked" iconType="duotone" color="#06b6d4">
     Stock tracking, lot management, low-stock alerts, auto-reorder, and PO workflows.
   </Card>
-  <Card title="Enterprise Analytics" icon="chart-line">
+  <Card title="Enterprise Analytics" icon="chart-line" iconType="duotone" color="#06b6d4">
     Multi-location dashboards, predictive analytics, and centralized clinic oversight.
   </Card>
-  <Card title="Marcia AI Assistant" icon="robot">
+  <Card title="Marcia AI Assistant" icon="robot" iconType="duotone" color="#06b6d4">
     Chat, voice, SMS, and WhatsApp channels for clients and staff -- powered by Marcia.
   </Card>
-  <Card title="Compliance and Documents" icon="file-shield">
+  <Card title="Compliance and Documents" icon="file-shield" iconType="duotone" color="#06b6d4">
     DocuSign templates, consent forms, legal policies, and PDF certificate generation.
   </Card>
 </CardGroup>
@@ -89,28 +247,28 @@ A unified platform for every aspect of veterinary care.
 CrestPet is organized into eight portals, each accessed through a dedicated subdomain.
 
 <CardGroup cols={4}>
-  <Card title="Clinic" icon="stethoscope">
+  <Card title="Clinic" icon="stethoscope" iconType="duotone" color="#06b6d4">
     Primary workspace for veterinary practices. Appointments, EHR, billing, inventory, whiteboards, and staff ops.
   </Card>
-  <Card title="Consumer" icon="paw">
+  <Card title="Consumer" icon="paw" iconType="duotone" color="#06b6d4">
     Pet owner portal for booking, health records, medications, vaccinations, and clinic messaging.
   </Card>
-  <Card title="Enterprise" icon="building">
+  <Card title="Enterprise" icon="building" iconType="duotone" color="#06b6d4">
     Multi-location management for corporate vet groups -- analytics, staff, subscriptions, oversight.
   </Card>
-  <Card title="Platform" icon="shield-halved">
+  <Card title="Platform" icon="shield-halved" iconType="duotone" color="#06b6d4">
     Admin control panel. Tenants, users, species data, feature policies, AI settings, revenue.
   </Card>
-  <Card title="Referral" icon="share-nodes">
+  <Card title="Referral" icon="share-nodes" iconType="duotone" color="#06b6d4">
     Inter-clinic patient referrals with availability-based scheduling and full audit logging.
   </Card>
-  <Card title="Marcia" icon="robot">
+  <Card title="Marcia" icon="robot" iconType="duotone" color="#06b6d4">
     AI veterinary assistant -- chat, voice (ElevenLabs), SMS, WhatsApp, training data, draft generation.
   </Card>
-  <Card title="Vendor" icon="truck">
+  <Card title="Vendor" icon="truck" iconType="duotone" color="#06b6d4">
     Frontend portal for vendor purchase order confirmation pages.
   </Card>
-  <Card title="API" icon="code">
+  <Card title="API" icon="code" iconType="duotone" color="#06b6d4">
     Public REST API surface -- OpenAPI spec, authenticated tenant access, rate limiting.
   </Card>
 </CardGroup>
@@ -119,53 +277,165 @@ CrestPet is organized into eight portals, each accessed through a dedicated subd
 
 <Tabs>
   <Tab title="Frontend">
-    **Next.js 15** with App Router, **React 19**, **TypeScript 5.8**, **Tailwind CSS 4**. Mobile clients via **Expo (React Native)**.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Next.js 15</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>React 19</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>TypeScript 5.8</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Tailwind CSS 4</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>App Router</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Expo (RN)</span>
+    </div>
   </Tab>
   <Tab title="Backend">
-    **NestJS 11** on **Node.js 22**, **TypeScript 5.8**, **Prisma 6** ORM. **pnpm 10** workspaces.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>NestJS 11</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Node.js 22</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>TypeScript 5.8</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Prisma 6</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>pnpm 10</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>BullMQ</span>
+    </div>
   </Tab>
   <Tab title="Database">
-    **PostgreSQL** on **Amazon RDS** (Aurora-compatible). Multi-tenant schema with row-level isolation.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>PostgreSQL 16</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Amazon RDS</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Aurora-compatible</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Multi-tenant RLS</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Prisma Migrate</span>
+    </div>
   </Tab>
   <Tab title="Cache">
-    **Redis** on **ElastiCache** -- session storage, rate limiting, queue backplane, real-time fan-out.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Redis 7</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>ElastiCache</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Sessions</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Rate limiting</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>WS fan-out</span>
+    </div>
   </Tab>
   <Tab title="Auth">
-    **Better Auth** with **JWT** sessions, **Prisma adapter**, and **Passkey/WebAuthn** support across portals.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Better Auth</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>JWT</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Prisma adapter</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Passkey/WebAuthn</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Cross-portal SSO</span>
+    </div>
   </Tab>
   <Tab title="Runtime">
-    **Node.js 22**, **pnpm 10**, **Bun test runner**. CI on self-hosted GitHub Actions runners.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Node.js 22</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>pnpm 10</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Bun test runner</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Self-hosted GH runners</span>
+    </div>
   </Tab>
   <Tab title="Infrastructure">
-    **AWS ECS Fargate**, **EKS multi-region**, **RDS**, **ElastiCache**, **S3**, **CloudFront**, **ALB**, **WAF**, **Cloudflare** edge.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>ECS Fargate</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>EKS multi-region</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>RDS</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>ElastiCache</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>S3 + CloudFront</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>ALB + WAF</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Cloudflare edge</span>
+    </div>
   </Tab>
   <Tab title="API and Testing">
-    **Orval** auto-generates clients from the **OpenAPI** spec. **Bun test** for server unit + E2E. **Playwright** for frontend E2E.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem", marginTop: "0.5rem" }}>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>OpenAPI</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Orval auto-generated clients</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Bun test (unit + E2E)</span>
+      <span style={{ padding: "0.45rem 0.95rem", borderRadius: "8px", background: "rgba(6, 182, 212, 0.10)", color: "#0891b2", fontWeight: 600, fontSize: "0.88rem", border: "1px solid rgba(6, 182, 212, 0.2)" }}>Playwright (frontend E2E)</span>
+    </div>
   </Tab>
 </Tabs>
 
 ## Jump in
 
 <CardGroup cols={3}>
-  <Card title="Getting Started" icon="rocket" href="/guides/getting-started">
+  <Card title="Getting Started" icon="rocket" iconType="duotone" color="#06b6d4" href="/guides/getting-started">
     Local dev setup -- env, services, seed data
   </Card>
-  <Card title="Architecture" icon="diagram-project" href="/architecture/overview">
+  <Card title="Architecture" icon="diagram-project" iconType="duotone" color="#06b6d4" href="/architecture/overview">
     System design across all 8 portals
   </Card>
-  <Card title="Authentication" icon="lock" href="/guides/authentication">
+  <Card title="Authentication" icon="lock" iconType="duotone" color="#06b6d4" href="/guides/authentication">
     Better Auth, JWT, and cross-portal SSO
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+  <Card title="API Reference" icon="code" iconType="duotone" color="#06b6d4" href="/api-reference/introduction">
     REST endpoints, schemas, and examples
   </Card>
-  <Card title="Engineering Rules" icon="scale-balanced" href="/onboarding/engineering-rules">
+  <Card title="Engineering Rules" icon="scale-balanced" iconType="duotone" color="#06b6d4" href="/onboarding/engineering-rules">
     Code standards and review expectations
   </Card>
-  <Card title="Working in Linear" icon="list-check" href="/onboarding/working-in-linear">
+  <Card title="Working in Linear" icon="list-check" iconType="duotone" color="#06b6d4" href="/onboarding/working-in-linear">
     How we plan, track, and ship work
   </Card>
 </CardGroup>
+
+{/* ============== VALUES / WHY ============== */}
+<div style={{
+  position: "relative",
+  marginTop: "3.5rem",
+  marginBottom: "2rem",
+  padding: "3rem 2.5rem",
+  borderRadius: "20px",
+  background: "linear-gradient(135deg, #0c4a6e 0%, #0e7490 100%)",
+  overflow: "hidden",
+  boxShadow: "0 20px 50px -15px rgba(14, 116, 144, 0.45)"
+}}>
+  <img
+    src="/logo/peacock.png"
+    alt=""
+    aria-hidden="true"
+    style={{
+      position: "absolute",
+      left: "-40px",
+      bottom: "-40px",
+      height: "140%",
+      opacity: 0.07,
+      pointerEvents: "none",
+      filter: "brightness(0) invert(1)"
+    }}
+  />
+  <div style={{ position: "relative", textAlign: "center", maxWidth: "780px", margin: "0 auto", color: "white" }}>
+    <div style={{
+      display: "inline-block",
+      padding: "0.35rem 0.85rem",
+      borderRadius: "999px",
+      background: "rgba(255,255,255,0.15)",
+      color: "#cffafe",
+      fontSize: "0.75rem",
+      fontWeight: 700,
+      letterSpacing: "0.1em",
+      textTransform: "uppercase",
+      marginBottom: "1.25rem"
+    }}>
+      Why we ship
+    </div>
+    <h2 style={{
+      fontSize: "2.25rem",
+      fontWeight: 800,
+      lineHeight: 1.15,
+      margin: 0,
+      marginBottom: "1rem",
+      color: "white",
+      letterSpacing: "-0.02em"
+    }}>
+      Built for the world's largest vet network.
+    </h2>
+    <p style={{
+      fontSize: "1.1rem",
+      color: "rgba(255,255,255,0.88)",
+      lineHeight: 1.6,
+      margin: 0
+    }}>
+      CrestPet powers practice management for <strong style={{ color: "white" }}>Mars Veterinary Health</strong> -- 4,000+ clinics across BluePearl, VCA, Banfield, and Antech. Every appointment booked, every record written, every wellness plan delivered moves through the platform you build here.
+    </p>
+  </div>
+</div>
 
 <Note>
   This site is access-controlled. Internal-only -- do not share the access code outside Crest.
