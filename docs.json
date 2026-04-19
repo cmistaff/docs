@@ -14,35 +14,40 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Get Started",
+        "tab": "Onboarding",
         "groups": [
           {
             "group": "Start Here",
             "pages": [
-              "index",
-              "onboarding/day-one-walkthrough",
-              "onboarding/welcome-video",
-              "onboarding/engineering-handbook"
+              "onboarding/welcome",
+              "onboarding/before-you-start",
+              "onboarding/connect-to-devbox",
+              "onboarding/workstation-setup",
+              "onboarding/run-crestpetsystem-locally",
+              "onboarding/day-one-walkthrough"
             ]
           },
           {
             "group": "Working at Crest",
             "pages": [
-              "onboarding/working-in-linear",
-              "onboarding/engineering-rules",
-              "onboarding/data-access",
               "onboarding/environment-variables",
-              "onboarding/aws-sso-setup"
+              "onboarding/aws-sso-setup",
+              "onboarding/ai-tooling-stack",
+              "onboarding/pr-review-protocol",
+              "onboarding/argus-dev-scorecard"
             ]
           },
           {
-            "group": "Code Quality and Reviews",
+            "group": "More Engineering Docs",
             "pages": [
+              "index",
+              "onboarding/welcome-video",
+              "onboarding/engineering-handbook",
+              "onboarding/working-in-linear",
+              "onboarding/engineering-rules",
+              "onboarding/data-access",
               "onboarding/ai-review-pipeline",
-              "onboarding/pr-review-protocol",
-              "onboarding/sonarcloud-sonarlint",
-              "onboarding/argus-dev-scorecard",
-              "onboarding/ai-tooling-stack"
+              "onboarding/sonarcloud-sonarlint"
             ]
           }
         ]
