@@ -71,6 +71,12 @@
               "onboarding/ai-review-pipeline",
               "onboarding/sonarcloud-sonarlint"
             ]
+          },
+          {
+            "group": "Performance and Reviews",
+            "pages": [
+              "onboarding/argus-dev-scorecard"
+            ]
           }
         ]
       },

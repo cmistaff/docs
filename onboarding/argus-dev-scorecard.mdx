@@ -1,0 +1,263 @@
+---
+title: "Argus Dev Scorecard"
+description: "How Crest measures engineering work day-to-day: the signals Argus collects, how the nightly 0-100 score is built, where to find your scorecard, and what gets discussed in your monthly review."
+---
+
+<Note>
+**Read this before your first month-end review.** Argus is the system that turns your daily activity into a single rolling score. The score is one input into your monthly review, not the whole review. The point of this page is to make sure you understand what the system sees so nothing in your review feels like a surprise.
+</Note>
+
+## What Argus is
+
+Argus is Crest's engineering measurement system. It is not a tool you log into. It is a nightly batch that pulls signals from Hubstaff, GitHub, Jira, Linear, the dev box screenshot reviews, and (for PR-level analysis) the standalone [`argus-cli`](https://github.com/cmistaff/argus-cli) on top of the `cmistaff` GitHub org. The output is a per-developer scorecard PDF and JSON dropped into `~/dev-scorecards/` on the ops box every night at 02:00 UTC, plus a copy in the shared Google Drive Daily Operations folder.
+
+The job of Argus is to surface the signals that already exist in our tooling. It does not invent metrics. If the score says you had three high-severity flags this month, that is because the screenshot AI reviewer flagged three of your screenshots with risk score five or higher, and you can read the descriptions in your card. The system is designed to be readable, not opaque.
+
+There are two related layers and it is worth knowing the difference:
+
+<CardGroup cols={2}>
+  <Card title="Nightly Dev Scorecard" icon="chart-line" href="#what-we-measure">
+    The 0-100 composite score. Hubstaff hours + GitHub + Jira + flags + screenshot risk. Runs at 02:00 UTC. PDF + JSON in `~/dev-scorecards/`. This is what your manager looks at.
+  </Card>
+  <Card title="argus-cli (PR engine)" icon="code-pull-request" href="#argus-cli-pr-only-deep-dive">
+    Standalone CLI that scores merged PRs across the `cmistaff` org with S/A/B/C/D bands. Used for sprint and team views. Configurable weights in `argus.yaml`.
+  </Card>
+</CardGroup>
+
+When this page says "your score" without qualifying, it means the nightly 0-100 composite. The S/A/B/C/D bands are a separate PR-only view that we use for sprint retrospectives.
+
+## What we measure
+
+The nightly scorecard collects the following per developer over the **month-to-date** window (1st of the current month through today, weekdays only count toward targets):
+
+| Source | Signal | Where it comes from |
+| --- | --- | --- |
+| Hubstaff | Hours tracked MTD | `daily_hours` table in `~/hubstaff-data/reviews.db`, populated from Hubstaff API |
+| Hubstaff | Days tracked | Distinct dates with any tracked time |
+| Hubstaff | High/critical flags | `flags` table, severity in (`high`, `critical`) |
+| Hubstaff | Screenshot risk | `screenshot_reviews` table, average and max risk score (1-10) from the AI reviewer |
+| GitHub | Commits | All commits authored across `crestpetsystem`, `infra`, `EC2DevsCrestPet` and tracked branches |
+| GitHub | PRs merged | Merged-state PRs whose author resolves to you |
+| GitHub | PR reviews submitted | Counts toward bonus, never toward penalty |
+| Jira / Linear | Tickets done MTD | Status-category Done, updated since the 1st, across PW, MARS, SCORE projects |
+| Jira / Linear | Open tickets | Excluding sub-tasks, to match board view |
+| Jira / Linear | In-progress tickets | Subset of open |
+| Jira / Linear | Blocked tickets | Subset of open with "block" in status name |
+
+Devs are matched across systems by canonical name. Bots, AI co-author logins (`claude*`, `cursor*`, `copilot*`), departed contractors, and Michael's accounts are excluded.
+
+<Note>
+**UI/UX designers are scored differently.** Designers (Olha, Oleksandra, Alona K, Alona N) are not penalized for zero GitHub commits. Their GitHub bonus tier is replaced with a Jira-throughput tier so role differences do not punish people unfairly.
+</Note>
+
+## How it is weighted
+
+The score starts at **50** and moves up or down based on six categories. Maximum possible is 100, minimum is 0.
+
+The exact deltas are in [`dev_scorecard_report.py`](https://github.com/cmistaff/management-tools/blob/main/scripts/dev_scorecard_report.py) (function `score_dev`). The summary:
+
+<AccordionGroup>
+  <Accordion title="Hours vs target (work_days x 8h)" icon="clock">
+    - Greater than or equal to 95 percent of target: **+15** ("on target")
+    - 80 to 94 percent: **+5** ("close")
+    - 60 to 79 percent: **-10** ("below target")
+    - 1 to 59 percent: **-20** ("significantly low")
+    - Zero hours tracked: **-30**
+
+    Target is `work_days_in_month_so_far x 8`. If the 17th is a Friday, target is roughly 13 weekdays x 8 = 104 hours.
+  </Accordion>
+  <Accordion title="GitHub output (engineers only)" icon="code">
+    - 10+ commits AND 3+ merged PRs: **+15** ("strong")
+    - 5+ commits OR 2+ merged PRs: **+5** ("solid")
+    - 1 to 4 commits with no merged PRs: neutral
+    - Zero commits AND fewer than 5 reviews: **-10** ("no GitHub activity")
+    - Zero commits BUT 5+ reviews: neutral (active reviewer, no penalty)
+
+    Plus a separate review bonus: 10+ PR reviews MTD adds **+5**, 5 to 9 reviews is called out positively but adds zero.
+  </Accordion>
+  <Accordion title="UI/UX Jira output (designers only)" icon="palette">
+    Replaces the GitHub tier:
+    - 8+ tickets done MTD: **+15**
+    - 4 to 7 tickets done MTD: **+5**
+  </Accordion>
+  <Accordion title="Jira / Linear ticket throughput" icon="list-check">
+    - 5+ done MTD: **+10** ("high throughput")
+    - 2 to 4 done MTD: **+3** ("moderate")
+    - Zero done MTD with open tickets sitting on you: **-10**
+    - Any blocked tickets: **-5**
+    - More than 8 open tickets at once: **-5** (ticket pile)
+  </Accordion>
+  <Accordion title="Hubstaff flags (high or critical only)" icon="triangle-exclamation">
+    - 3+ high or critical flags: **-10**
+    - 1 to 2 high or critical flags: **-3**
+
+    Low and medium severity flags do not move the score, but they do show up on your card so you can see them.
+  </Accordion>
+  <Accordion title="Screenshot risk" icon="camera">
+    - Average screenshot risk score 4.0 or higher: **-8**
+    - Average 3.0 to 3.9: **-3**
+
+    Max risk on a single screenshot does not move the score directly, but a single 9 or 10 will land in your card and is reviewed by the security team.
+  </Accordion>
+</AccordionGroup>
+
+The final score is clamped to the range 0 to 100 and bucketed for the ranking table:
+
+| Band | Score | Label |
+| --- | --- | --- |
+| Green | 70 to 100 | Strong |
+| Yellow | 50 to 69 | OK |
+| Orange | 35 to 49 | Needs Attention |
+| Red | 0 to 34 | At Risk |
+
+<Tip>
+**The point of the scoring formula is to surface signals, not to be gamed.** If you find yourself optimizing for the score (padding hours, opening trivial PRs to bump commit count, opening tickets just to close them), you have misunderstood the system and your manager will notice in the qualitative half of the review. The score exists so the qualitative discussion can start from facts instead of feelings.
+</Tip>
+
+## How to find your score
+
+The nightly scorecard is currently distributed three ways:
+
+1. **PDF in your monthly review.** Your manager pulls the latest PDF from `~/dev-scorecards/` or the shared Google Drive folder before your one-on-one. If you want to see your score before the meeting, ask in your team channel or DM your manager.
+2. **Google Drive (managers and Michael).** `Daily Operations/{YYYY}/{MM-Month}/{YYYY-MM-DD}/dev-scorecard-{YYYY-MM-DD}.pdf`. If you do not have access, you are not meant to have the org-wide rollup. Ask for your slice.
+3. **JSON for AI tooling.** The same nightly run writes a JSON file (`dev-scorecard-{YYYY-MM-DD}.json`) that downstream automation reads. You will not normally interact with this directly.
+
+<Warning>
+**Your scorecard is not posted in Slack channels.** It is not visible to your teammates by default. Performance data is treated as confidential. If you see your or another developer's score posted publicly, that is a process violation and should be flagged to Michael (Chief of Staff) directly.
+</Warning>
+
+For PR-level deep dives between reviews, ask for an Argus run on a specific window:
+
+```bash
+# On the ops box, scoped to your GitHub username, last 2 weeks
+argus score --user <your-github-handle> --since 2w --format table
+
+# Last sprint, PDF, your specific repo
+argus score --user <your-github-handle> --since 2w --repo cmistaff/crestpetsystem --format pdf
+```
+
+## What good looks like
+
+The behaviors that move your score up are the same behaviors codified in the [Engineering Rules](/onboarding/engineering-rules) and [Working in Linear](/onboarding/working-in-linear). The score rewards you for following the playbook.
+
+<CardGroup cols={2}>
+  <Card title="Track hours honestly in Hubstaff" icon="stopwatch">
+    Run the desktop app on the dev box during paid work hours. Hitting 95 percent of target is a +15 swing on the score and the single biggest input.
+  </Card>
+  <Card title="Push a draft PR on day one of a ticket" icon="code-pull-request">
+    More merged PRs over the month means more credit. Stacked, smaller PRs (under 500 lines) get reviewed faster, which means they merge faster, which means they show up in the next nightly run.
+  </Card>
+  <Card title="Write detailed Linear tickets" icon="list-check">
+    Tickets you actually finish in the month count for "done MTD". Vague tickets sit in "open" or "blocked" forever, which counts against you. Detail unblocks the AI reviewers and the human reviewer.
+  </Card>
+  <Card title="Pass 5 of 6 AI reviewers before tagging a human" icon="robot">
+    Clean PRs that pass the [AI Review Pipeline](/onboarding/ai-review-pipeline) merge faster, which surfaces in your `prs_merged` count. Bot rework cycles do not penalize you directly, but they delay the merge.
+  </Card>
+  <Card title="Review your teammates' PRs" icon="eye">
+    Submitted PR reviews bonus your score (5+ called out, 10+ adds +5). It also covers you on weeks where you are heads-down on a single hard ticket and your own commit count is low.
+  </Card>
+  <Card title="Keep your dev box clean" icon="shield">
+    Zero high or critical flags from the screenshot AI reviewer means zero penalty. Read the [Engineering Rules](/onboarding/engineering-rules) and [SonarCloud and SonarLint](/onboarding/sonarcloud-sonarlint) to understand what triggers them.
+  </Card>
+</CardGroup>
+
+## What hurts your score
+
+The penalties exist so that the things that actually slow the team down are visible. None of these are mystery deductions. Each one shows up in your card with a one-line explanation.
+
+| Behavior | Score impact | Why it matters |
+| --- | --- | --- |
+| Not running Hubstaff during paid hours | -10 to -30 | Hours are how we reconcile invoices and how leadership sees who is on. Untracked time looks like absence. |
+| Zero GitHub activity AND no PR reviews | -10 | If you are an engineer and a full month passes with no commits and no reviews, something is wrong (sick, blocked, mis-assigned). The score forces the conversation. |
+| Tickets pile up unfinished | -10 (zero done with open work), -5 (more than 8 open) | A growing open queue means scope is unclear or estimates are wrong. Either way the score nudges the conversation. |
+| Blocked tickets sitting on you | -5 each cycle | If you are blocked, move it back to **Todo** with a "blocked by" comment per [Working in Linear](/onboarding/working-in-linear) requirement #6, or reassign. |
+| High or critical Hubstaff flags | -3 to -10 | Tunnels detected, secrets visible on screen, off-task patterns. These are reviewed by the security team. See [Engineering Rules](/onboarding/engineering-rules). |
+| High average screenshot risk (4.0+) | -8 | Repeated patterns across screenshots, not a single bad shot. Usually credentials in plaintext, side-job tabs, or unmanaged AI tools. |
+| Large unbroken PRs (over 500 lines) | Indirect | Not in the score formula directly, but they take longer to merge and slow your `prs_merged` count. Splitting work in half typically lifts the next month's score. |
+| Shipping a broken build to prestaging | Indirect | Hotfix PRs are weighted higher than standard PRs in `argus-cli`, but a pattern of needing hotfixes shows up in the qualitative half of your review. |
+
+## Monthly performance review
+
+Your monthly review is a one-on-one with your manager. The Argus scorecard is the **opening document**, not the verdict. Roughly half the conversation is quantitative (your card, your trend over the last 3 months, your peers' bands for context) and half is qualitative.
+
+### What is quantitative
+
+- Your nightly score, averaged across the month and on the day of review.
+- Trend deltas vs the previous month (the scorecard PDF includes vs-yesterday deltas; managers also pull month-over-month).
+- Hours vs target.
+- PRs merged, commits, reviews submitted.
+- Tickets done, open, blocked.
+- Flag count and screenshot risk profile.
+- For sprint context: your S/A/B/C/D band from `argus-cli` over the last two two-week windows.
+
+### What is qualitative
+
+These do not appear on the scorecard. They come from your manager's direct observation, peer feedback, and reading your tickets and PRs.
+
+- **Architectural impact.** Did your work move the codebase forward, or did it add to the pile?
+- **Mentorship and review quality.** Are your PR reviews substantive? Do junior teammates ship better after you review them?
+- **On-call and incident response.** When something broke, were you available? Did your runbook hold up?
+- **Communication.** Are your tickets readable? Do your daily updates reflect reality? Do you flag blockers early?
+- **Trust and judgment.** Did you ask before doing the irreversible thing? Did you push back when you should have?
+
+A high score with weak qualitative signals is a flag for the manager to dig in. A lower score with strong qualitative signals (you carried a hard ticket all month, or covered for a teammate who was out) is also expected and accounted for.
+
+<Tip>
+**Bring your own evidence.** If your month had context the score does not capture (you carried on-call for a teammate, you spent two weeks on a research spike with no merged output, you mentored a new hire), bring it to the meeting. Your manager would rather hear it from you than reconstruct it after the fact.
+</Tip>
+
+## FAQs
+
+<AccordionGroup>
+  <Accordion title="What if I am sick for part of the month?" icon="bed">
+    Tell your manager and update your Linear ticket per [Working in Linear](/onboarding/working-in-linear) requirement #6. The hours target is calculated against full work-days in the month, but your manager prorates against actual availability when they read the score. Do not silently suffer a low score.
+  </Accordion>
+  <Accordion title="What if I am stuck on a slow ticket all month?" icon="hourglass-half">
+    The score will likely dip because `prs_merged` is small and `tickets done MTD` is small. This is expected and your manager knows it. Two things help: (1) push a draft PR early so progress is visible; (2) split the ticket into sub-tickets so each piece marks done as it lands. Slow does not mean low quality, and the qualitative half of the review is where that gets weighed.
+  </Accordion>
+  <Accordion title="Can I see my historical trend?" icon="chart-line">
+    Yes. Ask your manager for the trend rollup or look at consecutive `dev-scorecard-{date}.json` files in the shared Google Drive folder. Each nightly run also stores deltas via `trend_tracker.py`, so the PDF shows vs-yesterday for each metric.
+  </Accordion>
+  <Accordion title="Is my score visible to my teammates?" icon="lock">
+    No. The org-wide PDF is shared with managers and Michael. Your individual score is not posted in Slack, Notion, or Linear. If you see your score posted publicly, flag it to Michael directly. See the warning above.
+  </Accordion>
+  <Accordion title="The score thinks I am 'At Risk' but I had a great month. What do I do?" icon="circle-question">
+    Two checks. First, look at your card and confirm the inputs are correct (right Hubstaff name, right GitHub login, your tickets actually attributed to you). Cross-system name matching is good but not perfect. Second, bring it to your one-on-one. The scorecard is the opening document, not the verdict. If a signal is missing or mis-attributed, your manager fixes it; if it is real but the score under-weights your specific contribution, the qualitative discussion covers it.
+  </Accordion>
+  <Accordion title="Are AI-assisted PRs counted differently?" icon="robot">
+    Yes. When an AI login (`claude*`, `cursor*`, `copilot*`) is a co-author alongside you, credit goes to you, not the bot. When the AI is the sole author with no human co-author, points flow to a blanket `[AI]` category and do not boost any individual. Your card also tracks `ai_assisted_count` so the ratio of AI-assisted to fully-yours work is visible.
+  </Accordion>
+</AccordionGroup>
+
+## argus-cli (PR-only deep dive)
+
+For sprint retros and team-vs-team views, we run the standalone `argus-cli` separately from the nightly composite. It only looks at merged PRs across the `cmistaff` org and assigns S/A/B/C/D bands.
+
+| PR Type | Default weight | Trigger |
+| --- | --- | --- |
+| Standard | 3 points | Anything not hotfix or promotion |
+| Hotfix | 5 points | Title contains "hotfix" OR head branch starts with `hotfix/` or `hotfix-` |
+| Promotion | 2 points | Merge from `prestaging` to `staging` or `staging` to `main` |
+| Clean bonus | +2 points | All CI checks passed AND zero unresolved review threads |
+
+Default sprint band thresholds (calibrated for a two-week sprint):
+
+| Band | Score | Label |
+| --- | --- | --- |
+| S | 40+ | Outstanding |
+| A | 25 to 39 | Strong |
+| B | 15 to 24 | Solid |
+| C | 5 to 14 | Developing |
+| D | Under 5 | Minimal |
+
+Co-author splits matter: if you and a teammate both authored a clean standard PR, you each get 2.5 points (5 / 2). AI co-authors are excluded from human credit.
+
+Full reference and configuration: [`cmistaff/argus-cli` CLAUDE.md](https://github.com/cmistaff/argus-cli/blob/main/CLAUDE.md).
+
+## Related
+
+- [Engineering Onboarding Handbook](/onboarding/engineering-handbook) - the broader workflow this scorecard plugs into.
+- [Working in Linear at Crest](/onboarding/working-in-linear) - ticket conventions that drive the Jira / Linear half of your score.
+- [AI Review Pipeline](/onboarding/ai-review-pipeline) - the 5-of-6 bot rule that gates merges into your `prs_merged` count.
+- [Engineering Rules (Security & Conduct)](/onboarding/engineering-rules) - what triggers the high or critical Hubstaff flags and the screenshot risk score.
+- [SonarCloud and SonarLint](/onboarding/sonarcloud-sonarlint) - the deterministic quality gate that runs alongside the AI bots.
