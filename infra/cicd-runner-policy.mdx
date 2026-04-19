@@ -1,0 +1,65 @@
+---
+title: "CI/CD Runner Policy"
+description: "Self-hosted GitHub Actions runners are decommissioned. This page covers the approved GitHub-hosted runner labels, the one residual self-hosted-equivalent path, the GPU policy, and the GitHub IP allowlist gotcha for tools like Shift Left CLI."
+---
+
+## Self-hosted runners are decommissioned
+
+As of **March 18, 2026**, Crest no longer operates self-hosted GitHub Actions runners for general CI/CD. The decommissioning broadcast read:
+
+> Effective immediately, we are no longer running self-hosted GitHub Actions runners. All EC2 runner infrastructure has been decommissioned and the `github-runners-infrastructure` repo is archived. Do not attempt to create or register self-hosted runners. Anyone doing so will have their access revoked.
+
+<Note>
+A residual `github-build-runners` ASG (1 instance, persistent mode) remains provisioned in `github-runners-infrastructure` for the dev-db-seeding exception path described below. Treat that as the only sanctioned self-hosted footprint. Do not register additional runners against it.
+</Note>
+
+## Approved runner labels
+
+All workflows in `crestpetsystem`, `infra`, and `EC2DevsCrestPet` use one of the three GitHub-hosted labels below. Do not introduce new labels without an INF ticket.
+
+| Label | Spec | When to use |
+| --- | --- | --- |
+| `ubuntu-latest` | 2-core GitHub-hosted | Default for short jobs (lint hooks, Linear automations, hotfix-sync orchestration, lightweight scans) |
+| `ubuntu-latest-m` | 8-core GitHub-hosted (medium) | Default for everything that builds, tests, or deploys (Docker builds, Jest/Vitest, Terraform plans, deploy workflows, CodeQL, AI-review jobs) |
+| `ubuntu-latest-16-cores` | 16-core GitHub-hosted (large) | Heavy parallel test suites only — currently `playwright-tests.yml` and `server-e2e-tests.yml` |
+
+When in doubt, default to `ubuntu-latest-m`. The 16-core label is materially more expensive and should not be used for jobs that complete in under 10 minutes on the medium runner.
+
+## The one exception: db-seeding
+
+`crestpetsystem/.github/workflows/dev-db-seeding.yml` runs the workflow itself on `ubuntu-latest-m`, but the actual seeding work runs as an **ECS Fargate task** in the prestaging VPC. This is the only path that needs in-VPC access to the private RDS instance, and it works because the Fargate task (not the runner) is what holds the VPC interface.
+
+If you need a workflow that requires private VPC access to RDS, ElastiCache, or other private resources, model it on `dev-db-seeding.yml`: keep the runner GitHub-hosted, do the privileged work in a Fargate task launched from the workflow. Do not request a self-hosted runner for VPC access.
+
+## GPU jobs
+
+There are no GPU CI jobs at present. If a use case appears (model eval, on-runner training, GPU-accelerated codegen), file a CRC ticket. **Do not** reinstate self-hosted GPU runners. Options that will be evaluated, in order of preference:
+
+1. GitHub-hosted GPU runners (where supported).
+2. A workflow-launched SageMaker or Bedrock job analogous to the dev-db-seeding pattern.
+3. A managed third-party GPU CI provider, with a security review.
+
+## GitHub IP allowlist gotcha
+
+Several tools assume CI traffic originates from GitHub-Actions egress IPs and fail when called from runner egress IPs that are not on the target's allowlist. Known affected tools:
+
+- **SentinelOne Shift Left CLI** — fails to authenticate from non-allowlisted runner IPs when invoked after `actions/checkout@v4`.
+- Any vendor with an IP-allowlist rule on top of API key auth (third-party scanners, some private package registries).
+
+**Fix paths**, in order of preference:
+
+1. **Tailscale App Connector** — route the affected egress through the App Connector so the vendor sees a stable Tailscale-tagged source. Preferred for any vendor we already access via Tailscale internally.
+2. **Add the runner egress IP range to the vendor allowlist** — only viable if the vendor accepts a wide GitHub-hosted egress range, which is not stable. Use only when (1) is not available.
+3. **Move the affected step to the dev-db-seeding-style Fargate task pattern** so the egress comes from a known NAT IP. Heaviest lift; reserve for cases where the other two fail.
+
+If you hit this on a new vendor, file an INF ticket — do not work around it by adding a self-hosted runner.
+
+## Cost context
+
+The migration from self-hosted to GitHub-hosted runners reduced CI/CD compute spend from approximately **$12,224/month to approximately $1,375/month** (roughly 88% reduction, on the order of $131K/year in annual savings). The cost delta is the primary reason the policy is enforced strictly: every reintroduced self-hosted runner moves us back toward the higher cost basis.
+
+## Related
+
+- [CI/CD Onboarding Guide](/onboarding/cicd-guide) — branch strategy, promotion workflows, hotfix flow.
+- [PR Review Protocol](/onboarding/pr-review-protocol) — what has to be true before a PR can merge into the pipeline these workflows run on.
+- [Infrastructure Overview](/infra/overview) — broader infra topology that the runner policy sits inside.

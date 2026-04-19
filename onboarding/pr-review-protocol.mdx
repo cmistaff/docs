@@ -1,0 +1,84 @@
+---
+title: "PR Review Protocol"
+description: "End-to-end review protocol for crestpetsystem PRs: bot pipeline gate, two human approvals, primary-reviewer ownership of bot follow-through, changes-requested holds, and the Loom requirement before merge to prestaging."
+---
+
+This page is the operational protocol for getting a PR merged to `prestaging`. It assumes you have already read the [AI Review Pipeline](/onboarding/ai-review-pipeline) and [Working in Linear at Crest](/onboarding/working-in-linear) pages. Those describe the bot pipeline and the Linear-side requirements; this page describes the human-side review rules and the failure modes that have actually bitten the team.
+
+## The merge gate
+
+A PR is mergeable to `prestaging` only when **all** of the following are true:
+
+| Gate | Requirement |
+| --- | --- |
+| AI bot pipeline | At least 5 of 6 bots approving (see [AI Review Pipeline](/onboarding/ai-review-pipeline)) |
+| Human approvals | **2 reviewer approvals** required |
+| SonarCloud quality gate | Passing on the PR branch |
+| Outstanding changes-requested reviews | **Zero** |
+| Unresolved review threads | **Zero** (bot threads included) |
+| Loom walkthrough | Posted in `#crest-loom-reviews` and acknowledged (see [Engineering Onboarding Handbook](/onboarding/engineering-handbook#crest-loom-reviews)) |
+| Linear ticket | Linked, reflects current state, status will auto-transition on merge |
+
+If any of those is missing, the PR is not mergeable. There is no "I have 2 approvals so I can merge anyway" path. There is no "the bot comment is wrong so I'll skip it" path that does not involve a written reply on the PR.
+
+## Two approvals required
+
+Two reviewer approvals are required before merge to `prestaging`. One approval is not enough, even if all six bots have approved.
+
+This is the single most-violated rule in our recent PR history. The bot pipeline is a filter, not a substitute for two humans agreeing the change is correct.
+
+## Changes-requested means HOLD
+
+A `Changes requested` review **blocks merge**, even if you also have two `Approved` reviews from other reviewers.
+
+GitHub's UI will let you merge in some configurations once two approvals exist. Do not. Resolve the changes-requested review by either:
+
+1. Pushing commits that address the feedback (the reviewer should re-review and dismiss the changes-requested state), **or**
+2. Replying inline with a specific explanation of why the feedback does not apply, and getting the reviewer to convert the review to an approval.
+
+A `Comment` review is not the same as `Changes requested`. Comments don't block merge; changes-requested does.
+
+## Primary reviewer owns bot-feedback follow-through
+
+The first human reviewer to approve the PR is the **primary reviewer**. The primary reviewer owns ensuring that bot-flagged refinements are actually addressed before merge, including:
+
+- Threads opened by Devin, Bugbot, Codex, Copilot, Claude Code, or Augment that the PR author has not replied to.
+- "Resolved" threads where the resolution is a generic "pre-existing" or "out of scope" reply that does not actually address the issue.
+- New bot comments that appear after the latest push (bots re-review on every push; old approvals do not cover new changes).
+
+If the primary reviewer is on PTO, sick, or unreachable, the PR is **not mergeable** — find a new primary reviewer rather than merging without the follow-through.
+
+## AI coding rules apply
+
+PRs that introduce AI-assisted code must conform to the AI coding rules added to `CLAUDE.md` after the April 8 manual-revert blocker thread (tracked in CPE-5613). The rules cover:
+
+- No silent reverts of previous human-authored code.
+- AI-generated code must be specifically flagged and called out for human review.
+- Bot-generated test coverage does not substitute for the test-coverage review step.
+
+Refer to the in-repo `CLAUDE.md` for the binding text.
+
+## Loom video before review request
+
+Loom walkthroughs are mandatory for any PR that changes business logic or UI/UX. Record after your code is in `Draft` state and before you flip the PR to `Ready for Review`. Detailed requirements (channel, tagging, exception list) live in the [Engineering Onboarding Handbook](/onboarding/engineering-handbook#crest-loom-reviews). Don't duplicate that policy here — read it there.
+
+## Common failure modes
+
+These are not hypothetical. Each of these has caused a real PR to ship a regression or to get reverted within the last quarter:
+
+| Failure | Why it bites | What to do instead |
+| --- | --- | --- |
+| 2 approvals + 1 changes-requested → merged | Reviewer who requested changes was on a different timezone and didn't see the merge | Treat changes-requested as a hard block until explicitly converted |
+| Primary reviewer absent → PR sits, then merged by author | "I had 2 approvals, the bot threads were just style" | Wait for the primary reviewer or formally hand off ownership |
+| Bot threads "bulk resolved" with generic reply | Real null-safety, type, or migration bugs hidden in noise | Read each bot comment individually; reply to each with the specific reason |
+| Bots approved before latest push, never re-reviewed | New commits add new bugs not covered by stale approval | Wait for bots to re-post on the latest commit before requesting human review |
+| Codex hadn't posted yet → declared green | Codex routinely takes 5-15 min longer than the others | Wait at least 15 minutes after CI green before declaring ready |
+| Loom skipped on a UI change | Reviewers had no way to verify the actual user flow | Post the Loom; PRs without it for UI/business-logic changes will be bounced |
+
+## Related
+
+- [AI Review Pipeline](/onboarding/ai-review-pipeline) — the six-bot gate that runs before human review.
+- [Working in Linear at Crest](/onboarding/working-in-linear) — requirement #9 codifies the 5-of-6 rule and links bot review to ticket state.
+- [Engineering Onboarding Handbook](/onboarding/engineering-handbook) — Loom requirement, `#crest-loom-reviews`, broader workflow context.
+- [SonarCloud and SonarLint](/onboarding/sonarcloud-sonarlint) — the deterministic quality gate that runs alongside the bots.
+- [CI/CD Onboarding Guide](/onboarding/cicd-guide) — branch strategy and promotion workflows.
