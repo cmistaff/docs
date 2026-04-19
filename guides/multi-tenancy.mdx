@@ -81,7 +81,7 @@ Controller (@CurrentTenant)
 1. **Never trust client-provided tenantId** -- The tenant is always resolved from the server-side session context
 2. **Every query must filter by tenantId** -- No bare `findMany()` or `findUnique()` without tenant scoping
 3. **Cross-portal imports are forbidden** -- Shared code lives in `portals/shared/`, not copied between portals
-4. **Platform admin is the only exception** -- Platform-level endpoints protected by `RequireTenantTypeGuard` and `TenantAccessGuard` (in `server/src/modules/portals/shared/domain/guards/`) can access cross-tenant data
+4. **Platform admin is the only exception** -- Platform-level endpoints protected by `RequireTenantTypeGuard` (`tenant-type.guard.ts`) and `TenantAccessGuard` (`tenant-access.guard.ts`), both in `server/src/modules/portals/shared/domain/guards/`, can access cross-tenant data
 
 ### Example: Correct Tenant Scoping
 
@@ -141,7 +141,7 @@ The `TenantUser` join table carries:
 
 ## Tenant Settings
 
-Each tenant can configure behavior through dedicated settings tables:
+Each tenant can configure behavior through dedicated settings tables (11 total):
 
 | Settings Table | What It Controls |
 |---------------|-----------------|
@@ -153,6 +153,8 @@ Each tenant can configure behavior through dedicated settings tables:
 | `TenantPaymentSettings` | Payment processing settings |
 | `TenantPortalSettings` | Portal-specific configuration |
 | `TenantBackupSettings` | Backup and data retention configuration |
+| `TenantCreditSettings` | Tenant prepaid credit balance and clinic credit configuration |
+| `TenantVideoConsultationProviderSettings` | Per-tenant video consultation provider routing (LiveKit / Daily) |
 | `TenantMiscSettings` | Miscellaneous settings (JSON value field) |
 
 <Note>
