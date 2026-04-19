@@ -4,15 +4,15 @@ description: "Complete architecture documentation for the Marcia AI multi-channe
 ---
 
 <Warning>
-Status: **Planned** -- This is a design document. Implementation has not started or is in early stages.
+Status: **Mixed** -- Per-channel status is broken out in the table below. The overarching architecture is partially implemented; image-only flow diagrams from the original Confluence draft have not yet been recreated as Mintlify-native assets.
 </Warning>
 
 # Marcia AI - Complete Architecture Documentation
 
 **Author:** hamza
-**Source:** Personal Confluence space at cammaratainc.atlassian.net
+**Source:** Originally drafted in the personal Confluence space (now sunset); republished here as the current source of truth. New revisions live only in this Mintlify page.
 
-**Marcia** is a multi-channel AI-powered veterinary assistant embedded throughout the CrestPetSystem platform. It provides intelligent conversational AI capabilities across 4 communication channels (Web Portal, SMS, WhatsApp, Voice), leveraging 70+ MCP tools and 42+ specialised subagents to help pet owners and veterinary clinics with:
+**Marcia** is a multi-channel AI-powered veterinary assistant embedded throughout the CrestPetSystem platform. It provides intelligent conversational AI capabilities across four communication channels, leveraging an MCP-tool surface and a set of specialised subagents to help pet owners and veterinary clinics with:
 
 - Pet health management and assessments
 - Appointment booking and clinic discovery
@@ -22,40 +22,126 @@ Status: **Planned** -- This is a design document. Implementation has not started
 - Treatment plan tracking
 - Network subscription management
 
-[Image: image-20260326-100916.png]
+## Channel Status
 
-web portal flow:
+Verified against the live `server/src/modules/portals/marcia/` and `server/src/modules/portals/shared/` trees on 2026-04-18.
 
-[Image: image-20260326-101159.png]
+| Channel | Status | Backend module(s) |
+|---------|--------|-------------------|
+| Web chat | Shipped | `portals/marcia/chatbot/` |
+| SMS | Shipped | `portals/marcia/sms/` (Twilio webhook + outbound) |
+| WhatsApp | In Progress | `portals/marcia/whatsapp/` (Twilio Business API webhook live; outbound campaigns staged) |
+| ElevenLabs voice | In Progress | `portals/marcia/elevenlabs/` (webhook auth guard shipped; full voice tool calling pending) |
+| Voice tool calling | Planned | Will hang off the ElevenLabs channel once the function-calling surface is finalized |
 
-SMS flow:
+## Web Portal Flow
 
-[Image: image-20260326-101350.png]
+```
+Browser (Marcia widget)
+        │
+        ▼
+Next.js Marcia page (client/src/app/marcia/)
+        │
+        ▼
+NestJS API: /portals/marcia/chatbot/*
+        │
+        ├── Auth Guard (Better Auth session OR Turnstile public token)
+        ├── Tenant resolver (subdomain → tenantId, optional)
+        ▼
+ChatbotService
+        │
+        ├── Persists message → ChatbotMessage / ChatbotConversations
+        ├── (file upload) → S3 AGENT_CONVERSATION_IMAGES bucket
+        ▼
+LLM Router (server/src/app/llm-router/)
+        │
+        ├── MCP tool surface (appointment booking, scans, RAG, etc.)
+        ├── Provider resolution (Anthropic primary, fallbacks)
+        ▼
+Response → SSE stream → browser
+```
 
-whatsApp flow:
+## SMS Flow
 
-[Image: image-20260326-101504.png]
+```
+Pet owner SMS
+        │
+        ▼
+Twilio webhook → POST /portals/marcia/sms/webhook
+        │
+        ├── Twilio signature validation (TwilioWebhookAuthGuard)
+        ├── Phone-number → User lookup (or registration prompt)
+        ▼
+MarciaSmsService
+        │
+        ├── Persists message → SmsConversation / SmsMessage
+        ├── (MMS) → S3 AGENT_CONVERSATION_IMAGES bucket
+        ▼
+LLM Router (same as web chat)
+        │
+        ▼
+Outbound SMS via Twilio API (chunked to <=160 chars where possible)
+```
 
-MCP tool execution:
+## WhatsApp Flow
 
-[Image: image-20260326-101622.png]
+```
+Pet owner WhatsApp message
+        │
+        ▼
+Twilio Business API webhook → POST /portals/marcia/whatsapp/webhook
+        │
+        ├── TwilioWebhookAuthGuard (signature validation)
+        ├── Conversation routing (existing thread vs. new)
+        ▼
+WhatsApp service
+        │
+        ├── WhatsApp message drafts → marcia-whatsapp.prisma models
+        ├── Medical updates / proactive outreach (in progress)
+        ▼
+LLM Router (same as web chat)
+        │
+        ▼
+Outbound WhatsApp via Twilio Business API
+```
 
-Subagent routing:
+## ElevenLabs Voice Flow (In Progress)
 
-[Image: image-20260326-101728.png]
+```
+Pet owner phone call
+        │
+        ▼
+ElevenLabs voice agent (PSTN bridge)
+        │
+        ▼
+ElevenLabs webhook → POST /portals/marcia/elevenlabs/webhook
+        │
+        ├── ElevenLabsWebhookAuthGuard (signature validation, shipped)
+        ├── Phone-number → User lookup
+        ▼
+Marcia voice service (in progress)
+        │
+        ├── Conversation transcript persistence
+        ├── Function-calling surface (planned)
+        ▼
+Response synthesized via ElevenLabs voice
+```
 
-Ai provider resolution
+## Cross-Channel Concerns
 
-[Image: image-20260326-101919.png]
+- **Tenant context:** Marcia is a consumer-facing assistant. SMS, WhatsApp, and voice channels have no inherent tenant context — see the [S3 Tenant Isolation Audit](/operations/s3-tenant-isolation) "Chatbot & SMS Files" section for the explicit user-scoped vs. tenant-scoped decision.
+- **Auth:** Crest uses [Better Auth](/guides/authentication) (1.4.22) for portal sessions. Webhook channels (Twilio, ElevenLabs) use signature-validation guards in `portals/marcia/<channel>/guards/`.
+- **Storage:** Conversation media (images, audio) lives in the `AGENT_CONVERSATION_IMAGES` S3 bucket under `${userId}/${conversationId}/...` keys.
 
-Frontend Component Hierarchy
+## Pending Diagrams
 
-[Image: image-20260326-102613.png]
+The original Confluence draft included these diagrams as PNG attachments. They have not yet been recreated as Mintlify-native assets and will be re-added in a follow-up:
 
-Training Data Capture:
+- MCP tool execution sequence
+- Subagent routing
+- AI provider resolution
+- Frontend component hierarchy
+- Training data capture
+- Security architecture
 
-[Image: image-20260326-102805.png]
-
-Secutrity Architecture:
-
-[Image: image-20260326-102921.png]
+When Mintlify diagrams ship, they should live under `/images/marcia/` in this repo, not as Confluence attachments.
