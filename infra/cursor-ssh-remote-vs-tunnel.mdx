@@ -1,0 +1,143 @@
+---
+title: "Cursor: SSH Remote vs CLI Tunnel"
+description: "Use Cursor's Remote-SSH extension, not the CLI tunnel mode. Server-side extensions like SonarLint do not install on tunnel mode. How to tell which mode you are on and how to switch back."
+---
+
+<Note>
+**TL;DR:** Use **Remote-SSH**, not **CLI tunnel mode**. Server-side extensions (SonarLint, language servers, several lint integrations) do not install on tunnel mode. If you are on tunnel mode and SonarLint is silently missing from your editor, that is why.
+</Note>
+
+## Why this matters
+
+Cursor offers two ways to attach the editor on your laptop to a dev box on the other side of Tailscale:
+
+| Mode | What it is | What works | What breaks |
+|---|---|---|---|
+| **Remote-SSH** (correct) | The Remote-SSH extension opens an SSH session to the dev box and runs Cursor's remote server there. Your editor on the laptop is a thin client | Everything: integrated terminal, tasks, debugger, **server-side extensions including SonarLint**, the Cursor chat panel, hot reload, port forwarding | n/a |
+| **CLI tunnel** (wrong for our setup) | The `cursor tunnel` CLI on the dev box exposes an HTTPS tunnel that you connect to from `cursor.com`. The "remote server" runs but several extension hooks are not exposed | Editing, terminal, basic chat | **Server-side extensions silently fail to install.** SonarLint reports clean even when the project has live issues. Some language-server integrations partially attach. |
+
+Adeetya hit this on Mar 18, 2026 and surfaced it in `#project-crestpetsystem`: he was on tunnel mode and his SonarLint panel was empty even though the project had open issues SonarCloud was flagging. The fix was to switch back to Remote-SSH. Do not use tunnel mode for normal dev work.
+
+## Working SSH config
+
+The same config from the [Day 1 walkthrough](/onboarding/day-one-walkthrough) and the [Devbox Setup](/onboarding/devbox-setup) page applies. On your **laptop** (not the dev box), in `~/.ssh/config`:
+
+```sshconfig
+Host dev-*
+  User ubuntu
+  ForwardAgent yes
+  AddKeysToAgent yes
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+If you do not have an SSH key:
+
+```bash
+ssh-keygen -t ed25519 -C "your.name@creststaff.com"
+ssh-add ~/.ssh/id_ed25519
+```
+
+Add the public key to GitHub at Settings -> SSH and GPG keys.
+
+Verify SSH works at the shell first (`ssh ubuntu@dev-yourname`) before pointing Cursor at it. If shell SSH does not work, Cursor's Remote-SSH will not work either.
+
+## Connecting Cursor over Remote-SSH
+
+1. In Cursor on your laptop, install the **Remote - SSH** extension from the extensions panel.
+2. Open the command palette: `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Linux/Windows).
+3. Run **Remote-SSH: Connect to Host...**
+4. Enter `ubuntu@dev-yourname` (substitute your dev box hostname).
+5. Cursor opens a new window with your dev box as the remote workspace. The bottom-left status bar should read **"SSH: dev-yourname"** in green.
+
+Open the integrated terminal — you are now running commands on the dev box. Open a folder (`File -> Open Folder` -> `~/Crest/GitHub/crestsystem/crestpetsystem`) and start working.
+
+## How to tell which mode you are on
+
+Look at the **bottom-left status bar** in Cursor. The remote indicator tells you which mode you are in:
+
+| Status bar shows | You are on |
+|---|---|
+| `SSH: dev-yourname` (green) | Remote-SSH ✓ |
+| `Tunnel: <name>` or `Cursor Tunnel` | CLI tunnel ✗ |
+| Nothing / blank | Local on your laptop (also wrong — work belongs on the dev box per [Engineering Rule 14](/onboarding/engineering-rules)) |
+
+You can also check from the dev box:
+
+```bash
+# If a tunnel is running, you will see a `cursor tunnel` (or similar) process
+ps -ef | grep -E 'cursor.*tunnel|code.*tunnel' | grep -v grep
+```
+
+If that returns a running process and you did not start it intentionally, you are likely on tunnel mode.
+
+## How to switch from tunnel back to Remote-SSH
+
+1. **Disconnect from the tunnel session.** Click the bottom-left status bar in Cursor and select **"Close Remote Connection"**. The Cursor window will reload locally.
+2. **Stop the tunnel daemon on the dev box** (so it does not keep advertising):
+   ```bash
+   # On the dev box
+   ps -ef | grep -E 'cursor.*tunnel|code.*tunnel' | grep -v grep
+   # Note the PID, then:
+   kill <pid>
+   ```
+   If the tunnel was started under systemd or a launchd-style wrapper, stop the wrapper too.
+3. **Reconnect via Remote-SSH** following the steps above.
+4. **Reinstall server-side extensions.** Once Remote-SSH is connected, open the extensions panel — extensions installed on the previous tunnel session may need to be re-enabled in the "SSH: dev-yourname" scope. SonarLint in particular should now show a populated issues panel for any open project.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection drops every few minutes" icon="plug">
+    Most often a Tailscale or DERP relay flap. Check `tailscale status` on your laptop. If you see your dev box but pings are slow, force a relay refresh with `tailscale ping dev-yourname`. If the issue persists, DM Michael — there have been cases where a regional DERP relay needs a restart (Mumbai and Frankfurt have hit this).
+
+    Also confirm your `~/.ssh/config` includes `ServerAliveInterval` if your network is aggressive about idle connections. Add:
+
+    ```sshconfig
+    Host dev-*
+      ServerAliveInterval 60
+      ServerAliveCountMax 3
+    ```
+  </Accordion>
+  <Accordion title="Host key changed warning" icon="key">
+    If your dev box was rebuilt or migrated, the SSH host key changes and you will see:
+
+    ```
+    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!
+    ```
+
+    Confirm with Michael that the box was actually rebuilt (do not just blow it away — if no rebuild happened, this is a man-in-the-middle warning and you should stop). If the rebuild is legitimate, remove the old key:
+
+    ```bash
+    ssh-keygen -R dev-yourname
+    ```
+
+    Then SSH again to accept the new key.
+  </Accordion>
+  <Accordion title="Remote-SSH hangs on 'Setting up SSH host'" icon="hourglass">
+    Cursor is trying to install or update its remote server on the dev box. Check disk space on the dev box — `~/.cursor-server` (or `~/.vscode-server`) can grow large and a full `/` will block install.
+
+    ```bash
+    # On the dev box
+    df -h ~
+    du -sh ~/.cursor-server ~/.vscode-server 2>/dev/null
+    ```
+
+    If you have stale server installs from previous Cursor versions, remove the older directories. If `/` is full for unrelated reasons, escalate.
+  </Accordion>
+  <Accordion title="SonarLint panel is empty even on a project with known issues" icon="bug">
+    Almost always tunnel mode. Confirm your status bar reads `SSH: dev-yourname`, not `Tunnel: ...`. If you are on tunnel, switch back per the instructions above and reinstall SonarLint in the SSH scope.
+
+    If you are on Remote-SSH and SonarLint is still empty, check that the SonarLint extension is installed on the **remote** (dev box), not just locally. The extensions panel shows two columns when on Remote-SSH; the right side is "SSH: dev-yourname".
+  </Accordion>
+  <Accordion title="Cursor wants me to use 'Cursor Tunnel' for everything" icon="route">
+    Cursor's onboarding sometimes pushes the tunnel flow because it is the simpler path on consumer setups. We do not use it. We have Tailscale for transport and Remote-SSH for editor attachment, and that combination preserves the full extension surface (including SonarLint, which we rely on for code quality enforcement).
+  </Accordion>
+</AccordionGroup>
+
+## Related pages
+
+- [Day 1: Zero to Running Code](/onboarding/day-one-walkthrough) — first-time Cursor + Remote-SSH setup
+- [Devbox Setup](/onboarding/devbox-setup) — Tailscale, SSH config, Zsh enhancements
+- [AI Tooling Stack](/onboarding/ai-tooling-stack) — which AI tools to use inside Cursor (Composer/Auto + Marcia Code)
+- [SonarCloud and SonarLint](/onboarding/sonarcloud-sonarlint) — what SonarLint surfaces locally and why tunnel mode breaks it
+- [Engineering Rules](/onboarding/engineering-rules) — Rule 14: work happens on the dev box
