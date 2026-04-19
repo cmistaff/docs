@@ -40,12 +40,30 @@ crestpetsystem/
 │           └── shared/              # 87 modules (auth, payments, services, repositories)
 ├── packages/
 │   └── common/                      # Shared package (@repo/common)
-│       └── prisma/schema/           # Multi-file Prisma schema (88 files, ~11,300 lines)
+│       └── prisma/schema/           # Multi-file Prisma schema (90+ files, ~12K lines, ~325 models)
 ├── compose.db.yaml                  # Database containers (PostgreSQL + Redis)
 ├── compose.dev.yaml                 # Development containers
 ├── compose.test.yaml                # Test containers (PostgreSQL + Redis + MinIO)
 └── compose.prod.yaml                # Production containers
 ```
+
+## Framework Versions
+
+Pinned in `client/package.json` and `pnpm-workspace.yaml` (verified against the prestaging tree on 2026-04-18):
+
+| Stack | Version | Source |
+|-------|---------|--------|
+| React | 19.2.3 | `client/package.json` |
+| Next.js | 15.5.14 | `client/package.json` |
+| Tailwind CSS | 4.1.18 | `client/package.json` |
+| TypeScript | 5.8.3 | `pnpm-workspace.yaml` (catalog) |
+| NestJS | 11.x | `server/package.json` |
+| Prisma | 6.16.2 | `pnpm-workspace.yaml` (catalog) |
+| Better Auth | 1.4.22 | `pnpm-workspace.yaml` (catalog) |
+| Node.js | 22.x | `nvm use 22` on dev boxes |
+| pnpm | 10.15.0 | `package.json` (`packageManager` field) |
+
+The docs-ops weekly drift cron re-verifies these against the live tree and opens a PR if any drift is detected.
 
 ## Portal Architecture
 
