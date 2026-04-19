@@ -135,13 +135,15 @@ The NestJS API server runs on port `8080` by default.
 
 ## Git Workflow
 
+Crest tracks all active work in [Linear](https://linear.app/crest-usa) (Jira was retired in 2026). Use the Linear team key for the work area: `CPE` for product work on this repo, `INF` for infrastructure, `AI` for autonomous-dev, etc.
+
 <Steps>
   <Step title="Create a branch">
-    Branch from `prestaging` using the format `PW-<jira-key>-<description>`:
+    Branch from `prestaging` using the format `<TEAM-KEY>-<NUMBER>-<short-description>`:
     ```bash
     git checkout prestaging
     git pull
-    git checkout -b PW-1234-add-appointment-reminders
+    git checkout -b CPE-1234-add-appointment-reminders
     ```
   </Step>
   <Step title="Make changes and commit">
@@ -159,11 +161,15 @@ The NestJS API server runs on port `8080` by default.
   <Step title="Push and create PR">
     Target the `prestaging` branch (never `main`):
     ```bash
-    git push -u origin PW-1234-add-appointment-reminders
+    git push -u origin CPE-1234-add-appointment-reminders
     ```
-    Create a PR targeting `prestaging` on GitHub.
+    Create a PR targeting `prestaging` on GitHub. Linear's git automation will link the PR back to the ticket if the branch name starts with the ticket key.
   </Step>
 </Steps>
+
+<Note>
+Legacy `PW-XXXX` branches predate the Jira → Linear migration. Existing references in older docs and PRs are preserved for history; new branches must use the Linear team-key format.
+</Note>
 
 ## Troubleshooting
 
