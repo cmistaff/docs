@@ -30,7 +30,7 @@ Crest Pet System is a **multi-tenant SaaS platform**. The core security invarian
 | --- | --- | --- |
 | Cannot purge a tenant's files on offboarding | High | Tenant cancels subscription; their files remain mixed with others, requiring DB queries to find them |
 | Cannot apply S3 bucket policies per tenant | Medium | If we ever need IAM-based tenant isolation or S3 Access Points, tenantId-prefixed keys are a prerequisite |
-| Key collisions in flat namespaces | Low | generateUniqueFileName() returns ${uuid}.ext - while UUIDs are unique, the flat structure makes it impossible to identify ownership without a DB lookup |
+| Key collisions in flat namespaces | Low | generateUniqueFileName() returns `${uuid}`.ext - while UUIDs are unique, the flat structure makes it impossible to identify ownership without a DB lookup |
 | Cannot use S3 Inventory / analytics per tenant | Medium | Billing, storage usage tracking, or compliance reporting per tenant requires prefix-based grouping |
 | Cannot perform per-tenant cost analysis | High | Without tenantId-prefixed keys, there is no way to calculate storage costs per tenant. S3 Storage Lens and S3 Inventory can filter by prefix, enabling per-tenant storage size reports, request counts, and cost attribution - but only if keys are organized by tenant. This is critical for accurate margin analysis, identifying high-storage tenants, enforcing storage quotas, and building usage-based billing models. |
 
@@ -65,18 +65,18 @@ Crest Pet System is a **multi-tenant SaaS platform**. The core security invarian
 
 | File | Key Pattern | Bucket |
 | --- | --- | --- |
-| clinic-documents.service.ts | ${tenantId}/${petId}/${uuid}.${ext} via generateDocumentS3Key() | CLINIC_DOCUMENTS |
-| template-management.service.ts | consent-forms/${tenantId}/${uniqueId}-${fileName} | CLINIC_DOCUMENTS |
-| upload-and-create-template.helper.ts | consent-forms/${tenantId}/${uniqueId}-${fileName} | CLINIC_DOCUMENTS |
-| consultation-transcription.service.ts | transcription-temp/${tenantId}/${uuid}.${ext} | CONSULTATION_NOTES |
-| treatment-sheet-reading-file.service.ts | ${folder}/${tenantId}/${readingId}/${uuid}.${ext} | MEDIA |
-| clinic-pet-certificate-storage.service.ts | pet-certificates/${tenantId}/${uniqueId}-${fileName} | DOCUMENTS |
-| pet-certificate-signature-handler.service.ts | pet-certificates/${tenantId}/${certId}/signed.pdf | DOCUMENTS |
-| clinic/settings/settings.service.ts | branding/${tenant.slug}/... | MEDIA |
-| enterprise/settings/settings.service.ts | branding/${tenant.slug}/... | MEDIA |
-| tooth-scan.service.ts | ${tenantId}/${uuid}.${ext} | TOOTH_SCANS |
-| poop-scan.service.ts | ${tenantId}/${uuid}.${ext} | POOP_SCANS |
-| health-record.service.ts | ${tenantId}/${petId}/${fileName} | CLINIC_DOCUMENTS |
+| clinic-documents.service.ts | `${tenantId}`/`${petId}`/`${uuid}`.`${ext}` via generateDocumentS3Key() | CLINIC_DOCUMENTS |
+| template-management.service.ts | consent-forms/`${tenantId}`/`${uniqueId}`-`${fileName}` | CLINIC_DOCUMENTS |
+| upload-and-create-template.helper.ts | consent-forms/`${tenantId}`/`${uniqueId}`-`${fileName}` | CLINIC_DOCUMENTS |
+| consultation-transcription.service.ts | transcription-temp/`${tenantId}`/`${uuid}`.`${ext}` | CONSULTATION_NOTES |
+| treatment-sheet-reading-file.service.ts | `${folder}`/`${tenantId}`/`${readingId}`/`${uuid}`.`${ext}` | MEDIA |
+| clinic-pet-certificate-storage.service.ts | pet-certificates/`${tenantId}`/`${uniqueId}`-`${fileName}` | DOCUMENTS |
+| pet-certificate-signature-handler.service.ts | pet-certificates/`${tenantId}`/`${certId}`/signed.pdf | DOCUMENTS |
+| clinic/settings/settings.service.ts | branding/`${tenant.slug}`/... | MEDIA |
+| enterprise/settings/settings.service.ts | branding/`${tenant.slug}`/... | MEDIA |
+| tooth-scan.service.ts | `${tenantId}`/`${uuid}`.`${ext}` | TOOTH_SCANS |
+| poop-scan.service.ts | `${tenantId}`/`${uuid}`.`${ext}` | POOP_SCANS |
+| health-record.service.ts | `${tenantId}`/`${petId}`/`${fileName}` | CLINIC_DOCUMENTS |
 
 > **Note on settings services:** These use `tenant.slug` instead of `tenantId`. Slug is unique per tenant and serves the same isolation purpose, but for consistency, consider migrating to `tenantId` in a future pass.
 
@@ -105,19 +105,19 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 
 | Bucket | Before | After |
 | --- | --- | --- |
-| TREATMENT_PLANS | ${uuid}.webm | ${tenantId}/${uuid}.webm |
-| CONSULTATION_NOTES | ${uuid}.webm | ${tenantId}/${uuid}.webm |
-| AGENT_CONVERSATION_IMAGES | ${uuid}.jpg | ${tenantId}/${uuid}.jpg |
-| DIAGNOSTIC_REQUEST_FILES | ${userId}/${petId}/${uuid}.pdf | ${tenantId}/${uuid}.pdf |
-| DOCUMENTS (insurance) | insurance-policies/${userId}/${uuid}.pdf | ${tenantId}/insurance-policies/${uuid}.pdf |
-| DOCUMENTS (network) | networks/${networkId}/logo.png | ${tenantId}/networks/${networkId}/logo.png |
-| DOCUMENTS (referrals) | patient-referrals/${referralId}/... | ${tenantId}/patient-referrals/${referralId}/... |
-| DOCUMENTS (email) | insurance-email-attachments/${ts}-${name} | ${tenantId}/insurance-email-attachments/${ts}-${name} |
-| MEDIA (pet photos) | pet-photos/${userId}/${petId}/${uuid}.jpg | ${tenantId}/pet-photos/${petId}/${uuid}.jpg |
+| TREATMENT_PLANS | `${uuid}`.webm | `${tenantId}`/`${uuid}`.webm |
+| CONSULTATION_NOTES | `${uuid}`.webm | `${tenantId}`/`${uuid}`.webm |
+| AGENT_CONVERSATION_IMAGES | `${uuid}`.jpg | `${tenantId}`/`${uuid}`.jpg |
+| DIAGNOSTIC_REQUEST_FILES | `${userId}`/`${petId}`/`${uuid}`.pdf | `${tenantId}`/`${uuid}`.pdf |
+| DOCUMENTS (insurance) | insurance-policies/`${userId}`/`${uuid}`.pdf | `${tenantId}`/insurance-policies/`${uuid}`.pdf |
+| DOCUMENTS (network) | networks/`${networkId}`/logo.png | `${tenantId}`/networks/`${networkId}`/logo.png |
+| DOCUMENTS (referrals) | patient-referrals/`${referralId}`/... | `${tenantId}`/patient-referrals/`${referralId}`/... |
+| DOCUMENTS (email) | insurance-email-attachments/`${ts}`-`${name}` | `${tenantId}`/insurance-email-attachments/`${ts}`-`${name}` |
+| MEDIA (pet photos) | pet-photos/`${userId}`/`${petId}`/`${uuid}`.jpg | `${tenantId}`/pet-photos/`${petId}`/`${uuid}`.jpg |
 
 ## Bucket Classification {#bucket-classification}
 
-### Single-Feature Buckets - Key: ${tenantId}/... {#single-feature-buckets-key-tenantid}
+### Single-Feature Buckets - Key: `${tenantId}`/... {#single-feature-buckets-key-tenantid}
 
 | Bucket | Feature prefix needed? |
 | --- | --- |
@@ -129,13 +129,13 @@ Seven of our 11 buckets serve a single feature (e.g., `TOOTH_SCANS` only holds t
 | AGENT_CONVERSATION_IMAGES | No |
 | VIDEO_CONSULTATION_RECORDINGS | No (externally written by Tavus - read-only from our side) |
 
-### Multi-Feature Buckets - Key: ${tenantId}/${feature}/... {#multi-feature-buckets-key-tenantid-feature}
+### Multi-Feature Buckets - Key: `${tenantId}`/`${feature}`/... {#multi-feature-buckets-key-tenantid-feature}
 
 | Bucket | Features | Existing prefixes in use |
 | --- | --- | --- |
 | DOCUMENTS | Consumer docs, pet certificates, insurance policies, insurance email attachments, network logos, referral documents | pet-certificates/, insurance-policies/, insurance-email-attachments/, insurance/authorization/, networks/, patient-referrals/ |
 | MEDIA | Pet photos, treatment sheet files, wellness media, branding/settings | pet-photos/, treatment-sheet-files/, branding/ |
-| CLINIC_DOCUMENTS | Consent form templates, health records, clinic-uploaded documents | consent-forms/, and flat ${tenantId}/ paths |
+| CLINIC_DOCUMENTS | Consent form templates, health records, clinic-uploaded documents | consent-forms/, and flat `${tenantId}`/ paths |
 | VET_ASSISTANT_FILES | Vet assistant | To be verified |
 
 ## Affected Files - Detailed Breakdown {#affected-files-detailed-breakdown}
@@ -725,8 +725,8 @@ Examples:
 
 | File | Current Key Pattern | Change |
 | --- | --- | --- |
-| clinic/settings/settings.service.ts | branding/${tenant.slug}/clinicLogo-${ts}.${ext} | Replace tenant.slug with tenantId |
-| enterprise/settings/settings.service.ts | branding/${tenant.slug}/${fileType}-${ts}.${ext} | Replace tenant.slug with tenantId |
+| clinic/settings/settings.service.ts | branding/`${tenant.slug}`/clinicLogo-`${ts}`.`${ext}` | Replace tenant.slug with tenantId |
+| enterprise/settings/settings.service.ts | branding/`${tenant.slug}`/`${fileType}`-`${ts}`.`${ext}` | Replace tenant.slug with tenantId |
 
 ### Migration Script for Existing Data {#migration-script-for-existing-data}
 
@@ -934,7 +934,7 @@ WHERE d."petId" IS NULL AND d."deletedAt" IS NULL;
 | --- | --- | --- |
 | 1 | Should ChatbotConversations and SmsConversation get a tenantId column? DECIDED: No. These are tenant-agnostic, user-scoped features (Marcia AI via WhatsApp/phone/web - no tenant context). AGENT_CONVERSATION_IMAGES bucket is an accepted exclusion from the tenantId-prefix rule. See Chatbot & SMS Files section. | Architect / Tech Lead |
 | 2 | SendGrid inbound attachments: immediate tenant resolution or staging prefix approach? DECIDED: Immediate resolution (reorder). Resolve tenant via findMatchingRequest before S3 upload. Skip upload if no match. See SendGrid Inbound Email Attachments section. | Backend Lead |
-| 3 | Should branding/${tenant.slug}/ keys be migrated to ${tenantId}/branding/ for consistency? DECIDED: Yes - migrate in Phase 2b. See Branding Keys Migration section. | Product / Engineering |
+| 3 | Should branding/`${tenant.slug}`/ keys be migrated to `${tenantId}`/branding/ for consistency? DECIDED: Yes - migrate in Phase 2b. See Branding Keys Migration section. | Product / Engineering |
 | 4 | Should we configure Tavus to use tenantId-prefixed keys for video recordings? DECIDED: No action needed. See Tavus Recording Keys section. | Product / Integrations |
 | 5 | For Document records with petId = NULL, what is the handling strategy? DECIDED: Skip + log. 21 rows in production (all CONSUMER_UPLOAD; 12 on staging, 3 on prestaging). See NULL petId Documents section. | Backend Lead |
 
