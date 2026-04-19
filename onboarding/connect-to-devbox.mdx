@@ -1,0 +1,119 @@
+---
+title: "Connect to Your Devbox"
+description: "How to reach your assigned dev EC2 box once you're on Tailscale: Cursor for editing, a terminal for AI agents, and your local browser for web services."
+---
+
+## Mental model
+
+Once Tailscale is up, your devbox is just another machine on your network. There is no remote desktop in the loop. You SSH in for terminal work, and you point your local browser at `http://dev-NAME:PORT` for any web service running on the box. Tailscale handles routing.
+
+You will use three tools, in this order of frequency:
+
+1. **Cursor SSH Remote** for editing code.
+2. **Termius (or native `ssh`)** for long-lived terminal sessions running AI agents.
+3. **Your local browser** for any web UI the box serves.
+
+A fourth option, noVNC, exists as an optional fallback if you specifically need a graphical desktop session. Most devs never open it.
+
+## Prerequisites {#prerequisites}
+
+Before any of the steps below will work:
+
+- **Tailscale installed locally.** Download from [tailscale.com/download](https://tailscale.com/download).
+- **Invited to the `cmistaff.com` tailnet.** HR/IT handles this during your first day. Run `tailscale status` locally. If you do not see your devbox listed, ping `#it-support`.
+- **SSH key on the box.** Most devboxes are provisioned with your public key already in `~/.ssh/authorized_keys`. If `ssh ubuntu@dev-<NAME>` rejects your key, ping `#it-support`.
+- **Your devbox name.** Format is `dev-<firstname>` (for example, `dev-michael`), assigned at hire.
+
+Confirm Tailscale can see the box before going further:
+
+```bash
+tailscale status | grep dev-
+ping -c 2 dev-<NAME>
+```
+
+If neither responds, fix Tailscale first (see [Tailscale troubleshooting](/infra/tailscale-troubleshooting)) before debugging anything else.
+
+## 1. Cursor SSH Remote (primary IDE) {#cursor}
+
+This is the default for editing code. Cursor opens the box as if it were local: file tree, integrated terminal, debugger, and AI features all run against the remote filesystem.
+
+1. Open Cursor on your laptop.
+2. Open the command palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on Windows/Linux).
+3. Run **Remote-SSH: Connect to Host**.
+4. Enter `ubuntu@dev-<NAME>` (for example, `ubuntu@dev-michael`). Tailscale MagicDNS resolves the name.
+5. When the connection is up, **File > Open Folder** and pick the repo you want to work in (typically under `~/Crest/GitHub/`).
+
+For deeper Cursor configuration (settings sync, extensions, tunnel vs. remote tradeoffs), see [Cursor SSH Remote vs. tunnel](/infra/cursor-ssh-remote-vs-tunnel).
+
+## 2. Termius or native SSH (for terminal AI agents) {#terminal}
+
+Use a real terminal client, not Cursor's integrated terminal, for anything long-running: `claude`, `codex`, `gemini`, `openCode`, builds, watchers. That way your editor stays responsive and the agent does not die when you close a tab.
+
+### Native SSH
+
+Add this block to your local `~/.ssh/config`:
+
+```text
+Host dev-*
+  User ubuntu
+  ForwardAgent yes
+  ServerAliveInterval 60
+```
+
+Then connect with:
+
+```bash
+ssh ubuntu@dev-<NAME>
+```
+
+Once on the box, wrap your work in a named tmux session so it survives disconnects:
+
+```bash
+tmux new -A -s main
+```
+
+`-A` attaches if `main` already exists, creates it if not. Detach with `Ctrl+b` then `d`. Reattach later with `tmux attach -t main`.
+
+### Termius
+
+Termius is the recommended GUI client when you want saved hosts, key management, and mobile access.
+
+- **Host:** `dev-<NAME>`
+- **User:** `ubuntu`
+- **Authentication:** key-based (point Termius at the same private key you use locally)
+- **Port:** `22` (default)
+
+Save it as a host, then connect. Run `tmux new -A -s main` on first attach.
+
+## 3. Local browser to a web service on the box {#browser}
+
+Any service listening on the box is reachable from your laptop's browser at `http://dev-<NAME>:<PORT>`. Tailscale routes the traffic. You do not need an SSH tunnel or a port forward.
+
+Common targets:
+
+| URL | What it is |
+|---|---|
+| `http://dev-<NAME>:3000` | CrestPet web (Next.js dev server) |
+| `http://dev-<NAME>:3001` | CrestPet API (NestJS) |
+| `http://dev-<NAME>:6080/vnc.html` | noVNC (only if you actually need a desktop) |
+
+If a URL hangs or refuses, check that the service is actually running on the box (`ss -tlnp` or your project's start command) before assuming Tailscale is at fault.
+
+## 4. noVNC (optional fallback) {#novnc}
+
+noVNC gives you a full graphical desktop session in your browser. Use it **only** if you specifically need a remote desktop, for example to run a GUI tool that has no headless mode. For everyday work, Cursor + a terminal is faster and uses far less bandwidth.
+
+When you do need it: `http://dev-<NAME>:6080/vnc.html`.
+
+## Troubleshooting {#troubleshooting}
+
+- **Cannot resolve `dev-<NAME>`.** Tailscale is not connected or MagicDNS is off. See [Tailscale troubleshooting](/infra/tailscale-troubleshooting).
+- **SSH `Permission denied (publickey)`.** Your key is not in the box's `~/.ssh/authorized_keys`. Ping `#it-support`.
+- **SSH connects, then everything is slow or wedged.** The box itself may be unhealthy. See [Devbox health](/infra/devbox-health).
+- **Browser hits the URL but nothing loads.** Confirm the service is running on the box first, then suspect the network.
+
+## Reference
+
+- [Cursor SSH Remote vs. tunnel](/infra/cursor-ssh-remote-vs-tunnel)
+- [Devbox health](/infra/devbox-health)
+- [Tailscale troubleshooting](/infra/tailscale-troubleshooting)
