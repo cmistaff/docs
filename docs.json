@@ -41,7 +41,8 @@
               "onboarding/ai-review-pipeline",
               "onboarding/pr-review-protocol",
               "onboarding/sonarcloud-sonarlint",
-              "onboarding/argus-dev-scorecard"
+              "onboarding/argus-dev-scorecard",
+              "onboarding/ai-tooling-stack"
             ]
           }
         ]
@@ -158,6 +159,7 @@
             "pages": [
               "devbox/overview",
               "onboarding/devbox-setup",
+              "infra/cursor-ssh-remote-vs-tunnel",
               "infra/tailscale-troubleshooting",
               "infra/devbox-health"
             ]

@@ -1,0 +1,97 @@
+---
+title: "AI Tooling Stack"
+description: "Which AI coding tools to use, when, and the cost-control rules in force since Apr 6 2026. Claude Code is primary, Cursor is restricted to Composer/Auto + Marcia Code."
+---
+
+<Note>
+**Effective Apr 6, 2026.** This page captures the current AI tooling rules announced in `#project-crestpetsystem` on Apr 3 and tightened on Apr 6. If you joined before that date, your habits probably need to change. Read this page top to bottom before starting work.
+</Note>
+
+## The short version
+
+| Tool | Status | When to use it |
+|---|---|---|
+| **Claude Code CLI** | Primary | Default for all coding work, refactors, reviews, multi-file edits, agentic loops |
+| **Cursor** | Restricted | Composer/Auto mode only. Custom-model slot configured to call Marcia Code. No premium model usage |
+| **Codex CLI / Composer** | Fallback | Only when Claude Code is degraded or rate-limited |
+| **Marcia Code API** | Always available | OpenAI-compatible endpoint wired into Cursor as a custom model. See [Day 1 walkthrough](/onboarding/day-one-walkthrough), Cursor + Marcia configuration step |
+
+## Why these rules exist
+
+Two reasons:
+
+1. **Cost control.** Per-developer Cursor spend was published in `#project-crestpetsystem` on Apr 3, 2026. Heavy premium-model usage in Cursor was driving spend that did not correlate with output. Claude Code (CLI) plus Marcia Code (custom-model slot inside Cursor) covers the same workflows for a fraction of the cost.
+2. **Capability.** Claude Code's agentic loop, tool use, and multi-file editing now exceed what most engineers were getting out of Cursor's default chat. The substrate behind Marcia Code handles bulk refactors and code generation efficiently when piped through the right configuration.
+
+Spend is tracked. Per-developer Cursor spend tables are published periodically in `#project-crestpetsystem`. Treat your monthly Cursor usage like any other line item.
+
+## Claude Code: the primary tool
+
+Claude Code CLI is the default. It is pre-installed on every dev box and authenticated during Day 1 onboarding. If you are not driving most of your day through `claude` in your terminal, you are using the wrong tool.
+
+### Recommended global settings (CRC-90)
+
+A set of global settings was identified in [CRC-90](https://linear.app/crest-usa/issue/CRC-90/update-devbox-claude-code-global-settings) (filed Apr 15) that should always be enabled for max effectiveness. Apply them in `~/.claude/settings.json` on your dev box:
+
+| Setting | Value | Why |
+|---|---|---|
+| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | `100000` | Lifts the default output cap so long edits and multi-file changes do not get truncated |
+| `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` | `1` | Disables the adaptive-reasoning shortcut so the model uses the budget you give it (see next section) |
+| `MAX_THINKING_TOKENS` | `30000` | Gives the model headroom for deep reasoning on hard problems |
+| `showThinkingSummaries` | `true` | Surfaces reasoning summaries in the CLI so you can see what the agent is actually considering |
+
+Bryant identified these settings in `#project-crestpetsystem` on Apr 15. The CRC-90 ticket is the canonical reference; if it has been updated with newer values since this page was published, **defer to the ticket**.
+
+<Note>
+**Apr 13 reasoning-threshold change.** The default reasoning threshold in Claude Code was lowered on Apr 13, 2026. Without the settings above, Claude Code will favor faster, shallower responses by default. The four settings above (especially `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` and `MAX_THINKING_TOKENS=30000`) restore the deeper reasoning behavior you probably remember from before the change. If your prompts feel "less smart" than they were a week ago, this is why. Apply the settings.
+</Note>
+
+### Where to apply
+
+`~/.claude/settings.json` on your dev box, **not** on your laptop. All work happens on the dev box per [Engineering Rule 14](/onboarding/engineering-rules).
+
+## Cursor: restricted to Composer/Auto + Marcia Code
+
+After Apr 6, 2026, Cursor usage is restricted to:
+
+1. **Composer / Auto mode** for general edits. No selecting premium models from the dropdown.
+2. **The Marcia Code custom-model slot** for chat-based prompts. Configured per the [Day 1 walkthrough](/onboarding/day-one-walkthrough), Cursor + Marcia configuration steps.
+
+You can still use Cursor as your editor (see [Cursor: SSH Remote vs CLI Tunnel](/infra/cursor-ssh-remote-vs-tunnel) for the right connection mode). What changed is the model selection: do not switch to premium third-party models in the dropdown when picking up tickets. Default Composer/Auto handles the editor-integration cases (inline accept/reject, tab completion). Marcia Code handles the chat-style prompts.
+
+If you have a workflow that genuinely cannot be done in Composer/Auto or Marcia Code, file a CRC ticket explaining the case before reaching for a premium model. Do not just use it and expense it.
+
+## Codex CLI / Composer: fallback
+
+Codex CLI is installed on the dev box and authenticated during Day 1. Use it as a fallback when Claude Code is degraded, rate-limited, or down. It is not your daily driver.
+
+## Marcia Code API: how it fits
+
+Marcia Code is Crest's developer AI, exposed as an OpenAI-compatible HTTP endpoint at `https://api.marciacode.com/v1`. You access it three ways:
+
+1. **From the `marcia` CLI on the dev box.** Pre-installed and authenticated during Day 1.
+2. **From inside Cursor** as a custom model. Add it under Settings -> Models -> Add Custom Model. Full configuration (base URL, API key format, model name) is in the [Day 1 walkthrough](/onboarding/day-one-walkthrough), under "Day one: configure Cursor to call Marcia Code".
+3. **Programmatically** from any code that speaks the OpenAI Chat Completions schema. Useful for batch jobs, evals, and tool-using agents.
+
+Your `MARCIA_API_KEY` (format `sk-marcia-<user>-<random>`) is issued by Michael. If you do not have one, DM him.
+
+<Note>
+**Engineering Rule 20: do not disclose the substrate.** Marcia Code is Crest's product. The underlying model providers and model names are trade secret. When discussing Marcia Code with clients, prospects, candidates, in public posts, in client-facing docs, or in any external material, refer to it only as "Marcia" or "Marcia Code". Do not name the providers, do not name the model families, do not paste provider model names into customer-visible artifacts. See [Engineering Rules](/onboarding/engineering-rules) for the full rule.
+</Note>
+
+## Quick reference
+
+- Default tool: **Claude Code CLI** on the dev box, with the four CRC-90 settings applied
+- Editor: **Cursor over SSH Remote** (see [Cursor: SSH Remote vs CLI Tunnel](/infra/cursor-ssh-remote-vs-tunnel))
+- In-Cursor chat: **Marcia Code custom model** + **Composer/Auto**
+- Fallback: **Codex CLI / Composer** when Claude is degraded
+- Cost: **tracked**, published periodically in `#project-crestpetsystem`
+- Substrate: **never disclosed externally** ([Engineering Rule 20](/onboarding/engineering-rules))
+
+## Related pages
+
+- [Day 1: Zero to Running Code](/onboarding/day-one-walkthrough) — installs and authenticates Claude Code, Codex, Marcia, and Cursor
+- [Cursor: SSH Remote vs CLI Tunnel](/infra/cursor-ssh-remote-vs-tunnel) — use SSH Remote, not the tunnel mode
+- [Engineering Rules](/onboarding/engineering-rules) — Rule 14 (work happens on the dev box), Rule 20 (Marcia substrate is confidential)
+- [AI Review Pipeline](/onboarding/ai-review-pipeline) — the six-bot pipeline that reviews every PR
+- [Argus Dev Scorecard](/onboarding/argus-dev-scorecard) — how AI-assisted commits are surfaced in your monthly review
