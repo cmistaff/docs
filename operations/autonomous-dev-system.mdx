@@ -5,16 +5,17 @@ description: "Infrastructure design for the autonomous AI development system at 
 
 # Autonomous Development System - Infrastructure Design
 
-**Related JIRA Epic:** [PW-1486](https://cammaratainc.atlassian.net/browse/PW-1486)
-**Infrastructure Task:** [PW-1494](https://cammaratainc.atlassian.net/browse/PW-1494)
-**Status:** Draft
-**Last Updated:** December 2024
+<Warning>
+**Operational state (2026-04):** All auto-execute flags default **OFF** following the January 2026 incident. The Brain Box and Agent Box stack remain deployed at `crestbrain.com`, but agents now require explicit opt-in per task. Treat the original architecture below as the design baseline; the live system runs in observe-and-suggest mode by default.
+</Warning>
+
+**Related Linear initiatives:** the legacy Jira tickets `PW-1486` (epic) and `PW-1494` (infra task) are still readable in Atlassian during the Jira→Linear cutover but are no longer the source of truth. Active work tracks under the **AI** team in Linear; new work should be filed there. The two-way Jira↔Linear sync handles cross-references for legacy tickets.
 
 ---
 
 ## Overview
 
-This document defines the AWS infrastructure architecture for the Autonomous Development System, which enables developers to trigger AI-powered coding workflows from any device (iPad, iPhone, terminal, JIRA) with full E2E execution.
+This document defines the AWS infrastructure architecture for the Autonomous Development System, which enables developers to trigger AI-powered coding workflows from any device (iPad, iPhone, terminal, Linear) with full E2E execution.
 
 The architecture separates concerns into two distinct components:
 
