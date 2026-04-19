@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Stylized peacock watermark">
+  <defs>
+    <radialGradient id="plumeFade" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0" stop-color="#06b6d4" stop-opacity="0.0"/>
+      <stop offset="0.5" stop-color="#06b6d4" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#06b6d4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="400" cy="370" r="340" fill="url(#plumeFade)"/>
+  <!-- Plume fan: 11 curved feathers radiating from body -->
+  <g fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round">
+    <path d="M400 470 C 220 380, 140 240, 120 110" opacity="0.55"/>
+    <path d="M400 470 C 260 360, 200 200, 200 70" opacity="0.6"/>
+    <path d="M400 470 C 310 340, 290 180, 300 50" opacity="0.65"/>
+    <path d="M400 470 C 360 330, 360 170, 380 40" opacity="0.7"/>
+    <path d="M400 470 C 400 320, 410 160, 430 40" opacity="0.7"/>
+    <path d="M400 470 L 400 30" opacity="0.7"/>
+    <path d="M400 470 C 440 320, 470 170, 500 50" opacity="0.65"/>
+    <path d="M400 470 C 490 340, 510 180, 540 60" opacity="0.6"/>
+    <path d="M400 470 C 540 360, 600 200, 620 70" opacity="0.55"/>
+    <path d="M400 470 C 580 380, 660 240, 680 110" opacity="0.5"/>
+    <path d="M400 470 C 620 410, 720 280, 740 160" opacity="0.4"/>
+  </g>
+  <!-- Feather "eyes" along plume tips -->
+  <g fill="none" stroke="#0891b2" stroke-width="2">
+    <ellipse cx="120" cy="110" rx="14" ry="10" opacity="0.55"/>
+    <ellipse cx="200" cy="70" rx="14" ry="10" opacity="0.6"/>
+    <ellipse cx="300" cy="50" rx="14" ry="10" opacity="0.65"/>
+    <ellipse cx="380" cy="40" rx="14" ry="10" opacity="0.7"/>
+    <ellipse cx="430" cy="40" rx="14" ry="10" opacity="0.7"/>
+    <ellipse cx="400" cy="30" rx="14" ry="10" opacity="0.7"/>
+    <ellipse cx="500" cy="50" rx="14" ry="10" opacity="0.65"/>
+    <ellipse cx="540" cy="60" rx="14" ry="10" opacity="0.6"/>
+    <ellipse cx="620" cy="70" rx="14" ry="10" opacity="0.55"/>
+    <ellipse cx="680" cy="110" rx="14" ry="10" opacity="0.5"/>
+    <ellipse cx="740" cy="160" rx="14" ry="10" opacity="0.4"/>
+  </g>
+  <g fill="#06b6d4">
+    <circle cx="120" cy="110" r="3" opacity="0.55"/>
+    <circle cx="200" cy="70" r="3" opacity="0.6"/>
+    <circle cx="300" cy="50" r="3" opacity="0.65"/>
+    <circle cx="380" cy="40" r="3" opacity="0.7"/>
+    <circle cx="430" cy="40" r="3" opacity="0.7"/>
+    <circle cx="400" cy="30" r="3" opacity="0.7"/>
+    <circle cx="500" cy="50" r="3" opacity="0.65"/>
+    <circle cx="540" cy="60" r="3" opacity="0.6"/>
+    <circle cx="620" cy="70" r="3" opacity="0.55"/>
+    <circle cx="680" cy="110" r="3" opacity="0.5"/>
+    <circle cx="740" cy="160" r="3" opacity="0.4"/>
+  </g>
+  <!-- Body: stylized peacock body + neck + crest -->
+  <g fill="#06b6d4" opacity="0.85">
+    <ellipse cx="400" cy="540" rx="70" ry="95"/>
+  </g>
+  <g fill="none" stroke="#06b6d4" stroke-width="6" stroke-linecap="round" opacity="0.9">
+    <path d="M400 470 C 405 420, 415 380, 420 340"/>
+  </g>
+  <g fill="#06b6d4" opacity="0.85">
+    <circle cx="424" cy="330" r="18"/>
+  </g>
+  <g fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" opacity="0.8">
+    <path d="M422 314 L 418 296"/>
+    <path d="M427 314 L 428 294"/>
+    <path d="M432 316 L 438 300"/>
+  </g>
+  <g fill="#0891b2">
+    <circle cx="430" cy="328" r="2"/>
+  </g>
+  <!-- Beak -->
+  <path d="M442 332 L 456 334 L 442 338 Z" fill="#0891b2" opacity="0.9"/>
+  <!-- Tail trailing feathers below body -->
+  <g fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" opacity="0.55">
+    <path d="M360 620 C 320 680, 280 720, 240 760"/>
+    <path d="M380 630 C 360 700, 340 740, 320 770"/>
+    <path d="M420 630 C 440 700, 460 740, 480 770"/>
+    <path d="M440 620 C 480 680, 520 720, 560 760"/>
+  </g>
+</svg>

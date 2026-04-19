@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Decorative stat burst">
+  <defs>
+    <radialGradient id="g" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#06b6d4" stop-opacity="0.35"/>
+      <stop offset="0.6" stop-color="#06b6d4" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#06b6d4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="url(#g)"/>
+  <g fill="none" stroke="#06b6d4" stroke-width="0.8">
+    <circle cx="100" cy="100" r="30" opacity="0.35"/>
+    <circle cx="100" cy="100" r="50" opacity="0.22"/>
+    <circle cx="100" cy="100" r="72" opacity="0.14"/>
+    <circle cx="100" cy="100" r="92" opacity="0.08"/>
+  </g>
+  <g stroke="#06b6d4" stroke-width="0.7" stroke-linecap="round" opacity="0.35">
+    <line x1="100" y1="14" x2="100" y2="34"/>
+    <line x1="100" y1="166" x2="100" y2="186"/>
+    <line x1="14" y1="100" x2="34" y2="100"/>
+    <line x1="166" y1="100" x2="186" y2="100"/>
+    <line x1="39" y1="39" x2="53" y2="53"/>
+    <line x1="161" y1="39" x2="147" y2="53"/>
+    <line x1="39" y1="161" x2="53" y2="147"/>
+    <line x1="161" y1="161" x2="147" y2="147"/>
+  </g>
+</svg>
