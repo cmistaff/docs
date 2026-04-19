@@ -112,26 +112,53 @@
               "operations/s3-tenant-isolation",
               "operations/owasp-audit"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Marcia",
-        "groups": [
+          },
           {
-            "group": "Marcia AI",
+            "group": "Marcia AI Assistant",
             "pages": [
               "features/marcia-ai-brd",
               "features/marcia-architecture",
               "features/marcia-omnichannel",
-              "features/marcia-judge-llm",
-              "features/unified-ai-pipeline"
+              "features/marcia-judge-llm"
             ]
           },
           {
             "group": "Marcia Mobile",
             "pages": [
               "mobile/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "MarciaOS",
+        "groups": [
+          {
+            "group": "MarciaOS",
+            "pages": [
+              "marciaos/coming-soon"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Marcia Code",
+        "groups": [
+          {
+            "group": "Marcia Code",
+            "pages": [
+              "marcia-code/coming-soon"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Ask Marcia",
+        "groups": [
+          {
+            "group": "Ask Marcia",
+            "pages": [
+              "ask-marcia/coming-soon"
             ]
           }
         ]
