@@ -47,7 +47,7 @@ The nightly scorecard collects the following per developer over the **month-to-d
 Devs are matched across systems by canonical name. Bots, AI co-author logins (`claude*`, `cursor*`, `copilot*`), departed contractors, and Michael's accounts are excluded.
 
 <Note>
-**UI/UX designers are scored differently.** Designers (Olha, Oleksandra, Alona K, Alona N) are not penalized for zero GitHub commits. Their GitHub bonus tier is replaced with a Jira-throughput tier so role differences do not punish people unfairly.
+**UI/UX designers are scored differently.** The carve-out is a hardcoded `UIUX` set in [`dev_scorecard_report.py`](https://github.com/cmistaff/management-tools/blob/main/scripts/dev_scorecard_report.py) and currently covers four people: Olha Semenii, Oleksandra Zvirevych, Alona Klymiuk, and Alona Novak. Designers in that set are not penalized for zero GitHub commits; their GitHub bonus tier is replaced with a Jira-throughput tier so role differences do not punish people unfairly. New designers must be added to the set in code.
 </Note>
 
 ## How it is weighted
@@ -116,7 +116,7 @@ The final score is clamped to the range 0 to 100 and bucketed for the ranking ta
 
 ## How to find your score
 
-The nightly scorecard is currently distributed three ways:
+The nightly scorecard is distributed three ways. There is no per-developer auto-delivery (no email, no DM); if you want to see your score outside your one-on-one, ask in your team channel or DM your manager.
 
 1. **PDF in your monthly review.** Your manager pulls the latest PDF from `~/dev-scorecards/` or the shared Google Drive folder before your one-on-one. If you want to see your score before the meeting, ask in your team channel or DM your manager.
 2. **Google Drive (managers and Michael).** `Daily Operations/{YYYY}/{MM-Month}/{YYYY-MM-DD}/dev-scorecard-{YYYY-MM-DD}.pdf`. If you do not have access, you are not meant to have the org-wide rollup. Ask for your slice.
@@ -125,6 +125,8 @@ The nightly scorecard is currently distributed three ways:
 <Warning>
 **Your scorecard is not posted in Slack channels.** It is not visible to your teammates by default. Performance data is treated as confidential. If you see your or another developer's score posted publicly, that is a process violation and should be flagged to Michael (Chief of Staff) directly.
 </Warning>
+
+**Sprint scorecards** from `argus-cli` are generated every **Monday at 14:00 UTC** (10:00 AM ET, before standup) by a cron on the ops box and dropped into the same shared Google Drive folder as the nightly composite. The cron is tracked in [CRC-105](https://linear.app/crest-usa/issue/CRC-105) (in progress) — until it lands, sprint scorecards are produced manually on request.
 
 For PR-level deep dives between reviews, ask for an Argus run on a specific window:
 
@@ -183,7 +185,7 @@ Your monthly review is a one-on-one with your manager. The Argus scorecard is th
 ### What is quantitative
 
 - Your nightly score, averaged across the month and on the day of review.
-- Trend deltas vs the previous month (the scorecard PDF includes vs-yesterday deltas; managers also pull month-over-month).
+- Trend deltas. The nightly PDF surfaces vs-yesterday only (deltas are stored by `trend_tracker.py` for that single comparison). Month-over-month is a manual read by your manager across consecutive nightly PDFs, not a separate report.
 - Hours vs target.
 - PRs merged, commits, reviews submitted.
 - Tickets done, open, blocked.
@@ -197,7 +199,7 @@ These do not appear on the scorecard. They come from your manager's direct obser
 - **Architectural impact.** Did your work move the codebase forward, or did it add to the pile?
 - **Mentorship and review quality.** Are your PR reviews substantive? Do junior teammates ship better after you review them?
 - **On-call and incident response.** When something broke, were you available? Did your runbook hold up?
-- **Communication.** Are your tickets readable? Do your daily updates reflect reality? Do you flag blockers early?
+- **Communication.** Are your tickets readable? Do your daily updates in [`#daily-updates`](https://mycrest.slack.com/archives/C09HE3A4F9D) reflect reality? Do you flag blockers early? Bookmark the channel — it is where managers see your day-to-day pulse outside the scorecard.
 - **Trust and judgment.** Did you ask before doing the irreversible thing? Did you push back when you should have?
 
 A high score with weak qualitative signals is a flag for the manager to dig in. A lower score with strong qualitative signals (you carried a hard ticket all month, or covered for a teammate who was out) is also expected and accounted for.
