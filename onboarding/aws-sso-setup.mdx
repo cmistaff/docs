@@ -1,0 +1,191 @@
+---
+title: "AWS SSO Setup"
+description: "Configure AWS IAM Identity Center on your dev box so you can pull local-dev secrets from AWS Secrets Manager."
+---
+
+<Note>
+Background: INF-156 (April 9, 2026) centralized local-dev API keys, tokens, and third-party credentials in AWS Secrets Manager. INF-159 documented the SSO onramp. This page is the short-form developer setup; the long-form reference lives in the infra repo at `infra/docs/SSO_ONBOARDING.md`.
+</Note>
+
+## Why SSO
+
+We use **AWS IAM Identity Center (SSO)** for all AWS access. Instead of long-lived access keys, you get short-lived temporary credentials through your SSO session. Your AWS profiles each map to a specific permission set + environment, so the same `aws` command targets the right scope based on `AWS_PROFILE`.
+
+Concretely, SSO gives you the ability to:
+
+- Pull shared dev secrets from AWS Secrets Manager into your local `.env` files (see [Environment Variables](/onboarding/environment-variables)).
+- View prestaging logs, ECS state, CloudWatch metrics.
+- Open a bastion tunnel to RDS or Redis (separate access, see [Data Access Onboarding](/onboarding/data-access)).
+- Read production-only state (logs, metrics) without write capability.
+
+## Prerequisites
+
+Install these once. You can verify with the commands in the right column.
+
+| Tool | Verify |
+|------|--------|
+| AWS CLI v2 | `aws --version` (must be `aws-cli/2.x.x`) |
+| `jq` (for parsing JSON into `.env`) | `jq --version` |
+| Session Manager Plugin (only needed for bastion access later) | `session-manager-plugin` |
+
+macOS: `brew install awscli jq && brew install --cask session-manager-plugin`
+Linux: see the install steps in `infra/docs/SSO_ONBOARDING.md`.
+
+## Step 1: Get added to the SSO groups
+
+Ask your team lead or DevOps to add you to the appropriate Identity Center groups. The minimum for local development is `Observers-Prestaging` plus `AppTesters-Prestaging` (the latter is what gives you read access to `local/crest-pet/api` and `local/crest-pet/web`). Backend devs who need to deploy or touch data also get `AppDeployers-{Env}` and `DataManagers-{Env}` for their environments.
+
+## Step 2: Configure AWS CLI
+
+```bash
+aws configure sso
+```
+
+Answer the prompts as follows:
+
+| Prompt | Value |
+|--------|-------|
+| SSO session name | `crest` |
+| SSO start URL | `https://cammarata.awsapps.com/start` |
+| SSO region | `us-east-1` |
+| Registration scopes | `sso:account:access` |
+
+The CLI will open a browser tab for you to log in. Complete the flow.
+
+When the wizard asks which account/role to use as the default, you can pick anything; you'll override per-command via `AWS_PROFILE`.
+
+## Step 3: Add AWS profiles
+
+Edit `~/.aws/config` and add the profiles you have access to. The minimum for fetching local-dev secrets is the `app-tester` profile. Add others as you need them.
+
+```ini
+# SSO session - login once, use multiple profiles
+[sso-session crest]
+sso_start_url = https://cammarata.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
+
+# Required for fetching local-dev secrets from local/crest-pet/api and local/crest-pet/web
+[profile crest-prestaging-app-tester]
+sso_session = crest
+sso_account_id = 908027379030
+sso_role_name = AppTester-Prestaging
+region = us-east-1
+
+# Useful for reading prestaging logs, ECS state, etc.
+[profile crest-prestaging-observer]
+sso_session = crest
+sso_account_id = 908027379030
+sso_role_name = Observer-Prestaging
+region = us-east-1
+
+# Optional - production read-only access (most devs use this for log spelunking)
+[profile crest-production-observer]
+sso_session = crest
+sso_account_id = 908027379030
+sso_role_name = Observer-Production
+region = us-east-1
+```
+
+<Note>
+**Region note.** The SSO session itself lives in `us-east-1`. The application infrastructure (RDS, ECS, Secrets Manager) is also in `us-east-1` for prestaging/staging/production. When you run `aws secretsmanager get-secret-value`, pass `--region us-east-1` explicitly so the request hits the right region regardless of your default.
+</Note>
+
+The full set of available profiles (DataViewer, DataManager, AppDeployer, SecretsManager, etc.) is in the long-form guide. Add the ones your role requires.
+
+## Step 4: Verify access
+
+```bash
+# Login (browser flow, lasts 1-12 hours depending on role)
+aws sso login --sso-session crest
+
+# Check identity for the app-tester profile
+aws sts get-caller-identity --profile crest-prestaging-app-tester
+
+# Should print account 908027379030 and an ARN ending in
+# AppTester-Prestaging/<your-name>@creststaff.com
+```
+
+## Step 5: Fetch dev secrets
+
+Once SSO is working, you can populate your local `.env` files in two commands:
+
+```bash
+# Server-side (NestJS API) secrets
+AWS_PROFILE=crest-prestaging-app-tester \
+  aws secretsmanager get-secret-value \
+  --secret-id local/crest-pet/api \
+  --region us-east-1 \
+  --query SecretString --output text \
+  | jq -r 'to_entries[] | "\(.key)=\(.value)"' > server/.env
+
+# Client-side (Next.js) secrets
+AWS_PROFILE=crest-prestaging-app-tester \
+  aws secretsmanager get-secret-value \
+  --secret-id local/crest-pet/web \
+  --region us-east-1 \
+  --query SecretString --output text \
+  | jq -r 'to_entries[] | "\(.key)=\(.value)"' > client/.env
+```
+
+For details on what comes from the secret bundles vs. what you set yourself, see [Environment Variables](/onboarding/environment-variables).
+
+## Daily Workflow
+
+```bash
+# 1. Login at the start of your day (one browser tab)
+aws sso login --sso-session crest
+
+# 2. Use AWS_PROFILE per command for the right scope
+AWS_PROFILE=crest-prestaging-observer aws logs tail /ecs/crest-pet-prestaging-api --follow
+AWS_PROFILE=crest-prestaging-app-tester aws secretsmanager get-secret-value --secret-id local/crest-pet/api --region us-east-1
+```
+
+Sessions last 1-12 hours (longer for read-only roles, shorter for write/data roles). When a command fails with "SSO session has expired," just run `aws sso login --sso-session crest` again.
+
+## Troubleshooting
+
+### `Unable to locate credentials` or `The SSO session associated with this profile has expired`
+
+Your SSO session is expired. Re-login:
+
+```bash
+aws sso login --sso-session crest
+```
+
+If that fails, clear the cache and try again:
+
+```bash
+rm -rf ~/.aws/sso/cache
+aws sso login --sso-session crest
+```
+
+### `An error occurred (ForbiddenException)` or `AccessDenied`
+
+You don't have the permission set the profile is targeting. Confirm:
+
+1. Which profile you're using: `echo $AWS_PROFILE`
+2. Whether you're in the right group: ask DevOps or check the SSO portal at https://cammarata.awsapps.com/start.
+3. If you were just added to a group, run `rm -rf ~/.aws/sso/cache && aws sso login --sso-session crest` so the new membership takes effect.
+
+### `The config profile (crest-prestaging-app-tester) could not be found`
+
+You haven't added the profile to `~/.aws/config` yet, or the profile name is misspelled. Re-paste the snippet from Step 3.
+
+### Commands work for one profile but not another (region mismatch)
+
+Profiles default to `us-east-1`. If you set `AWS_REGION=us-east-2` in your shell, that overrides the profile's default. For Secrets Manager and ECS, always pass `--region us-east-1` explicitly to avoid surprises.
+
+### Cannot find the `local/crest-pet/*` secrets in the AWS Console
+
+`AppTester` does not have `secretsmanager:ListSecrets` permission (by design - it would expose every secret name in the account). Use the CLI commands above and reference secrets by name.
+
+### `No such file or directory: '~/.aws/config'`
+
+Run `aws configure sso` first (Step 2). It creates the file.
+
+## Related
+
+- [Environment Variables](/onboarding/environment-variables) - how to use SSO to populate your local `.env`
+- [Data Access Onboarding](/onboarding/data-access) - bastion tunnels to RDS and Redis
+- Long-form reference: `infra/docs/SSO_ONBOARDING.md` (permission set details, session durations, full profile catalog)

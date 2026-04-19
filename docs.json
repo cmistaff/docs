@@ -30,7 +30,9 @@
             "pages": [
               "onboarding/working-in-linear",
               "onboarding/engineering-rules",
-              "onboarding/data-access"
+              "onboarding/data-access",
+              "onboarding/environment-variables",
+              "onboarding/aws-sso-setup"
             ]
           },
           {
@@ -62,8 +64,7 @@
               "guides/getting-started",
               "guides/authentication",
               "guides/multi-tenancy",
-              "guides/deployment",
-              "onboarding/environment-variables"
+              "guides/deployment"
             ]
           },
           {
