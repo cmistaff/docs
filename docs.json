@@ -56,31 +56,40 @@
         "tab": "Crest Handbook",
         "groups": [
           {
-            "group": "Welcome",
+            "group": "Crest Handbook",
             "pages": [
-              "crest-corp/welcome"
-            ]
-          },
-          {
-            "group": "Required Setup",
-            "pages": [
-              "crest-corp/background-check",
-              "crest-corp/deel-setup",
-              "crest-corp/hubstaff-policy",
-              "crest-corp/vpn-tailscale"
-            ]
-          },
-          {
-            "group": "Policies",
-            "pages": [
-              "crest-corp/engineering-rules",
-              "crest-corp/code-of-conduct"
-            ]
-          },
-          {
-            "group": "Communication",
-            "pages": [
-              "crest-corp/slack-channels"
+              {
+                "group": "Welcome",
+                "expanded": true,
+                "pages": [
+                  "crest-corp/welcome"
+                ]
+              },
+              {
+                "group": "Required Setup",
+                "expanded": false,
+                "pages": [
+                  "crest-corp/background-check",
+                  "crest-corp/deel-setup",
+                  "crest-corp/hubstaff-policy",
+                  "crest-corp/vpn-tailscale"
+                ]
+              },
+              {
+                "group": "Policies",
+                "expanded": false,
+                "pages": [
+                  "crest-corp/engineering-rules",
+                  "crest-corp/code-of-conduct"
+                ]
+              },
+              {
+                "group": "Communication",
+                "expanded": false,
+                "pages": [
+                  "crest-corp/slack-channels"
+                ]
+              }
             ]
           }
         ]
