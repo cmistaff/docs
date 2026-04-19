@@ -155,7 +155,9 @@
             "group": "Dev Workstations",
             "pages": [
               "devbox/overview",
-              "onboarding/devbox-setup"
+              "onboarding/devbox-setup",
+              "infra/tailscale-troubleshooting",
+              "infra/devbox-health"
             ]
           },
           {
