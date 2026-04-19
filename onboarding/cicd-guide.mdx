@@ -3,11 +3,15 @@ title: "Crest Pet System CI/CD Onboarding Guide and Branch Strategy Overview"
 description: "Complete guide to the CI/CD pipeline, branch strategy, promotion workflows, hotfixes, and deployment procedures."
 ---
 
-**Last Updated**: December 2025
+**Last Updated**: April 2026
 **Maintainers**: Crest Advisory Group Development Team
 
 <Note>
-The team has migrated from Jira (PW project) to Linear. **All new work uses team-key prefixes** (`CPE-####` for product, `INF-####` for infra, `MOB-####` for mobile, `DES-####` for design, `AI-####` for ML, `CRC-####` for internal access/ops). Legacy `PW-XXXX` branches remain valid during the cutover and the CI/CD automation accepts either prefix — examples below show `PW-XXX` to match the underlying GitHub Actions code, but new branches and PRs should use the appropriate Linear team-key prefix. See the [Engineering Onboarding Handbook](/onboarding/engineering-handbook) and [Working in Linear at Crest](/onboarding/working-in-linear) for the full team-key list.
+The team has migrated from Jira (PW project) to Linear. **All new work uses team-key prefixes** (`CPE-####` for product, `INF-####` for infra, `MOB-####` for mobile, `DES-####` for design, `AI-####` for ML, `CRC-####` for internal access/ops). Examples in this guide use `CPE-XXX` as the canonical convention. The CI/CD automation accepts any of the Linear team prefixes (`CPE`, `AI`, `INF`, `MOB`, `DES`, `SUP`, `CLI`, `PCK`) as well as the legacy `PW` prefix for backward compatibility. Both are valid in CI today, but new branches and PRs should use the appropriate Linear team-key prefix. See the [Engineering Onboarding Handbook](/onboarding/engineering-handbook) and [Working in Linear at Crest](/onboarding/working-in-linear) for the full team-key list.
+</Note>
+
+<Note>
+**CI regex tracking:** The `linear-pr-merged.yml` workflow's `ISSUE_PATTERN` already matches all Linear team prefixes plus `PW`, so no immediate workflow change is required. Eventual removal of the `PW` legacy fallback will be tracked in a separate ticket once all open `PW-####` branches are drained.
 </Note>
 
 ## Overview
@@ -42,7 +46,7 @@ The Crest Pet System uses a **three-tier branch strategy** with automated CI/CD 
 | 🟢 Top | main | Production | ⬆️ From staging (manual + approval) |
 | 🟡 Middle | staging | Staging | ⬆️ From prestaging (manual) |
 | 🔵 Base | prestaging | PreStaging | ⬆️ From feature branches (PR) |
-| 🌿 Feature | PW-XXX-* | Local | Created from prestaging |
+| 🌿 Feature | CPE-XXX-* (or other team prefix) | Local | Created from prestaging |
 
 **Flow Direction:**
 
@@ -60,18 +64,21 @@ The Crest Pet System uses a **three-tier branch strategy** with automated CI/CD 
 | main | Production code | ❌ Never | Only via staging promotion or ProdHotFix | 🔒 Highest |
 | staging | Pre-production testing | ❌ Never | Only via prestaging promotion or StagingHotFix | 🔒 High |
 | prestaging | Development integration | ❌ Never | All feature branches | 🔒 Standard |
-| PW-XXX-* | Feature development | ✅ Yes | prestaging only | 🔓 None |
+| `<TEAM>-XXX-*` | Feature development | ✅ Yes | prestaging only | 🔓 None |
 
 ### Branch Naming Convention
 
 ```
-PW--
+<TEAM-KEY>-<TICKET-NUMBER>-<short-description>
 
-Examples:
-- PW-123-add-payment-processing
-- PW-456-fix-appointment-scheduling
-- PW-789-refactor-user-auth
+Examples (use the team-key prefix matching the Linear team that owns the work):
+- CPE-123-add-payment-processing       (Crest Pet, product)
+- INF-456-rotate-rds-credentials       (Infrastructure)
+- MOB-789-marcia-push-notifications    (Mobile / Marcia)
+- AI-204-tune-marcia-router-fallback   (ML / Marcia model ops)
+- DES-118-clinic-portal-empty-states   (Design)
 
+Legacy PW-XXX branches still in flight (e.g. PW-644-...) remain valid until merged.
 ```
 
 ## Git Workflow
@@ -95,16 +102,16 @@ Examples:
 git checkout prestaging
 git pull origin prestaging
 
-# 2. Create feature branch
-git checkout -b PW-123-add-feature
+# 2. Create feature branch (use the team-key prefix for your Linear team)
+git checkout -b CPE-123-add-feature
 
 # 3. Make changes and commit
 git add .
-git commit -m "feat(module): add new feature [PW-123]"
+git commit -m "feat(module): add new feature [CPE-123]"
 
 # 4. Push and create PR
-git push origin PW-123-add-feature
-gh pr create --base prestaging --title "[PW-123] Add new feature"
+git push origin CPE-123-add-feature
+gh pr create --base prestaging --title "[CPE-123] Add new feature"
 
 # 5. After PR is approved and merged → Auto-deploys to PreStaging
 
@@ -114,15 +121,17 @@ gh pr create --base prestaging --title "[PW-123] Add new feature"
 
 | Type | Description | Example |
 | --- | --- | --- |
-| feat | New feature | feat(clinic): add appointment scheduling [PW-123] |
-| fix | Bug fix | fix(payment): resolve stripe webhook timeout [PW-456] |
-| docs | Documentation | docs(api): update swagger annotations [PW-789] |
+| feat | New feature | feat(clinic): add appointment scheduling [CPE-123] |
+| fix | Bug fix | fix(payment): resolve stripe webhook timeout [CPE-456] |
+| docs | Documentation | docs(api): update swagger annotations [CPE-789] |
 | style | Formatting | style(lint): fix eslint warnings |
-| refactor | Code refactoring | refactor(auth): simplify token validation [PW-101] |
+| refactor | Code refactoring | refactor(auth): simplify token validation [CPE-101] |
 | test | Adding tests | test(e2e): add appointment booking tests |
 | chore | Maintenance | chore(deps): update dependencies |
 
-**Format:** `<type>(<scope>): <description> [<jira-ticket>]`
+**Format:** `<type>(<scope>): <description> [<linear-ticket>]`
+
+The `<linear-ticket>` is the team-key prefix plus number from Linear (e.g. `CPE-123`, `INF-456`, `MOB-789`).
 
 ## Merge Rules
 
@@ -243,7 +252,7 @@ Workflows use intelligent change detection to determine if deployment is needed:
 | --- | --- |
 | 1️⃣ | Go to Actions → Promote PreStaging to Staging |
 | 2️⃣ | Click Run workflow |
-| 3️⃣ | Fill in Release title, Jira tickets, and Migration required |
+| 3️⃣ | Fill in Release title, Linear tickets, and Migration required |
 | 4️⃣ | Click Run workflow |
 
 **What happens:**
@@ -261,7 +270,7 @@ Workflows use intelligent change detection to determine if deployment is needed:
 | --- | --- |
 | 1️⃣ | Go to Actions → Promote Staging to Main |
 | 2️⃣ | Click Run workflow |
-| 3️⃣ | Fill in: Release title, Jira tickets, Breaking changes, Migration required |
+| 3️⃣ | Fill in: Release title, Linear tickets, Breaking changes, Migration required |
 | 4️⃣ | Wait for approval (production environment requires approval) |
 
 **What happens:**
@@ -285,9 +294,9 @@ Workflows use intelligent change detection to determine if deployment is needed:
 | Step | Action |
 | --- | --- |
 | 1️⃣ | Go to Repository → Releases → Draft a new release |
-| 2️⃣ | Click "Choose a tag" and select the new tag (e.g., rel-2025.01.15-14.30Z) |
+| 2️⃣ | Click "Choose a tag" and select the new tag (e.g., rel-2026.01.15-14.30Z) |
 | 3️⃣ | Set Release title: Same as promotion title or more descriptive |
-| 4️⃣ | Write Release notes: Summary, JIRA tickets, breaking changes, migrations |
+| 4️⃣ | Write Release notes: Summary, Linear tickets, breaking changes, migrations |
 | 5️⃣ | Check "Set as latest release" |
 | 6️⃣ | Click "Publish release" |
 
@@ -298,14 +307,14 @@ Workflows use intelligent change detection to determine if deployment is needed:
 git tag -l 'rel-*' --sort=-creatordate | head -5
 
 # Create release from tag
-gh release create rel-2025.01.15-14.30Z \
+gh release create rel-2026.01.15-14.30Z \
  --title "Release: Assessment Filtering Fixes" \
  --notes "## Changes
-- [PW-644] Fix assessment filtering
-- [PW-645] Improve search performance
+- [CPE-644] Fix assessment filtering
+- [CPE-645] Improve search performance
 
-## JIRA Tickets
-- PW-644, PW-645"
+## Linear Tickets
+- CPE-644, CPE-645"
 
 ```
 
@@ -495,36 +504,27 @@ Automatically redirects PRs to correct branch:
 | Wrong PR target | ✅ Auto-corrected | Retargeting workflow |
 | Invalid PR to release branch | ✅ Blocked | Release branch guard |
 
-## JIRA Integration
+## Linear Integration
 
 ### Automatic Ticket Detection
 
-The CI/CD system automatically detects JIRA tickets from:
+The CI/CD system automatically detects Linear tickets from PR title, branch name, and PR body using the `ISSUE_PATTERN` regex in `linear-pr-merged.yml`. The pattern accepts all Linear team prefixes (`CPE`, `AI`, `INF`, `MOB`, `DES`, `SUP`, `CLI`, `PCK`) plus the legacy `PW` prefix:
 
 | Source | Example | Detects |
 | --- | --- | --- |
-| Branch name | PW-123-feature-name | PW-123 |
-| PR title | [PW-123] Add feature | PW-123 |
-| PR body | Any mention of PW-XXX | All mentioned |
-| Hidden marker | `<!-- jira-auto-created: PW-123 -->` | PW-123 |
+| Branch name | CPE-123-feature-name | CPE-123 |
+| PR title | [CPE-123] Add feature | CPE-123 |
+| PR body | Any mention of CPE-XXX (or other team prefix) | All mentioned |
 
-### Automatic Ticket Creation
+If a PR has no detectable Linear ticket, the merge workflow logs a notice telling the author how to link one. It does not auto-create a ticket. Open a Linear issue manually and reference it in the PR title or body before merging.
 
-If no ticket is found, the system:
+### Linear-GitHub Automation
 
-| Step | Action |
+| GitHub Action | Linear Transition |
 | --- | --- |
-| 1️⃣ | Creates a new JIRA ticket in project PW |
-| 2️⃣ | Updates PR title with ticket: [PW-123] Original Title |
-| 3️⃣ | Adds JIRA link to PR description |
-| 4️⃣ | Searches for related tickets |
+| PR Merged | Notify Linear via `linear-pr-merged.yml` (status transitioned by `linear-status-transition.yml`) |
 
-### JIRA-GitHub Automation
-
-| GitHub Action | JIRA Transition |
-| --- | --- |
-| PR Created | → 📋 READY FOR DEPLOY |
-| PR Merged | → ✅ DONE |
+For the canonical reference on team keys, workflows, and Linear conventions, see [Working in Linear at Crest](/onboarding/working-in-linear).
 
 ## Quality Gates
 
@@ -555,7 +555,7 @@ The `claude-code-review.yml` workflow provides:
 | Feature | Description |
 | --- | --- |
 | 🤖 Automated review | Code review using Claude AI |
-| 🎫 JIRA management | Automatic ticket detection/creation |
+| 🎫 Linear linking | Automatic Linear ticket detection (Linear linking handled separately by `linear-pr-merged.yml`) |
 | 🔒 Security checks | Security and best practices analysis |
 | 💡 Suggestions | Improvement recommendations |
 
@@ -626,7 +626,7 @@ git tag -l 'rel-*' --sort=-creatordate | head -5
 
 # Rollback to specific tag
 git checkout main
-git reset --hard rel-2025.01.15-14.30Z
+git reset --hard rel-2026.01.15-14.30Z
 git push origin main --force-with-lease
 
 ```
@@ -646,7 +646,7 @@ git push origin main --force-with-lease
 | --- | --- |
 | ☐ Verify deployment completed | |
 | ☐ Test critical functionality | |
-| ☐ Update JIRA tickets | |
+| ☐ Update Linear tickets | |
 | ☐ Notify team in Slack | |
 | ☐ Investigate root cause | |
 
@@ -807,10 +807,11 @@ git fetch origin --prune
 | hotfix-sync.yml | Automatic hotfix synchronization |
 | release-branch-guard.yml | PR validation for release branches |
 | retarget-pr-to-prestaging.yml | Auto-retarget PRs |
-| pr-jira-automation.yml | JIRA ticket automation |
+| linear-pr-merged.yml | Linear ticket detection on PR merge |
+| linear-status-transition.yml | Linear status updates from CI |
+| linear-promotion-notify.yml | Linear notifications on promotion |
 | claude-code-review.yml | AI code review |
 | lint-*.yml | Linting workflows |
 | run-*-tests.yml | Test workflows |
 
-**© 2025 Crest Advisory Group LLC. All rights reserved.**
-
+**© 2026 Crest Advisory Group LLC. All rights reserved.**
