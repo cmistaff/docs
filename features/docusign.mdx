@@ -21,10 +21,37 @@ We have two types of Docusign Implementation.
 3. Get Envelope Status API
 
 #### Models
+
+All models below live in `packages/common/prisma/schema/agreements.prisma` (verified against the prestaging tree on 2026-04-18).
+
 **Agreement**
 
-This stores details about the agreement, so that we can look it up via docusign. It stores status and timestamps, and signingURL.
+Stores details about the agreement so we can look it up via DocuSign. Carries status, timestamps, and `signingURL`.
 
-**EntityAgreementMap**
+**EntityAgreement**
 
-This stores entityID (petId, userId, clinicId etc), agreementId and entity type (pet, user, clinic etc). This also store whether this agreement was created by us or clinics.
+Joins an `Agreement` to its target entity (pet, user, clinic, etc.) via an `entityId` plus `entityType` discriminator. Also tracks whether the agreement was created by us or by the clinic.
+
+**ConsentFormTemplate**
+
+Per-tenant template for clinic-authored consent forms. Bound to one or more visit types via `ConsentFormTemplateVisitType`, and to service steps via `ConsentFormTemplateServiceStep`.
+
+**ConsentFormTemplateVisitType**
+
+Join table that wires a `ConsentFormTemplate` to the visit types where it is automatically required.
+
+**ConsentFormTemplateServiceStep**
+
+Join table that wires a `ConsentFormTemplate` to the service steps where it is automatically required.
+
+**ConsentFormSignature**
+
+A captured signature on a consent form (image or DocuSign envelope) attached to a specific appointment / patient.
+
+**EstimateConsentSignature**
+
+A captured signature on a treatment estimate (separate from clinical consent forms).
+
+**UserPolicyConsent**
+
+Tracks acceptance of platform-level legal policies (Terms of Service, Privacy Policy) per user.
