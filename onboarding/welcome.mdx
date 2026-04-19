@@ -1,0 +1,58 @@
+---
+title: "Welcome to Crest"
+description: "You made it. Here is what your first week looks like and how to get set up."
+---
+
+You made it through hiring. Welcome to Crest Advisory Group. This page is the front door for new engineers, designers, and operators joining the team. Watch the orientation video below, then walk through the linked setup guides in order.
+
+<video
+  controls
+  width="100%"
+  poster="/logo/peacock.png"
+  src="https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v6-20260418.mp4"
+>
+  Your browser does not support embedded video. You can download it from
+  https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v6-20260418.mp4
+</video>
+
+## Get Set Up
+
+Work through these in order. Each one builds on the last. Plan on roughly half a day total if everything goes smoothly.
+
+<CardGroup cols={2}>
+  <Card title="Before You Start" icon="clipboard-list" href="/onboarding/before-you-start">
+    Accounts, paperwork, and access prerequisites to handle on Day 0.
+  </Card>
+  <Card title="Connect to Your Devbox" icon="plug" href="/onboarding/connect-to-devbox">
+    Tailscale VPN, SSH keys, and noVNC into your assigned EC2 workstation.
+  </Card>
+  <Card title="Workstation Setup" icon="screwdriver-wrench" href="/onboarding/workstation-setup">
+    Tools, shells, editors, and base configuration for your devbox.
+  </Card>
+  <Card title="Run CrestPetSystem Locally" icon="play" href="/onboarding/run-crestpetsystem-locally">
+    Clone the main product, install dependencies, and boot the stack.
+  </Card>
+  <Card title="Day 1 Walkthrough" icon="map" href="/onboarding/day-one-walkthrough">
+    A guided tour of the codebase, tools, and people you will work with.
+  </Card>
+</CardGroup>
+
+## What to Expect in Week 1
+
+A rough timeline so you know what good progress looks like.
+
+- **Day 1.** Accounts active, devbox reachable via Tailscale, video watched, Day 1 walkthrough complete.
+- **Day 2.** CrestPetSystem running locally end to end. First Linear issue assigned for orientation.
+- **Day 3.** First small PR opened against a sandboxed branch. Pair with your onboarding buddy on review.
+- **Day 4.** Environment variables, AWS SSO, and the AI tooling stack configured. Comfortable in the PR review protocol.
+- **Day 5.** First substantive PR merged. Sync with Michael on goals for Week 2.
+
+## Where to Go Next
+
+Once you have the basics running, branch out:
+
+- The [Crest Handbook](/crest-corp/welcome) covers HR setup, policies, and the engineering rules every contributor follows.
+- The [Crest Pet System](/architecture/overview) tab is your reference for the main product architecture, features, and infrastructure.
+- The [docs homepage](https://docs.crestadvisorygroup.com/) lists every section of the docs site.
+
+If anything in this guide is wrong, missing, or out of date, ping Michael on Slack or open a PR against `cmistaff/docs`. Onboarding docs decay fast and we rely on fresh eyes to keep them honest.
