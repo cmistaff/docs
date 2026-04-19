@@ -154,6 +154,55 @@
             "pages": [
               "mobile/overview"
             ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              {
+                "group": "Overview",
+                "pages": [
+                  "infra/overview",
+                  "infra/onboarding-portal"
+                ]
+              },
+              {
+                "group": "Multi-Region and Migration",
+                "pages": [
+                  "operations/multi-region-architecture",
+                  "operations/ecs-eks-migration",
+                  "operations/cost-analysis"
+                ]
+              },
+              {
+                "group": "Dev Workstations",
+                "pages": [
+                  "devbox/overview",
+                  "onboarding/devbox-setup",
+                  "infra/cursor-ssh-remote-vs-tunnel",
+                  "infra/tailscale-troubleshooting",
+                  "infra/devbox-health"
+                ]
+              },
+              {
+                "group": "CI/CD",
+                "pages": [
+                  "onboarding/cicd-guide",
+                  "infra/cicd-runner-policy"
+                ]
+              },
+              {
+                "group": "Autonomous Dev System",
+                "pages": [
+                  "operations/autonomous-dev-system"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction"
+            ]
           }
         ]
       },
@@ -186,60 +235,6 @@
             "group": "Ask Marcia",
             "pages": [
               "ask-marcia/coming-soon"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Infrastructure",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "infra/overview",
-              "infra/onboarding-portal"
-            ]
-          },
-          {
-            "group": "Multi-Region and Migration",
-            "pages": [
-              "operations/multi-region-architecture",
-              "operations/ecs-eks-migration",
-              "operations/cost-analysis"
-            ]
-          },
-          {
-            "group": "Dev Workstations",
-            "pages": [
-              "devbox/overview",
-              "onboarding/devbox-setup",
-              "infra/cursor-ssh-remote-vs-tunnel",
-              "infra/tailscale-troubleshooting",
-              "infra/devbox-health"
-            ]
-          },
-          {
-            "group": "CI/CD",
-            "pages": [
-              "onboarding/cicd-guide",
-              "infra/cicd-runner-policy"
-            ]
-          },
-          {
-            "group": "Autonomous Dev System",
-            "pages": [
-              "operations/autonomous-dev-system"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API Reference",
-        "groups": [
-          {
-            "group": "API Reference",
-            "pages": [
-              "api-reference/introduction"
             ]
           }
         ]
