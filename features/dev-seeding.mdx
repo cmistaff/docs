@@ -265,7 +265,7 @@ NODE_ENV=development pnpm db:fetch
 - s3:PutObject on arn:aws:s3:::crest-pet-dev-db-dumps/dumps/*
 - s3:GetObject on arn:aws:s3:::crest-pet-dev-db-dumps/dumps/*
 - s3:ListBucket on arn:aws:s3:::crest-pet-dev-db-dumps
-- rds-db:connect on arn:aws:rds-db:{region}:{account}:dbuser:{dbi-resource-id}/viewer_iam
+- rds-db:connect on arn:aws:rds-db:`{region}`:`{account}`:dbuser:`{dbi-resource-id}`/viewer_iam
 
 ### OIDC Trust Policy {#oidc-trust-policy}
 
