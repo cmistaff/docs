@@ -1,0 +1,242 @@
+---
+title: "Run CrestPetSystem Locally"
+description: "End-to-end walkthrough for getting the multi-tenant vet platform running on your devbox, from pnpm install to a logged-in clinic dashboard."
+---
+
+<Note>
+Issues setting up? Drop a message in `#project-crestpetsystem` (Slack), someone has hit your bug before.
+</Note>
+
+## Prerequisites
+
+Onboarding is a three-page sequence, run them in order:
+
+1. [Connect to Devbox](/onboarding/connect-to-devbox), Tailscale, Cursor SSH, Termius, browser-via-Tailscale
+2. [Workstation Setup](/onboarding/workstation-setup), AWS SSO, GitHub auth, secrets pull, nvm, repo clones
+3. **This page**, run CrestPetSystem locally
+
+By the time you reach this page you should have:
+
+- AWS SSO configured and a fresh session
+- Admin secrets pulled (`source ~/management-tools/scripts/load-env.sh` works)
+- Node 22.x active (`nvm use` from the repo root reads `.nvmrc`)
+- pnpm 10.15.0 enabled via `corepack enable`
+- The repo cloned at `~/Crest/GitHub/crestsystem/crestpetsystem`
+- Your devbox connected to Tailscale, you will need this to hit the dev server from your laptop
+
+<Warning>
+The local dev URLs (for example `http://dev-michael:3000`) only resolve from your laptop while you are on the **Tailscale VPN**. If you are not on Tailscale, the page will hang. Connect first, then continue.
+</Warning>
+
+## 1. Install Dependencies
+
+CrestPetSystem uses **pnpm**, not Bun. The root `package.json` declares `"packageManager": "pnpm@10.15.0"`. If a doc, agent, or coworker tells you to `bun install`, they are reading stale notes, ignore them.
+
+```bash
+cd ~/Crest/GitHub/crestsystem/crestpetsystem
+nvm use
+corepack enable
+pnpm install
+```
+
+Install takes a few minutes the first time (large monorepo: client, server, packages/common). Subsequent runs are cached.
+
+## 2. Configure `/etc/hosts`
+
+The auth cookie architecture requires API requests to reach a subdomain that shares a parent domain with the portal. Without these entries, login cookies are silently rejected and you will be stuck on `/auth/login` with no error.
+
+Add these lines to `/etc/hosts` on your **devbox** (not your laptop):
+
+```text
+127.0.0.1 taylor.localhost clinic.localhost enterprise.localhost consumer.localhost referral.localhost
+127.0.0.1 api.consumer.localhost api.clinic.localhost api.enterprise.localhost api.taylor.localhost api.referral.localhost
+127.0.0.1 clinic.clinic.localhost enterprise.enterprise.localhost clinic.consumer.localhost referral.referral.localhost
+```
+
+```bash
+sudo nano /etc/hosts   # paste the three lines above, save
+```
+
+**Why this matters.** Your browser at `clinic.clinic.localhost:3000` makes API calls to `api.clinic.localhost:8080`. The cookie `Domain=clinic.localhost` covers both because they share the parent domain. If the API runs on bare `localhost:8080`, the browser refuses the cookie (different origin) and login silently fails.
+
+## 3. Environment Variables
+
+See [Environment Variables](/onboarding/environment-variables) for the full reference. Before your first run, verify these three are set correctly. The host-map values look like JSON, they are JSON strings, watch the quoting.
+
+**`client/.env`**
+
+```bash
+NEXT_PUBLIC_API_HOST_MAP={"consumer.localhost":"api.consumer.localhost:8080","clinic.localhost":"api.clinic.localhost:8080","enterprise.localhost":"api.enterprise.localhost:8080","taylor.localhost":"api.taylor.localhost:8080","referral.localhost":"api.referral.localhost:8080"}
+```
+
+**`server/.env`**
+
+```bash
+APP_API_HOST_MAP="{\"consumer.localhost:3000\":\"api.consumer.localhost:8080\",\"clinic.localhost:3000\":\"api.clinic.localhost:8080\",\"enterprise.localhost:3000\":\"api.enterprise.localhost:8080\",\"taylor.localhost:3000\":\"api.taylor.localhost:8080\",\"referral.localhost:3000\":\"api.referral.localhost:8080\"}"
+PRIMARY_TENANT_ID=<your-primary-tenant-uuid>
+```
+
+`PRIMARY_TENANT_ID` must match a real seeded tenant. The seed generates a fresh UUID every run, so you cannot hardcode this value or copy it from a teammate. Run the seed first (Step 4 below), then look up the Pawsome Veterinary Clinic tenant ID:
+
+```bash
+psql "$DATABASE_URL" -c "SELECT id FROM \"Tenant\" WHERE slug = 'clinic' AND type = 'CLINIC';"
+# or browse via Prisma Studio:
+pnpm prisma:studio
+```
+
+Paste the resulting UUID into `PRIMARY_TENANT_ID` and restart the server. If you point `PRIMARY_TENANT_ID` at a UUID that does not exist, the `/branding` endpoint returns 500 on every request.
+
+If you do not have `client/.env`, `server/.env`, or `packages/common/.env` files yet, ask in `#project-crestpetsystem`, they are distributed via the `Environment Variables` Slack channel.
+
+## 4. Start the Dev Server
+
+Bring up the local databases (Postgres, Redis, MinIO), apply migrations, seed test data, then start the apps.
+
+```bash
+cd ~/Crest/GitHub/crestsystem/crestpetsystem
+
+# 1. Start Postgres + Redis + MinIO
+pnpm compose:db up --wait -d
+
+# 2. Apply migrations (only if you have new ones since last run)
+pnpm -w prisma:migration:run
+
+# 3. Seed test data (only on a fresh DB, skip otherwise)
+pnpm --filter server db:seed
+
+# 4. Build the server with SWC, NestJS type-check is disabled to avoid OOM
+cd server && npx nest build && cd ..
+
+# 5. Start server + client
+NODE_ENV=development node server/dist/main.js &
+pnpm --filter client dev:local &
+```
+
+Expected output: server logs `Nest application successfully started` on port 8080, client logs `Ready in <time>` on port 3000.
+
+Open your **laptop browser** (still on Tailscale) and hit:
+
+```text
+http://dev-<your-name>:3000
+```
+
+Replace `<your-name>` with your devbox hostname (for example `dev-michael`). You should see the portal landing page or a login form.
+
+## 5. Test Login Credentials
+
+Seed data ships with one user per portal. All passwords are `testpassword123`.
+
+| Portal | URL (replace `dev-<name>` with your devbox) | Email |
+| --- | --- | --- |
+| Clinic | `http://clinic.clinic.localhost:3000` (locally) or via your portal mapping | `david@clinic.test` |
+| Consumer | `http://clinic.consumer.localhost:3000` | `john@consumer.test` |
+| Enterprise | `http://enterprise.enterprise.localhost:3000` | `michael@enterprise.test` |
+| Platform | `http://taylor.localhost:3000` | `admin@platform.test` |
+| Referral | `http://referral.referral.localhost:3000` | `partner@referral.test` |
+
+<Note>
+Consumer and Enterprise portals route to a tenant selection page first by design (multi-tenant), they do not jump straight to a dashboard. Platform uses a different auth flow and does not require phone verification.
+</Note>
+
+## 6. Common Issues
+
+These are the seven gotchas the team has hit during local setup. If you bump into something not listed here, post in `#project-crestpetsystem`.
+
+### Login silently fails, no session cookie set
+
+You submit the login form, the API returns 200, but the page sits on `/auth/login` with no `crest.session_token` cookie in DevTools.
+
+**Cause.** `NEXT_PUBLIC_API_HOST_MAP` is mapping portals to bare `localhost:8080` instead of the `api.<portal>.localhost` subdomains. The browser rejects the `Set-Cookie` because the cookie domain does not match the request origin.
+
+**Fix.** Double-check Steps 2 and 3: `/etc/hosts` entries present, `NEXT_PUBLIC_API_HOST_MAP` and `APP_API_HOST_MAP` both pointing at API subdomains.
+
+### `nest start --watch` runs out of memory
+
+Server crashes during startup with `FATAL ERROR: JavaScript heap out of memory`.
+
+**Cause.** NestJS watch mode forks a type-checker process that loads all 8,781 source files. Combined with the dev server, it blows past the heap limit.
+
+**Fix.** Set `typeCheck: false` in `nest-cli.json`, then build with SWC instead of watch mode:
+
+```json
+{ "compilerOptions": { "builder": "swc", "typeCheck": false } }
+```
+
+```bash
+cd server && npx nest build && node dist/main.js
+```
+
+If a previous crash left a forked checker hanging around, reclaim memory with `pkill -9 -f forked-type-checker`.
+
+### `/branding` endpoint 500, "tenant not found"
+
+Server logs spam `Error: tenant not found` for every request, login page renders but downstream features break.
+
+**Cause.** `PRIMARY_TENANT_ID` in `server/.env` points at a UUID that does not exist in the seeded database. Most often this is because the seed was reset and a new UUID was generated.
+
+**Fix.** Look up the current Pawsome Veterinary Clinic tenant ID from your local database and update `PRIMARY_TENANT_ID`. The UUID changes every time the seed is reset, so you cannot copy this value from a teammate's `.env`.
+
+```bash
+psql "$DATABASE_URL" -c "SELECT id FROM \"Tenant\" WHERE slug = 'clinic' AND type = 'CLINIC';"
+```
+
+### Dashboard redirects to `/auth/verify` after login
+
+Login succeeds and the cookie is set, but the dashboard layout immediately bounces you to a "Verify Your Phone Numbers" page.
+
+**Cause.** The dashboard layout reads `session.user.phoneVerified`, which is computed from the `PhoneNumbers` table. The seed creates users but does not create phone records.
+
+**Fix.** Run this SQL after seeding to attach a verified phone to each test user:
+
+```sql
+INSERT INTO "PhoneNumbers" (id, "phoneNumber", "userId", verified, "createdAt", "updatedAt", "isPrimary")
+SELECT gen_random_uuid()::text, '+15559990' || row_number() OVER (), u.id, true, NOW(), NOW(), true
+FROM "User" u
+WHERE u.email IN ('david@clinic.test', 'michael@enterprise.test', 'admin@platform.test', 'partner@referral.test', 'john@consumer.test')
+AND NOT EXISTS (SELECT 1 FROM "PhoneNumbers" p WHERE p."userId" = u.id AND p.verified = true);
+```
+
+### Stale `dist/` after a branch switch
+
+Server fails on startup with `MODULE_NOT_FOUND` or `ENOTEMPTY`.
+
+**Cause.** Compiled output from the previous branch conflicts with the current source tree.
+
+**Fix.** Always wipe before rebuilding after a branch switch:
+
+```bash
+rm -rf server/dist
+cd server && npx nest build
+```
+
+### Prisma migration prompts hang in your editor terminal
+
+`pnpm prisma:migration:create <name>` or `pnpm prisma:migration:run` errors with "non-interactive environment" when run inside the Cursor or Claude Code terminal.
+
+**Cause.** Those terminals do not provide a real TTY, Prisma needs one to confirm prompts (especially the enum-split prompt in Prisma 6).
+
+**Fix.** Run the same command in a plain SSH terminal on the devbox. Never edit files under `_prisma_migrations` to "force" a state, that is a permanent PR blocker.
+
+### Port conflicts (3000, 8080, 5432, 6379)
+
+Server or client refuses to start with `EADDRINUSE`.
+
+**Cause.** A previous `node`, `pnpm`, or `docker compose` process is still bound to the port. Common after a crashed run or an SSH disconnect that orphaned the dev process.
+
+**Fix.**
+
+```bash
+lsof -i :3000   # or :8080, :5432, :6379
+kill -9 <PID>
+
+# If Docker-managed services are stuck:
+pnpm compose:db down
+pnpm compose:db up --wait -d
+```
+
+## Next Steps
+
+- Read [CLAUDE.md](https://github.com/cmistaff/crestpetsystem/blob/prestaging/CLAUDE.md) at the repo root, it is the single source of truth for code standards
+- Browse [FEATURES.md](https://github.com/cmistaff/crestpetsystem/blob/prestaging/docs/FEATURES.md) for the feature inventory
+- Run the test suite: `pnpm test:server:e2e:local`
+- Open Prisma Studio to poke at the local DB: `pnpm prisma:studio`
