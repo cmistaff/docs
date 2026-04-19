@@ -34,20 +34,22 @@ server/src/modules/
 │   ├── sentry/             # Error tracking
 │   ├── socket-io-adapter/  # Socket.IO Redis adapter
 │   ├── template/           # Email/PDF template rendering
-│   └── third-party/        # External service integrations
-│       ├── ai/             # Anthropic, Mistral AI
+│   └── third-party/        # External service integrations (17 modules)
+│       ├── ai/             # Anthropic + Mistral provider routing (parent of mistral/)
 │       ├── audio/          # Audio processing
 │       ├── docusign/       # Electronic signatures
 │       ├── email/          # AWS SES (transactional email)
 │       ├── google-api/     # Google services
-│       ├── mistral/        # Mistral AI
+│       ├── heygen/         # AI avatar/video generation (HeyGen)
+│       ├── mistral/        # Mistral AI sub-provider (used via ai/)
+│       ├── poop-scan-api/  # Fecal analysis
 │       ├── s3-storage/     # AWS S3 file storage
 │       ├── sms/            # Twilio SMS
 │       ├── stripe/         # Stripe payments
 │       ├── tavus/          # AI video generation
 │       ├── tooth-scan-api/ # Dental scan processing
-│       ├── poop-scan-api/  # Fecal analysis
 │       ├── turnstile/      # Cloudflare bot protection
+│       ├── video-consultation-providers/  # LiveKit + Daily provider routing
 │       └── whatsapp/       # WhatsApp Business API
 └── portals/                # Business logic by portal (7 backend portal namespaces)
     ├── clinic/             # 81 modules
@@ -140,7 +142,7 @@ Multi-tenant security is enforced at every layer:
 Controller (@CurrentTenant) → Service (tenantId param) → Repository (where: { tenantId })
 ```
 
-Client-provided `tenantId` values are never trusted. The tenant is always resolved from the authenticated session context, except for platform admin endpoints protected by `RequireTenantTypeGuard` and `TenantAccessGuard` (in `server/src/modules/portals/shared/domain/guards/`).
+Client-provided `tenantId` values are never trusted. The tenant is always resolved from the authenticated session context, except for platform admin endpoints protected by `RequireTenantTypeGuard` (`tenant-type.guard.ts`) and `TenantAccessGuard` (`tenant-access.guard.ts`), both in `server/src/modules/portals/shared/domain/guards/`.
 
 ## DTOs and Validation
 
