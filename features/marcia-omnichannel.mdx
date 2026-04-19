@@ -16,11 +16,19 @@ Status: **Planned** -- This is a design document. Implementation has not started
 - **Repos audited**: `crestpetsystem/`, `marcia-omnichannel-mcp/`, `infra/`
 
 #### Current Crest-hosted chat system
-![Image: image-20251212-015850.png](image-20251212-015850.png)
+<Note>
+Diagram omitted: original architecture diagram of the current Crest-hosted chat system (consumer browser, CrestPetSystem API, in-process Marcia AI orchestrator, downstream tool calls into Crest business APIs). Image was lost during the Confluence-to-Mintlify migration. Tracked under the CRC-1 documentation cleanup window.
+</Note>
+
 #### Phase 1: Target MCP-hosted realtime chat + Crest as system-of-record for tool actions
-![Image: image-20251212-020152.png](image-20251212-020152.png)
+<Note>
+Diagram omitted: target architecture for Phase 1 — consumer browser connects to Marcia Omnichannel MCP for realtime chat (Socket.IO), MCP performs tool calls back into CrestPetSystem APIs which remain the source of truth for business actions. Image was lost during the Confluence-to-Mintlify migration. Tracked under the CRC-1 documentation cleanup window.
+</Note>
+
 #### Phase 2-5: Target with omnichannel via MCP
-![Image: image-20251212-020351.png](image-20251212-020351.png)
+<Note>
+Diagram omitted: target architecture for Phases 2-5 — MCP fans out to additional channels (SMS via Twilio, Voice via Tavus/Vapi, WhatsApp via Twilio, Email inbound), each routed back through the same Crest tool registry. Image was lost during the Confluence-to-Mintlify migration. Tracked under the CRC-1 documentation cleanup window.
+</Note>
 ## Executive Summary
 
 - **Goal**: Move Marcia AI execution to **Marcia Omnichannel MCP** (Chat + SMS + Voice + WhatsApp + Email), while **CrestPetSystem** remains the product UI + source of truth for business data/actions.
