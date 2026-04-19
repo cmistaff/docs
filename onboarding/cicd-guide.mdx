@@ -7,7 +7,7 @@ description: "Complete guide to the CI/CD pipeline, branch strategy, promotion w
 **Maintainers**: Crest Advisory Group Development Team
 
 <Note>
-The team is migrating from Jira (PW project) to Linear (CPE team). Ticket references below may use either system during the transition.
+The team has migrated from Jira (PW project) to Linear. **All new work uses team-key prefixes** (`CPE-####` for product, `INF-####` for infra, `MOB-####` for mobile, `DES-####` for design, `AI-####` for ML, `CRC-####` for internal access/ops). Legacy `PW-XXXX` branches remain valid during the cutover and the CI/CD automation accepts either prefix — examples below show `PW-XXX` to match the underlying GitHub Actions code, but new branches and PRs should use the appropriate Linear team-key prefix. See the [Engineering Onboarding Handbook](/onboarding/engineering-handbook) and [Working in Linear at Crest](/onboarding/working-in-linear) for the full team-key list.
 </Note>
 
 ## Overview
@@ -742,8 +742,8 @@ git fetch origin --prune
 
 | Task | Command/Action |
 | --- | --- |
-| Create feature branch | git checkout prestaging && git checkout -b PW-XXX-feature |
-| Create PR | gh pr create --base prestaging --title "[PW-XXX] Description" |
+| Create feature branch | git checkout prestaging && git checkout -b CPE-XXX-feature (or your team-key prefix) |
+| Create PR | gh pr create --base prestaging --title "[CPE-XXX] Description" |
 | Merge PR | Use "Squash and merge" (not regular merge) |
 | Promote to Staging | Actions → "Promote PreStaging to Staging" → Run |
 | Promote to Production | Actions → "Promote Staging to Main" → Run (requires approval) |

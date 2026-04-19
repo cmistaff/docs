@@ -3,6 +3,10 @@ title: "Devbox Setup"
 description: "Step-by-step guide for setting up Tailscale VPN, SSH access, and connecting to your cloud development workstation."
 ---
 
+<Note>
+**New to Crest?** Start with the [Day 1: Zero to Running Code](/onboarding/day-one-walkthrough) walkthrough. It bundles this page with everything else you need on day one (CrestPet running locally, Cursor + Marcia + Claude Code authenticated, first commit shipped). This page remains the deeper reference for Tailscale and Zsh enhancements.
+</Note>
+
 # Tailscale Setup and SSH Connection Guide
 
 ## Step 1 - Install Tailscale on your laptop
@@ -138,15 +142,15 @@ Once your devbox is configured, clone the repository and pull the environment se
 git clone git@github.com:cmistaff/crestpetsystem.git
 cd crestpetsystem
 
-# Fetch environment secrets - DON'T USE THESE. SEE NOTE BELOW
-aws secretsmanager get-secret-value --secret-id crest-dev/client-env --query SecretString --output text --region ap-south-1 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > client/.env
-aws secretsmanager get-secret-value --secret-id crest-dev/server-env --query SecretString --output text --region ap-south-1 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > server/.env
+# Fetch environment secrets — replace --region with your devbox's home region
+# (us-east-2 for Ohio, ap-south-1 for Mumbai, eu-central-1 for Frankfurt)
+aws secretsmanager get-secret-value --secret-id crest-dev/client-env --query SecretString --output text --region us-east-2 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > client/.env
+aws secretsmanager get-secret-value --secret-id crest-dev/server-env --query SecretString --output text --region us-east-2 | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > server/.env
 ```
-note799eba6941e0
-You will have to manually add `.env` variables for `server/.env` , `client/.env` & `packages/common/.env`. AWS secrets are not updated, and hence they don’t work
 
-
-You will have to manually add `.env` variables for `server/.env` , `client/.env` & `packages/common/.env`. AWS secrets are not updated, and hence they don’t work
+<Note>
+Some `.env` slots may be empty after pulling — Secrets Manager is the source of truth but is updated on demand. If a slot is missing for `server/.env`, `client/.env`, or `packages/common/.env`, ask in `#crestpet-onboarding` for the current value. The full canonical list is at [Environment Variables](/onboarding/environment-variables).
+</Note>
 
 ## Step 8 - Start the app
 

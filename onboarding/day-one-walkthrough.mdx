@@ -1,0 +1,538 @@
+---
+title: "Day 1: Zero to Running Code"
+description: "The single page a new Crest engineer follows on day one to go from no access to running CrestPet locally on their dev box and shipping their first commit."
+---
+
+This is the action sequence. Follow it top to bottom and by the end of day one you will have Tailscale connected, your dev box reachable, Cursor wired up over Remote-SSH, three AI CLIs authenticated, CrestPet running, and a draft PR open against `prestaging`.
+
+<Note>
+This page is the **executable checklist**. The [Engineering Onboarding Handbook](/onboarding/engineering-handbook) is the **reference**: deeper background on Slack channels, sprint cadence, environments, code review, and the full toolchain. Bookmark both. If a step here fails, the handbook usually has the long-form context.
+</Note>
+
+<Note>
+Before you start: read the [Engineering Rules (Security and Conduct)](/onboarding/engineering-rules). They are non-negotiable. Rule 14 ("work happens on the dev box") is what makes this entire walkthrough possible — your local laptop is for SSH, Tailscale, Cursor's remote client, video calls. Everything else lives on the dev box.
+</Note>
+
+## Before day one
+
+<Steps>
+  <Step title="Confirm you received your day-zero access">
+    By end of business the day before you start, you should have:
+
+    - A Tailscale invite email to your `@creststaff.com` address
+    - A GitHub invite to the `cmistaff` org (and any sub-orgs your role needs)
+    - A Cursor invite (SAML auto-joins the Crest team once you sign in with Google)
+    - Your dev box hostname (format: `dev-yourname` — for example `dev-affan`, `dev-serhii`, `dev-michael`)
+    - An onboarding-portal pointer at [onboarding.crestadvisorygroup.com](https://onboarding.crestadvisorygroup.com)
+
+    If any of those are missing, **DM Michael Cammarata in Slack before day one**. Do not start day one without all four.
+  </Step>
+
+  <Step title="Watch the 6-minute onboarding video and skim the printable PDF">
+    Both live on the [Welcome Video and Printable Reference](/onboarding/welcome-video) page. The video is the fastest way to internalize how the team operates. The PDF is the printable copy of the 25 Engineering Rules and 11 Linear Workflow Requirements — keep it open in a tab on day one.
+  </Step>
+</Steps>
+
+## Day one: get connected
+
+<Steps>
+  <Step title="Install SentinelOne EDR on your local laptop">
+    SentinelOne is the company-required endpoint security agent for any device that connects to the Crest tailnet. Install it **before** Tailscale so the device is protected from the moment it joins the network.
+
+    1. DM Michael for the SentinelOne installer link for your OS. Links are S3 presigned and expire — do not reuse stale links.
+    2. Install the agent. macOS will prompt for full disk access and system extension approval; grant both.
+    3. After install, the agent should report into the **Remote Dev** site automatically (no extra config needed).
+
+    <Note>
+    SentinelOne is read-only telemetry for the company; it does not block your workflows. If you see any prompt asking for additional permissions during install, accept them.
+    </Note>
+  </Step>
+
+  <Step title="Install Tailscale on your local laptop and sign in">
+    Download Tailscale: [https://tailscale.com/download](https://tailscale.com/download)
+
+    Sign in with your **`@creststaff.com` Google account** (preferred). GitHub login also works but creates an `<github-username>@github` identity that requires an extra ACL update — Google is one fewer step.
+
+    <Note>
+    If Google login returns "cannot join another tenant", your `@creststaff.com` email is bound to a different Tailscale account. Stop and DM Michael with your GitHub username — he will provision GitHub-based access instead. Do not create a personal Tailscale account.
+    </Note>
+
+    After login your account may show `needs-approval` until Michael accepts you on the admin side. If `tailscale status` lists you but no peers appear, that is the symptom — wait for approval and re-check.
+  </Step>
+
+  <Step title="SSH to your dev box">
+    Open a terminal on your laptop and run:
+
+    ```bash
+    ssh ubuntu@dev-yourname
+    ```
+
+    Replace `yourname` with the dev box name you were given. First connection will prompt for `known_hosts` — type `yes`.
+
+    Verify you landed in the right place:
+
+    ```bash
+    hostname
+    # should print: dev-yourname
+    ```
+
+    <AccordionGroup>
+      <Accordion title="Error: tailnet policy does not permit you to SSH to this node">
+        Your SSH ACL is missing. DM Michael with your dev box name and the email/identity Tailscale registered you under (check `tailscale status` on your laptop). He will add `tag:dev-yourname` and an SSH rule. Mumbai/Frankfurt devs hit this most often.
+      </Accordion>
+      <Accordion title="Connection times out">
+        Confirm Tailscale is up on your laptop: `tailscale status`. If `dev-yourname` does not appear in the device list, wait a minute (DERP relay handshake) and try `tailscale ping dev-yourname`. If still nothing, DM Michael — your dev box may need approval or the Tailscale auth key may have rotated.
+      </Accordion>
+    </AccordionGroup>
+  </Step>
+
+  <Step title="Set up your SSH config and convenience aliases">
+    On your **laptop** (not the dev box), add this to `~/.ssh/config` (create the file if it does not exist):
+
+    ```sshconfig
+    Host dev-*
+      User ubuntu
+      ForwardAgent yes
+      AddKeysToAgent yes
+      IdentityFile ~/.ssh/id_ed25519
+    ```
+
+    If you do not already have an SSH key, generate one:
+
+    ```bash
+    ssh-keygen -t ed25519 -C "your.name@creststaff.com"
+    ssh-add ~/.ssh/id_ed25519
+    ```
+
+    Add the public key (`cat ~/.ssh/id_ed25519.pub`) to GitHub at Settings -> SSH and GPG keys.
+  </Step>
+</Steps>
+
+## Day one: tools on the dev box
+
+The dev box ships with Node.js 22, pnpm, Docker, AWS CLI, GitHub CLI, Claude Code, Codex CLI, and Marcia Code already installed. You only need to authenticate them.
+
+<Steps>
+  <Step title="Authenticate the GitHub CLI">
+    From inside the dev box (`ssh ubuntu@dev-yourname`):
+
+    ```bash
+    gh auth login
+    # Choose: GitHub.com -> SSH -> Login with a web browser
+    ```
+
+    This authenticates `gh`, generates an SSH key on the dev box (if needed), and registers it with your GitHub account.
+
+    Then set your git author identity:
+
+    ```bash
+    git config --global user.name "Your Name"
+    git config --global user.email "your.name@creststaff.com"
+    ```
+  </Step>
+
+  <Step title="Authenticate Claude Code">
+    Claude Code is pre-installed via the official installer. To authenticate:
+
+    ```bash
+    claude
+    ```
+
+    Follow the OAuth prompts. Sign in with the Anthropic account tied to your `@creststaff.com` email. Verify:
+
+    ```bash
+    claude --version
+    # should print a recent 2.x version
+    ```
+  </Step>
+
+  <Step title="Authenticate Codex CLI">
+    Codex CLI is pre-installed. To sign in:
+
+    ```bash
+    codex login
+    ```
+
+    Use the OpenAI / ChatGPT account Crest provided. Verify:
+
+    ```bash
+    codex --version
+    # should print: codex-cli 0.x
+    ```
+  </Step>
+
+  <Step title="Authenticate Marcia Code">
+    Marcia Code is Crest's developer AI CLI. It is pre-installed on the dev box. To sign in:
+
+    ```bash
+    marcia login
+    ```
+
+    Marcia uses the `MARCIA_API_KEY` issued to you by Michael. Format is `sk-marcia-<user>-<random>`. Paste it when prompted (or set it in your shell rc).
+
+    Verify:
+
+    ```bash
+    marcia --version
+    # should print: marcia, version 1.x
+    ```
+
+    <Note>
+    Marcia Code is Crest's product — when describing it externally, refer to it as "Marcia" or "Marcia Code". Per Engineering Rule 20, do **not** disclose the underlying model substrate publicly.
+    </Note>
+  </Step>
+
+  <Step title="Install Cursor on your laptop and connect via Remote-SSH">
+    Download Cursor: [https://cursor.com/download](https://cursor.com/download)
+
+    1. Sign in with your `@creststaff.com` Google account — SAML auto-joins the Crest team.
+    2. Install the **Remote - SSH** extension from the Cursor extensions panel.
+    3. Open the command palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` elsewhere) and run **Remote-SSH: Connect to Host...**
+    4. Enter `ubuntu@dev-yourname`.
+    5. Cursor opens a new window with your dev box as the remote workspace.
+
+    Once connected, open the integrated terminal — you are now running commands directly on the dev box. The repo you clone in the next step will be browsed and edited entirely on the remote.
+  </Step>
+</Steps>
+
+## Day one: clone, configure, run
+
+<Steps>
+  <Step title="Clone the CrestPet repo on your dev box">
+    From inside the dev box:
+
+    ```bash
+    mkdir -p ~/Crest/GitHub/crestsystem
+    cd ~/Crest/GitHub/crestsystem
+    git clone git@github.com:cmistaff/crestpetsystem.git
+    cd crestpetsystem
+    ```
+
+    Switch to `prestaging` so you start from a clean, integrated branch:
+
+    ```bash
+    git checkout prestaging
+    git pull origin prestaging
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    pnpm install
+    ```
+
+    First install takes 3-5 minutes (postinstall hooks pull Prisma engines, generate the OpenAPI client, etc.). Let it finish.
+  </Step>
+
+  <Step title="Configure /etc/hosts for portal subdomains">
+    The auth cookie architecture requires API requests to share a parent domain with the portal. Without these entries the browser silently rejects login cookies.
+
+    Append to `/etc/hosts` on the dev box (`sudo nano /etc/hosts`):
+
+    ```
+    127.0.0.1 taylor.localhost clinic.localhost enterprise.localhost consumer.localhost referral.localhost
+    127.0.0.1 api.consumer.localhost api.clinic.localhost api.enterprise.localhost api.taylor.localhost api.referral.localhost
+    127.0.0.1 clinic.clinic.localhost enterprise.enterprise.localhost clinic.consumer.localhost referral.referral.localhost
+    ```
+
+    **Why:** the browser at `clinic.clinic.localhost:3000` calls the API at `api.clinic.localhost:8080`. The cookie `Domain=clinic.localhost` covers both because they share `clinic.localhost` as a parent. With bare `localhost`, the cookie is rejected as cross-origin.
+  </Step>
+
+  <Step title="Fetch environment secrets from AWS Secrets Manager">
+    Your dev box already has IAM permissions to read from `crest-dev/*` in its home region.
+
+    ```bash
+    # Server env
+    aws secretsmanager get-secret-value \
+      --secret-id crest-dev/server-env \
+      --region us-east-2 \
+      --query SecretString --output text \
+      | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > server/.env
+
+    # Client env
+    aws secretsmanager get-secret-value \
+      --secret-id crest-dev/client-env \
+      --region us-east-2 \
+      --query SecretString --output text \
+      | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > client/.env
+    ```
+
+    <Note>
+    Mumbai dev boxes use `--region ap-south-1`, Frankfurt uses `--region eu-central-1`. Use the region your dev box lives in.
+    </Note>
+
+    Verify:
+
+    ```bash
+    grep DATABASE_URL server/.env
+    # should print a postgres:// connection string
+    ```
+
+    Some env values may be stale or missing — see [Environment Variables](/onboarding/environment-variables) for the canonical reference. If a slot is empty after pulling, ask in `#crestpet-onboarding`.
+  </Step>
+
+  <Step title="Patch local-dev specific env values">
+    Three values must be set correctly for the local URL/port scheme to work. Open `client/.env` and confirm:
+
+    ```env
+    NEXT_PUBLIC_API_HOST_MAP={"consumer.localhost":"api.consumer.localhost:8080","clinic.localhost":"api.clinic.localhost:8080","enterprise.localhost":"api.enterprise.localhost:8080","taylor.localhost":"api.taylor.localhost:8080","referral.localhost":"api.referral.localhost:8080"}
+    ```
+
+    Open `server/.env` and confirm:
+
+    ```env
+    APP_API_HOST_MAP={"consumer.localhost:3000":"api.consumer.localhost:8080","clinic.localhost:3000":"api.clinic.localhost:8080","enterprise.localhost:3000":"api.enterprise.localhost:8080","taylor.localhost:3000":"api.taylor.localhost:8080","referral.localhost:3000":"api.referral.localhost:8080"}
+    PRIMARY_TENANT_ID=aeb9122d-0f55-4cfc-9337-e40728565629
+    ```
+
+    `PRIMARY_TENANT_ID` must match the seeded "Pawsome Veterinary Clinic" tenant. If you change it, login flows will return `tenant not found`.
+  </Step>
+
+  <Step title="Disable the Nest type-check fork (avoids OOM)">
+    `nest start --watch` forks a separate type-checker process that loads all 8000+ source files and OOMs the dev box's heap. We compile with SWC alone in dev.
+
+    In `server/nest-cli.json` ensure:
+
+    ```json
+    {
+      "compilerOptions": {
+        "builder": "swc",
+        "typeCheck": false
+      }
+    }
+    ```
+
+    If you forget this and the server crashes mid-startup with `JavaScript heap out of memory`, run `pkill -9 -f forked-type-checker` to reclaim memory before retrying.
+  </Step>
+
+  <Step title="Start the local stack and seed the database">
+    Bring up Postgres, Redis, and MinIO via Docker Compose:
+
+    ```bash
+    pnpm compose:db up --wait -d
+    ```
+
+    Apply migrations and seed:
+
+    ```bash
+    pnpm -w prisma:migration:run
+    pnpm --filter server db:seed
+    ```
+
+    Build and start the server:
+
+    ```bash
+    cd server && npx nest build && cd ..
+    NODE_ENV=development node server/dist/main.js &
+    ```
+
+    Start the client in a second terminal pane (`tmux` is already installed):
+
+    ```bash
+    pnpm --filter client dev:local
+    ```
+
+    Open the clinic portal in your laptop browser at [http://clinic.clinic.localhost:3000](http://clinic.clinic.localhost:3000) (your laptop, not the dev box — Tailscale and `pnpm dev:local` together expose port 3000 over the tailnet).
+
+    Test login: `david@clinic.test` / `testpassword123`.
+  </Step>
+
+  <Step title="Verify the loop works in Cursor">
+    In your Cursor Remote-SSH window:
+
+    1. Open the cloned repo (`File -> Open Folder` -> `~/Crest/GitHub/crestsystem/crestpetsystem`).
+    2. Edit a non-critical UI string (for example a page title) and save.
+    3. Confirm the running Next.js dev server hot-reloads in the browser.
+    4. Open Cursor's chat panel and run any prompt — confirms your Cursor team membership is active.
+    5. Open the integrated terminal and run `claude` — confirms Claude Code works from inside the editor.
+  </Step>
+</Steps>
+
+## Day one: configure Cursor to call Marcia Code
+
+You can wire Cursor's chat to call the Marcia Code API directly as a custom OpenAI-compatible model. This gives you Marcia's substrate alongside the default Cursor models.
+
+<Steps>
+  <Step title="Open Cursor model settings">
+    Settings -> Models -> Add Custom Model.
+  </Step>
+
+  <Step title="Configure the Marcia Code endpoint">
+    | Field | Value |
+    |---|---|
+    | Provider | OpenAI-compatible |
+    | Base URL | `https://api.marciacode.com/v1` |
+    | API key | Your `MARCIA_API_KEY` (`sk-marcia-<user>-<random>`) |
+    | Model name | `marcia-code` |
+
+    Save the configuration.
+
+    <Note>
+    Ask Marcia (the conversational variant) lives at `https://api.askmarcia.com/v1` with model name `ask-marcia` if you need it for non-coding tasks.
+    </Note>
+  </Step>
+
+  <Step title="Verify the model responds">
+    1. Open Cursor's chat panel.
+    2. Switch the model dropdown to your new "Marcia Code" custom model.
+    3. Open any source file in the repo and prompt: "Explain what this file does."
+    4. You should get a Marcia response within a few seconds.
+  </Step>
+</Steps>
+
+<Note>
+Per Engineering Rule 20, **never disclose the underlying model substrate** (the providers Marcia routes to) to clients, prospects, candidates, or in any external material. Marcia is Crest's product — the substrate is trade secret. Refer to it only as "Marcia" or "Marcia Code".
+</Note>
+
+## Day one: ship your first commit
+
+<Steps>
+  <Step title="Pick or create a Linear ticket">
+    Open [linear.app/crest-usa](https://linear.app/crest-usa) and find your team — most engineers are on **CPE** (product). Pick a ticket assigned to you, or create a tiny "tour-the-codebase" ticket to scaffold your first PR.
+
+    See [Working in Linear at Crest](/onboarding/working-in-linear) for the canonical ticket workflow.
+  </Step>
+
+  <Step title="Create a branch">
+    Branch names follow `<TEAM-KEY>-<NUMBER>-<short-description>`. The team-key prefix is what triggers Linear's git automation (it auto-attaches the branch and PR to the ticket and moves the status as you progress).
+
+    ```bash
+    git checkout prestaging
+    git pull origin prestaging
+    git checkout -b CPE-1234-my-first-change
+    ```
+
+    Make a small, real change. Commit:
+
+    ```bash
+    git add .
+    git commit -m "chore(onboarding): tiny first change [CPE-1234]"
+    git push origin CPE-1234-my-first-change
+    ```
+  </Step>
+
+  <Step title="Open a draft PR against prestaging">
+    ```bash
+    gh pr create --base prestaging --draft \
+      --title "[CPE-1234] My first change" \
+      --body "Tour-the-codebase change to verify my dev environment. Linked to CPE-1234."
+    ```
+
+    Watch the Linear ticket — it should auto-move from `Backlog` -> `In Progress` once the draft PR exists, and the PR will appear linked in the ticket sidebar.
+
+    Post the PR link to `#daily-update` as part of your end-of-day update.
+  </Step>
+</Steps>
+
+## You are done with day one when
+
+- `ssh ubuntu@dev-yourname` works from your laptop
+- Cursor opens the repo as a Remote-SSH workspace
+- `claude --version`, `codex --version`, and `marcia --version` all return without error on the dev box
+- `pnpm dev:local` runs without error and `http://clinic.clinic.localhost:3000` shows a login page
+- You can log in as `david@clinic.test`
+- A draft PR exists on a `CPE-####-...` branch targeting `prestaging`
+
+If any of those fail, work through the troubleshooting log below before pinging Slack.
+
+## Troubleshooting log
+
+These are the seven concrete issues hit during the most recent reference setup. Each is the highest-likelihood failure mode, with the fix that worked.
+
+### 1. Login silently fails — no session cookie set
+
+**Symptom:** Login form submits, API returns 200 with token, but the browser has no `crest.session_token` cookie. Page stays on `/auth/login`.
+
+**Cause:** `NEXT_PUBLIC_API_HOST_MAP` mapped all portals to bare `localhost:8080`. The browser at `clinic.clinic.localhost:3000` makes a fetch to `localhost:8080`, but `Set-Cookie: Domain=clinic.localhost` is rejected because `localhost` is a different origin from `clinic.localhost`. `SameSite=Lax` then blocks the cross-site fetch from setting the cookie at all.
+
+**Fix:** Map portals to API subdomains (`api.clinic.localhost:8080`) and add `/etc/hosts` entries. Then cookie domain `clinic.localhost` is a parent of both `clinic.clinic.localhost` (page) and `api.clinic.localhost` (API). Both steps are above in the walkthrough — re-verify them.
+
+### 2. `nest start --watch` OOMs (8GB+ heap needed)
+
+**Symptom:** Server crashes with `FATAL ERROR: JavaScript heap out of memory` during startup.
+
+**Cause:** NestJS `--watch` mode forks a type-checker process that loads all 8000+ source files. Combined with the dev server itself, exceeds the dev box's available heap.
+
+**Fix:** Set `typeCheck: false` in `server/nest-cli.json`, then use `npx nest build` (compiles in ~400ms with SWC alone) followed by `node dist/main.js`. The forked type-checker processes also leak — if the server crashes mid-startup, run `pkill -9 -f forked-type-checker` to reclaim memory.
+
+### 3. `/branding` endpoint 500 — "tenant not found"
+
+**Symptom:** Server logs show `Error: tenant not found` for every request. Login page renders but some features are broken.
+
+**Cause:** `PRIMARY_TENANT_ID` in `server/.env` was set to a UUID that does not exist in the seeded DB. The `/branding` endpoint uses it to fetch default branding.
+
+**Fix:** Set `PRIMARY_TENANT_ID=aeb9122d-0f55-4cfc-9337-e40728565629` (the seeded Pawsome Veterinary Clinic tenant). Re-verify in `server/.env`.
+
+### 4. Dashboard redirects to `/auth/verify` — "Verify Your Phone Numbers"
+
+**Symptom:** Login succeeds, cookie is set, but the dashboard layout redirects to the phone verification page.
+
+**Cause:** Dashboard layout checks `session.user.phoneVerified`, which is computed from the `PhoneNumbers` table. Seed data creates users but does **not** create phone number records.
+
+**Fix:** Insert verified phone records for the seeded test users:
+
+```sql
+INSERT INTO "PhoneNumbers" (id, "phoneNumber", "userId", verified, "createdAt", "updatedAt", "isPrimary")
+SELECT gen_random_uuid()::text, '+15559990' || row_number() OVER (), u.id, true, NOW(), NOW(), true
+FROM "User" u
+WHERE u.email IN ('david@clinic.test', 'michael@enterprise.test', 'admin@platform.test', 'partner@referral.test', 'john@consumer.test')
+AND NOT EXISTS (SELECT 1 FROM "PhoneNumbers" p WHERE p."userId" = u.id AND p.verified = true);
+```
+
+Run this once after seeding, against the local Postgres container.
+
+### 5. Started on a feature branch with inconsistent code
+
+**Symptom:** Setup partially works but config references `rewritePath` / `rewriteUrl` that do not exist in the validated env schema.
+
+**Cause:** A feature branch had a partial `/v2` rewrite-proxy implementation — some files updated, others not.
+
+**Fix:** Always start from `prestaging`. It is the integration branch and is consistent. The walkthrough above explicitly checks out `prestaging` after cloning — do not skip that.
+
+### 6. `dist/` directory stale after branch switch
+
+**Symptom:** Server fails on startup with `MODULE_NOT_FOUND` or `ENOTEMPTY` errors.
+
+**Cause:** Compiled `server/dist/` directory has files from the previous branch that conflict with the new build.
+
+**Fix:** After any branch switch, run `rm -rf server/dist` before rebuilding. Make this a habit — it costs four seconds and saves an hour.
+
+### 7. No other dev box has the app fully running
+
+**Finding:** During the reference setup, only one other dev box had `/etc/hosts` entries and a working local stack. Most engineers run against the deployed `prestaging` environment instead.
+
+**Fix:** None — this is just calibration. The local-dev path is fully supported and worth setting up because it lets you iterate on database migrations and multi-portal cookie flows without burning a deploy. But know that if you ask "is the local dev broken?" in `#crestpet-onboarding`, the answer is usually "your env or `/etc/hosts` is wrong, not the codebase."
+
+## Portal URLs and seeded test users
+
+| Portal | URL | User | Password |
+|---|---|---|---|
+| Clinic | http://clinic.clinic.localhost:3000 | david@clinic.test | testpassword123 |
+| Consumer | http://clinic.consumer.localhost:3000 | john@consumer.test | testpassword123 |
+| Enterprise | http://enterprise.enterprise.localhost:3000 | michael@enterprise.test | testpassword123 |
+| Platform | http://taylor.localhost:3000 | admin@platform.test | testpassword123 |
+| Referral | http://referral.referral.localhost:3000 | partner@referral.test | testpassword123 |
+
+Consumer and Enterprise portals open on a tenant selection page rather than going straight to a dashboard — that is by design for multi-tenant. Platform portal does not require `phoneVerified` (different auth flow), so step 4 above is not required for it.
+
+## When you are stuck
+
+| Problem | Where to ask |
+|---|---|
+| Setup question, missing env value | `#crestpet-onboarding` |
+| Code question, PR feedback | `#crestpet-review` |
+| Bug found in the codebase | `#bug-reports` |
+| Access broken (Tailscale, AWS, GitHub, Linear, Cursor, Slack) | DM Michael Cammarata |
+| You need new tooling not on this list | File a `CRC` ticket in Linear with the business reason |
+
+Do not DM teammates for setup help unless you have already asked in the right channel and waited a few minutes. Per Engineering Rule 21, decisions and answers belong in public channels so the next person hitting your problem can find the thread.
+
+## Where to go next
+
+- [Engineering Onboarding Handbook](/onboarding/engineering-handbook) — full reference: communication, sprint cadence, environments, code review, the toolchain
+- [Engineering Rules (Security and Conduct)](/onboarding/engineering-rules) — non-negotiable rules; re-read these monthly
+- [Working in Linear at Crest](/onboarding/working-in-linear) — the canonical ticket workflow
+- [CI/CD Guide](/onboarding/cicd-guide) — branch strategy, promotion flow, hotfix prefixes
+- [Data Access](/onboarding/data-access) — how to query staging/production data safely
+- [Environment Variables](/onboarding/environment-variables) — canonical list of what each `.env` value does
+- [Devbox Setup](/onboarding/devbox-setup) — deeper dive on Tailscale, SSH config, optional Zsh enhancements
