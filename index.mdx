@@ -1,85 +1,178 @@
 ---
-title: "Introduction"
+title: "Crest Engineering"
 description: "CrestPet System -- a multi-tenant veterinary practice management platform built by Crest Advisory Group LLC."
+mode: "wide"
 ---
 
-# CrestPet System
+<div style={{
+  background: "linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(34, 211, 238, 0.04) 100%)",
+  borderRadius: "16px",
+  padding: "2.5rem 2rem",
+  marginBottom: "2.5rem",
+  border: "1px solid rgba(6, 182, 212, 0.15)"
+}}>
+  <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ flex: "1 1 400px" }}>
+      <h1 style={{ fontSize: "2.75rem", fontWeight: 800, lineHeight: 1.1, margin: 0, marginBottom: "0.75rem" }}>
+        <span style={{ color: "#06b6d4" }}>Crest</span> Engineering
+      </h1>
+      <p style={{ fontSize: "1.15rem", color: "#475569", margin: 0, marginBottom: "1.25rem", lineHeight: 1.5 }}>
+        Multi-tenant veterinary practice management, built by <strong>Crest Advisory Group LLC</strong>.
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>8 Portals</span>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>Next.js 15 + NestJS 11</span>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "0.35rem 0.85rem", borderRadius: "999px", background: "rgba(6, 182, 212, 0.12)", color: "#0891b2", fontSize: "0.85rem", fontWeight: 600 }}>AWS Multi-Region</span>
+      </div>
+    </div>
+    <div style={{ flex: "0 1 360px", minWidth: "280px" }}>
+      <Frame caption="Engineering onboarding (v5)">
+        <video
+          controls
+          playsInline
+          preload="metadata"
+          style={{ width: "100%", borderRadius: "8px", display: "block" }}
+          src="https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v5-20260418.mp4"
+        />
+      </Frame>
+    </div>
+  </div>
+</div>
 
-CrestPet System is a comprehensive, multi-tenant veterinary practice management platform. It serves veterinary clinics, pet owners, enterprise organizations, and platform administrators through seven portals (five core portals plus the Marcia AI assistant and Vendor purchase order confirmation portal), each tailored to a specific user group.
-
-## What CrestPet Does
-
-CrestPet provides a unified platform for managing every aspect of veterinary care:
-
-- **Appointment scheduling and management** with real-time availability, slot reservations, and video consultations
-- **Electronic health records** including consultation notes, dental charts, diagnostic requests, imaging, treatment sheets, and anesthetic sheets
-- **Pet wellness and health scoring** with AI-powered health assessments, wellness plans, and wellness reports with video summaries
-- **Inventory and purchasing** with stock tracking, lot management, low-stock alerts, auto-reorder, and vendor/purchase order workflows
-- **Billing and payments** with Stripe Connect integration, invoicing, insurance splits, cash payments, payout tracking, and staff commissions
-- **Multi-location enterprise management** with analytics dashboards, predictive analytics, performance monitoring, and centralized clinic oversight
-- **Consumer pet owner portal** with appointment booking, health records access, AI-powered symptom checking, medication tracking, and vaccination history
-- **Referral network** for inter-clinic patient referrals with availability-based scheduling
-- **WhatsApp integration** for client communication via Marcia, the AI veterinary assistant
-- **Document management** with DocuSign templates, consent forms, legal policies, and PDF certificate generation
-
-## The Seven Portals
-
-CrestPet is organized into seven portals, each accessed through a subdomain:
-
-<CardGroup cols={2}>
-  <Card title="Clinic Portal" icon="stethoscope">
-    The primary workspace for veterinary practices. Manages appointments, health records, billing, inventory, treatment sheets, whiteboards, and staff operations.
-  </Card>
-  <Card title="Consumer Portal" icon="paw">
-    A pet owner-facing portal for booking appointments, viewing pet health records, tracking medications and vaccinations, and communicating with clinics.
-  </Card>
-  <Card title="Enterprise Portal" icon="building">
-    Multi-location management for corporate veterinary groups. Provides analytics dashboards, staff management, subscription controls, and centralized clinic oversight.
-  </Card>
-  <Card title="Platform Portal" icon="shield">
-    Administrative control panel. Manages tenants, users, species data, feature policies, AI settings, revenue tracking, and platform-wide configuration.
-  </Card>
-</CardGroup>
+## Where do you want to go?
 
 <CardGroup cols={3}>
-  <Card title="Referral Portal" icon="share-nodes">
-    Handles inter-clinic patient referrals with availability-based scheduling and audit logging.
+  <Card title="New to Crest?" icon="sparkles" href="/onboarding/welcome-video" horizontal>
+    Start the engineering onboarding flow
   </Card>
-  <Card title="Marcia Portal" icon="robot">
-    AI veterinary assistant with chatbot, voice (ElevenLabs), SMS, WhatsApp channels, training data capture, and draft generation.
+  <Card title="Building features?" icon="hammer" href="/architecture/overview" horizontal>
+    Architecture and API reference
   </Card>
-  <Card title="Vendor Portal" icon="truck">
-    Frontend-only portal for vendor purchase order confirmation pages.
+  <Card title="Operating the platform?" icon="server" href="/infra/overview" horizontal>
+    Infrastructure and runbooks
   </Card>
 </CardGroup>
 
-## Tech Stack
+## What CrestPet does
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15 (App Router), React 19, TypeScript 5.8, Tailwind CSS 4 |
-| Backend | NestJS 11, TypeScript 5.8, Prisma 6 |
-| Database | PostgreSQL (RDS) |
-| Cache | Redis (ElastiCache) |
-| Auth | Better Auth + JWT + Prisma adapter, Passkey/WebAuthn support |
-| Runtime | Node.js 22, pnpm 10 |
-| Infrastructure | AWS ECS Fargate, EKS (multi-region), RDS, ElastiCache, S3, CloudFront, ALB, WAF |
-| API Client | Orval (auto-generated from OpenAPI spec) |
-| Testing | Bun test runner (server unit + E2E), Playwright (frontend E2E) |
-
-## Quick Links
+A unified platform for every aspect of veterinary care.
 
 <CardGroup cols={2}>
-  <Card title="Getting Started" icon="rocket" href="/guides/getting-started">
-    Set up your local development environment
+  <Card title="Appointments and Scheduling" icon="calendar-check">
+    Real-time availability, slot reservations, video consultations, and referral booking.
   </Card>
-  <Card title="Architecture Overview" icon="diagram-project" href="/architecture/overview">
-    Understand the system design
+  <Card title="Electronic Health Records" icon="clipboard-list">
+    Consultation notes, dental charts, diagnostic requests, imaging, treatment and anesthetic sheets.
   </Card>
-  <Card title="Authentication" icon="lock" href="/guides/authentication">
-    Learn how auth works across portals
+  <Card title="Pet Wellness" icon="heart-pulse">
+    AI-powered health scoring, wellness plans, and video summaries delivered to pet owners.
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    Explore the REST API
+  <Card title="Payments and Billing" icon="credit-card">
+    Stripe Connect, invoicing, insurance splits, payouts, and staff commissions.
+  </Card>
+  <Card title="Inventory and Purchasing" icon="boxes-stacked">
+    Stock tracking, lot management, low-stock alerts, auto-reorder, and PO workflows.
+  </Card>
+  <Card title="Enterprise Analytics" icon="chart-line">
+    Multi-location dashboards, predictive analytics, and centralized clinic oversight.
+  </Card>
+  <Card title="Marcia AI Assistant" icon="robot">
+    Chat, voice, SMS, and WhatsApp channels for clients and staff -- powered by Marcia.
+  </Card>
+  <Card title="Compliance and Documents" icon="file-shield">
+    DocuSign templates, consent forms, legal policies, and PDF certificate generation.
   </Card>
 </CardGroup>
+
+## The Eight Portals
+
+CrestPet is organized into eight portals, each accessed through a dedicated subdomain.
+
+<CardGroup cols={4}>
+  <Card title="Clinic" icon="stethoscope">
+    Primary workspace for veterinary practices. Appointments, EHR, billing, inventory, whiteboards, and staff ops.
+  </Card>
+  <Card title="Consumer" icon="paw">
+    Pet owner portal for booking, health records, medications, vaccinations, and clinic messaging.
+  </Card>
+  <Card title="Enterprise" icon="building">
+    Multi-location management for corporate vet groups -- analytics, staff, subscriptions, oversight.
+  </Card>
+  <Card title="Platform" icon="shield-halved">
+    Admin control panel. Tenants, users, species data, feature policies, AI settings, revenue.
+  </Card>
+  <Card title="Referral" icon="share-nodes">
+    Inter-clinic patient referrals with availability-based scheduling and full audit logging.
+  </Card>
+  <Card title="Marcia" icon="robot">
+    AI veterinary assistant -- chat, voice (ElevenLabs), SMS, WhatsApp, training data, draft generation.
+  </Card>
+  <Card title="Vendor" icon="truck">
+    Frontend portal for vendor purchase order confirmation pages.
+  </Card>
+  <Card title="API" icon="code">
+    Public REST API surface -- OpenAPI spec, authenticated tenant access, rate limiting.
+  </Card>
+</CardGroup>
+
+## Tech stack
+
+<Tabs>
+  <Tab title="Frontend">
+    **Next.js 15** with App Router, **React 19**, **TypeScript 5.8**, **Tailwind CSS 4**. Mobile clients via **Expo (React Native)**.
+  </Tab>
+  <Tab title="Backend">
+    **NestJS 11** on **Node.js 22**, **TypeScript 5.8**, **Prisma 6** ORM. **pnpm 10** workspaces.
+  </Tab>
+  <Tab title="Database">
+    **PostgreSQL** on **Amazon RDS** (Aurora-compatible). Multi-tenant schema with row-level isolation.
+  </Tab>
+  <Tab title="Cache">
+    **Redis** on **ElastiCache** -- session storage, rate limiting, queue backplane, real-time fan-out.
+  </Tab>
+  <Tab title="Auth">
+    **Better Auth** with **JWT** sessions, **Prisma adapter**, and **Passkey/WebAuthn** support across portals.
+  </Tab>
+  <Tab title="Runtime">
+    **Node.js 22**, **pnpm 10**, **Bun test runner**. CI on self-hosted GitHub Actions runners.
+  </Tab>
+  <Tab title="Infrastructure">
+    **AWS ECS Fargate**, **EKS multi-region**, **RDS**, **ElastiCache**, **S3**, **CloudFront**, **ALB**, **WAF**, **Cloudflare** edge.
+  </Tab>
+  <Tab title="API and Testing">
+    **Orval** auto-generates clients from the **OpenAPI** spec. **Bun test** for server unit + E2E. **Playwright** for frontend E2E.
+  </Tab>
+</Tabs>
+
+## Jump in
+
+<CardGroup cols={3}>
+  <Card title="Getting Started" icon="rocket" href="/guides/getting-started">
+    Local dev setup -- env, services, seed data
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture/overview">
+    System design across all 8 portals
+  </Card>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Better Auth, JWT, and cross-portal SSO
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    REST endpoints, schemas, and examples
+  </Card>
+  <Card title="Engineering Rules" icon="scale-balanced" href="/onboarding/engineering-rules">
+    Code standards and review expectations
+  </Card>
+  <Card title="Working in Linear" icon="list-check" href="/onboarding/working-in-linear">
+    How we plan, track, and ship work
+  </Card>
+</CardGroup>
+
+<Note>
+  This site is access-controlled. Internal-only -- do not share the access code outside Crest.
+</Note>
+
+---
+
+<div style={{ textAlign: "center", color: "#64748b", fontSize: "0.875rem", paddingTop: "1rem" }}>
+  <strong style={{ color: "#0891b2" }}>Crest Advisory Group LLC</strong> &middot; Palm Beach Office (561) 935-3100 &middot; <a href="https://www.crestadvisorygroup.com/" style={{ color: "#0891b2" }}>crestadvisorygroup.com</a>
+</div>
