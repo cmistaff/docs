@@ -149,7 +149,6 @@
             "group": "Platform",
             "pages": [
               "features/feature-toggles",
-              "features/database-query-logging",
               "features/dev-seeding"
             ]
           }
@@ -183,8 +182,7 @@
             "pages": [
               "operations/multi-region-architecture",
               "operations/ecs-eks-migration",
-              "operations/cost-analysis",
-              "operations/cost-tracking"
+              "operations/cost-analysis"
             ]
           },
           {
