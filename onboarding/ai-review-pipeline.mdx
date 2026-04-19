@@ -1,0 +1,67 @@
+---
+title: "AI Review Pipeline"
+description: "How the six-bot AI review pipeline works for every PR: what each bot checks, the 5-of-6 approval rule, dismissing false positives, and where the workflow files live."
+---
+
+Every PR opened against `crestpetsystem` (and the supporting repos that opt in) runs through a **six-bot AI review pipeline** before a human reviewer is tagged. SonarCloud also runs as a deterministic quality gate but is counted separately from the six bots.
+
+The goal is simple: human reviewer time is the most expensive thing on the team. Don't burn it on issues the bots can catch. The bots cover style, obvious bugs, security smells, type safety, test coverage, and architectural drift. Humans focus on intent, business logic, and whether the change is actually solving the right problem.
+
+## The six bots
+
+| Bot | What It Checks |
+| --- | --- |
+| **Devin** | Holistic AI review. Flags regressions, missing tests, unsafe migrations, broken assumptions. Often the slowest of the six but catches the most. |
+| **Bugbot** (Cursor) | Bug-class detection focused on null-safety, off-by-ones, race conditions, async misuse, type coercion. |
+| **Codex** | Code-quality analysis and refactor suggestions. Tends to comment on duplication, complexity, and naming. |
+| **Copilot** | AI-assisted review focused on style, obvious issues, and quick wins. Lighter-weight than Devin. |
+| **Claude Code** | AI code review driven by `.github/workflows/claude-code-review.yml`. Pulls in CLAUDE.md / AGENTS.md context to enforce repo-specific rules. |
+| **Augment** | Architectural and pattern-compliance review. Flags portal-boundary violations, missing tenant scoping, repository-pattern drift, etc. |
+
+## The 5-of-6 approval rule
+
+At least **5 of 6** AI bots must approve before you tag a human reviewer to merge into prestaging.
+
+If a bot leaves unresolved comments, you have two options:
+
+1. **Fix the issue** and push a new commit. The bot will re-review automatically.
+2. **Specifically address the comment in a PR reply** explaining why the comment is a false positive or otherwise not actionable. The reply must be on the PR conversation, not in Slack or Linear.
+
+Don't merge by force. Don't wait out the bot. Don't request human review with three bots still flagging issues - you'll get bounced back.
+
+The SonarCloud quality gate is **separate** from the 5-of-6 rule and must also pass.
+
+## Dismissing false positives
+
+When a bot is wrong, dismiss its review explicitly so the PR's reviewer count stays accurate:
+
+1. Reply to the bot's comment thread on the PR explaining the false positive. Be specific: "this `await` is intentional because the upstream callback is async even though the type signature is `void`."
+2. If the bot supports it (Devin, Claude Code), use the workflow's dismiss action. Otherwise resolve the conversation in GitHub.
+3. The `dismiss-bot-reviews.yml` workflow handles bulk dismissal for known-noisy patterns. Do not edit it casually - dismissals are audited.
+
+If a bot is consistently wrong on a class of issue, file a CRC ticket so we can tune the prompt or the workflow rather than dismissing on every PR.
+
+## Where the workflows live
+
+The six-bot pipeline is configured in [`crestpetsystem/.github/workflows/`](https://github.com/cmistaff/crestpetsystem/tree/main/.github/workflows):
+
+| Workflow file | Purpose |
+| --- | --- |
+| `claude-code-review.yml` | Claude Code review on every PR open / sync |
+| `claude.yml` | On-demand Claude invocations from PR comments |
+| `devin-pr-test.yml` | Devin review and test execution |
+| `dismiss-bot-reviews.yml` | Bulk dismissal of known false-positive reviews |
+
+Bugbot, Codex, Copilot, and Augment are wired in through their respective GitHub Apps - no in-repo workflow file is needed for those.
+
+## Common failure modes
+
+- **Bot didn't run.** Check that the workflow YAML hasn't been edited in your branch and that the GitHub App is still installed on the repo. If a bot silently stops appearing, file a CRC ticket.
+- **All 6 approved but SonarCloud failed.** The SonarCloud gate is separate. Fix the SonarCloud issues - bots passing is necessary but not sufficient.
+- **One bot is consistently slow.** Devin can take 10-20 minutes on large PRs. Don't tag a human until it returns or until you've explicitly addressed why you can't wait (e.g., a hot fix - but those still need 5 of 6 minimum).
+
+## Related
+
+- [Engineering Onboarding Handbook](/onboarding/engineering-handbook) - the broader workflow this pipeline plugs into.
+- [Working in Linear at Crest](/onboarding/working-in-linear) - requirement #9 codifies the 5-of-6 rule.
+- [SonarCloud and SonarLint](/onboarding/sonarcloud-sonarlint) - the deterministic quality gate that runs alongside the bots.
