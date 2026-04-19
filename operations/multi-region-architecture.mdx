@@ -1,306 +1,224 @@
 ---
-title: "Multi-Region Architecture Strategy"
-description: "Multi-region deployment strategy for active-active architecture across AWS regions."
+title: "Multi-Region Architecture"
+description: "Deployed-state reference for the active-active multi-region stack (Singapore + US East) on EKS Auto Mode, Aurora Global, and ElastiCache Global Datastore."
 ---
 
 <Warning>
-Status: **Planned / R&D** -- Production currently runs **single-region on ECS Fargate in us-east-1**. The EKS multi-region module exists as Terraform code in the infra repo (`modules/eks-multiregion-active-active/`) but is NOT deployed to production. This document describes the target architecture, not current state.
+**CRC-60 operational warning (April 16, 2026).** Never change `primary_vpc_cidr` or `secondary_vpc_cidr` on a live multiregion stack with Aurora Global Database or ElastiCache Global Datastore attached. RDS-managed ENIs cannot be detached by any principal except the RDS service, so the VPC destroy step blocks indefinitely and the apply fails. PR #267 hit exactly this failure on April 16, 2026 and was reverted in PR #268. Any destructive replacement must follow the drain sequence in the `feedback_multiregion_vpc_replace_unsafe.md` runbook (set `enable_aurora_global = false`, `enable_elasticache_global = false`, and `enable_eks = false` in a prior apply, or take Aurora snapshots and accept data loss).
 </Warning>
 
-**Regions:**
+## What is actually deployed
 
-- Asia Pacific (Singapore)
-- US East (N. Virginia)
+This document describes the **deployed state** of the multi-region Terraform stack at `infra/environments/multiregion/{prestaging,staging,production}/`. It is no longer a design proposal.
 
+| Environment | Multiregion stack | Primary region | Secondary region | AZs per region | NAT |
+| --- | --- | --- | --- | --- | --- |
+| Prestaging | **Live** | `ap-southeast-1` (Singapore) | `us-east-1` (N. Virginia) | 2 | Single NAT (cost-optimized) |
+| Staging | **Live** | `ap-southeast-1` (Singapore) | `us-east-1` (N. Virginia) | 3 | NAT per AZ |
+| Production | **Not yet cut over** -- still single-region ECS Fargate in `us-east-1` | n/a | n/a | n/a | n/a |
 
-Core Services:
+**Source of truth for region / VPC values:** `infra/environments/multiregion/prestaging/terraform.tfvars` and the `variables.tf` defaults in each environment directory:
 
-- Amazon EKS (Auto Mode Enabled)
-- Amazon Aurora Global Database
-- Amazon ElastiCache Global Datastore
-- AWS Global Accelerator
+- `primary_region = "ap-southeast-1"`
+- `secondary_region = "us-east-1"`
+- `primary_vpc_cidr = "10.10.0.0/16"`
+- `secondary_vpc_cidr = "10.11.0.0/16"`
+- `kubernetes_version = "1.35"`
+- `eks_endpoint_public_access = false` (private endpoints only; Tailscale subnet routers provide CI/operator access)
 
-# 🟢 RECOMMENDED MODEL: ACTIVE-ACTIVE WITH EKS AUTO MODE
+The stack is composed in each `environments/multiregion/<env>/main.tf` from three building blocks:
 
-## 1️⃣ Executive Summary
+1. `module "vpc_primary"` and `module "vpc_secondary"` (`modules/vpc`)
+2. `module "multiregion"` -> `modules/eks-multiregion-active-active` -- this single module wires up both EKS clusters, Aurora Global, ElastiCache Global, Global Accelerator, Pod Identity, EKS access entries, and CloudWatch Observability.
 
-The recommended enterprise architecture is **Active-Active multi-region deployment enhanced with EKS Auto Mode**.
+The production directory exists with the same composition but is **not yet applied to a live stack**. ECS Fargate in `us-east-1` continues to serve production traffic. There is no scheduled cutover date -- production stays single-region until a cutover plan is approved.
 
-Both Singapore and US East operate as fully active production regions.
+## Cutover roadmap
 
-By enabling **EKS Auto Mode**, infrastructure management is automated, reducing operational overhead while maintaining high scalability and resilience.
+Production multi-region cutover is **not yet scheduled**. The remaining work before a production cutover can be planned:
 
-### Strategic Benefits
+- Run a full DR drill against staging using `MULTIREGION_DR_RUNBOOK.md` (in `infra/docs/`)
+- Validate Aurora Global failover RPO/RTO against staging traffic
+- Confirm Global Accelerator latency-based routing behaves as expected for our customer geography
+- Decide on the production VPC CIDR plan (cannot reuse prestaging/staging `10.10.0.0/16` and `10.11.0.0/16` without conflict)
+- Resolve the CRC-60 destructive-replacement constraint before any future CIDR changes
 
-✔ Near-zero downtime
-✔ Global performance optimization
-✔ Automated infrastructure scaling
-✔ Reduced DevOps complexity
-✔ Enterprise-grade resilience
+Until those gates are cleared, production stays on single-region ECS Fargate in `us-east-1`. This page will be updated when a cutover plan exists.
 
-## 2️⃣ Why EKS Auto Mode Strengthens Active-Active
+## EKS Auto Mode
 
-In a traditional Active-Active setup, each region requires:
+Both regions run **Amazon EKS in Auto Mode** at Kubernetes `1.35`, with private API endpoints only. AWS manages compute provisioning, node lifecycle, scaling decisions, and infrastructure right-sizing.
 
-- Node group sizing
-- Capacity forecasting
-- Patch management
-- Scaling policy tuning
+Each cluster is named `{project}-{env}-{primary|secondary}` -- for example, `crest-pet-prestaging-primary` (Singapore) and `crest-pet-prestaging-secondary` (US East).
 
+### Pod Identity (workload IAM)
 
-With **EKS Auto Mode**, AWS manages:
+EKS Auto Mode pre-installs the Pod Identity Agent and restricts IMDS, so pods cannot inherit the node IAM role. Workloads needing AWS APIs use a dedicated IAM role per region wired through `aws_eks_pod_identity_association`.
 
-- Compute provisioning
-- Node lifecycle
-- Scaling decisions
-- Infrastructure right-sizing
+| Role | Region | Namespace | ServiceAccount | Permissions |
+| --- | --- | --- | --- | --- |
+| `{project}-{env}-eks-primary-app` | Singapore | `crest-pet-api` | `api-sa` | S3 + SES (matches ECS API task role) |
+| `{project}-{env}-eks-secondary-app` | US East | `crest-pet-api` | `api-sa` | S3 + SES (matches ECS API task role) |
 
+Web pods do not get S3 IAM -- they call the API or use pre-signed URLs. The trust policy uses ABAC session tags injected by the Pod Identity Agent (`aws:RequestTag/eks-cluster-name`, `kubernetes-namespace`, `kubernetes-service-account`), not `ArnLike` on `aws:SourceArn`.
 
-This ensures:
+Module: `modules/eks-multiregion-active-active/eks-pod-identity.tf`.
 
-- Faster scaling during traffic spikes
-- Faster recovery during regional failover
-- Lower operational risk
-- Reduced infrastructure misconfiguration
+### Access entries (kubectl / Console)
 
-## 3️⃣ Architecture Overview
+EKS uses `authentication_mode = "API"`. IAM permissions alone do not grant kubectl or Console access -- engineers also need an `aws_eks_access_entry`.
 
-### Global Flow
+The module discovers the SSO-provisioned `InfraAdmin` role automatically (`/aws-reserved/sso.amazonaws.com/`, name regex `^AWSReservedSSO_InfraAdmin_[a-zA-Z0-9]+$`) and grants `AmazonEKSAdminPolicy` at cluster scope. No per-user variable. If the InfraAdmin permission set has not been provisioned to the account yet, the data source returns empty and no access entries are created.
 
-Users Worldwide
-↓
-AWS Global Accelerator
-↓
-Singapore (Active)
-+
-US East (Active)
+Operator usage:
 
-Traffic is distributed using latency-based and health-based routing.
+```bash
+# Update kubeconfig for both clusters in an environment (replace {env})
+aws eks update-kubeconfig \
+  --name crest-pet-{env}-primary \
+  --region ap-southeast-1
 
-## 4️⃣ Regional Architecture (Per Region)
+aws eks update-kubeconfig \
+  --name crest-pet-{env}-secondary \
+  --region us-east-1
 
-Each region includes:
+kubectl get pods -A
+kubectl logs -n crest-pet-api <pod-name>
+kubectl exec -it -n crest-pet-api <pod-name> -- /bin/sh
+```
 
-### 🌐 Network Layer
+`AmazonEKSAdminPolicy` covers pod logs, exec, describe, restart/scale deployments, and namespace-level RBAC. It does **not** grant cluster-admin -- no Node/PV writes, no cluster-scoped RBAC writes.
 
-- 3 Availability Zones
-- Public Subnets (ALB)
-- Private Subnets (EKS, DB, Cache)
-- NAT per AZ
+Module: `modules/eks-multiregion-active-active/eks-access-entries.tf`.
 
-### ☸️ Application Layer (EKS Auto Mode Enabled)
+## Aurora Global Database
 
-Using:
+Aurora Global Database is **deployed in prestaging and staging** and provides cross-region replication with sub-second lag.
 
-- Amazon EKS (Auto Mode)
+| Environment | Primary cluster (writer) | Secondary cluster (reader) | Status |
+| --- | --- | --- | --- |
+| Prestaging | `ap-southeast-1` | `us-east-1` | Live |
+| Staging | `ap-southeast-1` | `us-east-1` | Live |
+| Production | n/a | n/a | Not deployed -- still standalone RDS in us-east-1 |
 
+Variables (`enable_aurora_global = true`, `enable_aurora_write_forwarding = true`, `aurora_master_username = "aurora"`) are set in each environment's tfvars / variables defaults.
 
-Capabilities:
+### Failover behavior
 
-- Automatic node provisioning
-- Automatic horizontal scaling
-- Pod rescheduling across AZs
-- Infrastructure patching handled by AWS
-- Self-healing cluster behavior
+- **Read traffic:** routed to the regional reader by application config; the secondary cluster handles low-latency reads in US East.
+- **Writes:** target the primary writer in Singapore. With write-forwarding enabled, writes initiated against the secondary cluster are forwarded to the primary -- useful for emergencies, not the steady-state pattern.
+- **Promotion:** during a primary-region failure, promote the US East secondary to a standalone primary using `MULTIREGION_DR_RUNBOOK.md`. Promotion is operator-initiated, not automatic.
+- **RPO/RTO targets:** RPO < 1 second (Aurora replication lag), RTO measured in single-digit minutes for an operator-driven promote. Verify against the next DR drill before relying on these numbers in any SLA.
 
+### Bastion access
 
-Impact During Regional Failover:
+The bastion host lives in the ECS VPC (`10.2.0.0/16` per environment) and reaches Aurora primary/secondary via VPC peering set up in `vpc-peering-bastion.tf`. SSM port-forwarding documents are owned by the multiregion stack (`modules/eks-multiregion-active-active/ssm-documents.tf`) and live in `us-east-1` where the bastion runs.
 
-If one region fails:
+Connect with the pnpm scripts from the `crestpetsystem` repo:
 
-- Traffic shifts
-- Remaining region auto-scales nodes automatically
-- No manual node provisioning required
+```bash
+# Aurora secondary (us-east-1, reader replica via SSO/IAM auth)
+pnpm bastion:aurora:prestaging:sso  # localhost:35433
+pnpm bastion:aurora:staging:sso     # localhost:15433
+pnpm bastion:aurora:production:sso  # localhost:25433  (no-op until production cuts over)
 
+# Aurora primary (ap-southeast-1, writer)
+pnpm bastion:aurora:prestaging:primary  # localhost:35435
+pnpm bastion:aurora:staging:primary     # localhost:15435
+pnpm bastion:aurora:production:primary  # localhost:25435  (no-op until production cuts over)
+```
 
-This significantly improves resilience under sudden traffic spikes.
+Standalone RDS (still used for production and as the existing dev path for prestaging/staging) keeps its own port mappings (`35432` / `15432` / `25432`).
 
-### 🗄 Database Layer
+## ElastiCache Global Datastore (Redis)
 
-Using:
+Redis Global Datastore is **deployed in prestaging and staging**. Cluster mode is disabled (single shard per region, accessed via `primary_endpoint_address`).
 
-- Amazon Aurora Global Database
+| Environment | Primary | Secondary | Status |
+| --- | --- | --- | --- |
+| Prestaging | `ap-southeast-1` | `us-east-1` | Live |
+| Staging | `ap-southeast-1` | `us-east-1` | Live |
+| Production | n/a | n/a | Not deployed -- still standalone ElastiCache in us-east-1 |
 
+### User model
 
-Singapore:
+ElastiCache Global Datastore does not replicate users, so each region has its own ACL user set. The same pattern is created per region:
 
-- Primary writer (Multi-AZ)
+- `app` -- password authentication, full `on ~* +@all`. Used by EKS pods. Password stored in Secrets Manager at `{env}/crest-pet/redis-global-app` in `ap-southeast-1`.
+- `global-developer` -- IAM auth, full access for debugging.
+- `global-viewer` -- IAM auth, read-only commands for QA / monitoring.
 
+DataViewer roles get secondary (read replica) access only. DataManager gets both primary and secondary.
 
-US East:
+### Bastion access
 
-- Secondary cluster (read optimized)
+```bash
+# Redis Global secondary (us-east-1, reader)
+pnpm bastion:redis-global:prestaging:sso  # localhost:36381
+pnpm bastion:redis-global:staging:sso     # localhost:16381
+pnpm bastion:redis-global:production:sso  # localhost:26381  (no-op until production cuts over)
 
+# Redis Global primary (ap-southeast-1, writer)
+pnpm bastion:redis-global:prestaging:primary  # localhost:36380
+pnpm bastion:redis-global:staging:primary     # localhost:16380
+pnpm bastion:redis-global:production:primary  # localhost:26380  (no-op until production cuts over)
+```
 
-Features:
+## CloudWatch Observability
 
-- Sub-second replication
-- Automatic storage scaling
-- Fast cross-region promotion
+The `amazon-cloudwatch-observability` EKS add-on is enabled in both regions per environment. Fluent Bit ships pod stdout/stderr to CloudWatch Logs and the CloudWatch Agent collects Container Insights metrics.
 
+**Log group per cluster:** `/aws/containerinsights/{cluster-name}/application`
 
-RPO: < 1 second
-RTO: Near zero
-
-### 🔴 Cache Layer
-
-Using:
-
-- Amazon ElastiCache Global Datastore
-
-
-Features:
-
-- Multi-AZ Redis
-- Cross-region replication
-- Automatic failover
-
-## 5️⃣ High Availability Strategy
-
-### AZ Failure
-
-- Pods rescheduled automatically
-- DB fails over within region
-- Redis promotes replica
-- No downtime
-
-### Region Failure
-
-- Global Accelerator reroutes traffic
-- Remaining region auto-scales via EKS Auto Mode
-- Aurora promoted if required
-- Redis replica promoted
-
-
-Downtime: Minimal to near-zero
-
-## 6️⃣ RTO / RPO Targets
-
-| Metric | Target |
-| --- | --- |
-| RTO | Near Zero |
-| RPO | < 1 Second |
-| Availability | 99.99%+ |
-
-## 7️⃣ Operational Impact
-
-With EKS Auto Mode:
-
-- No node group management
-- No AMI maintenance
-- Reduced DevOps workload
-- Faster scaling during peak demand
-- Simplified multi-region management
-
-
-This lowers operational risk in a complex Active-Active environment.
-
-## 8️⃣ Cost Consideration
-
-Active-Active + EKS Auto Mode:
-
-Higher infrastructure cost due to:
-
-- Fully active clusters in both regions
-- Full database and cache capacity
-
-
-However:
-
-✔ Cost justified by uptime
-✔ Reduced operational overhead
-✔ Improved scalability
-✔ Lower human-error risk
-
-# 🔵 ALTERNATIVE MODEL: ACTIVE-PASSIVE WITH EKS AUTO MODE
-
-## 1️⃣ Executive Summary
-
-Active-Passive operates Singapore as production and US East as standby.
-
-EKS Auto Mode still provides benefits by:
-
-- Keeping standby region warm
-- Scaling quickly if failover occurs
-- Reducing infrastructure management
-
-## 2️⃣ Architecture Flow
-
-Users
-↓
-AWS Global Accelerator
-↓
-Singapore (Active)
-↕ Replication
-US East (Standby)
-
-## 3️⃣ Regional Design
-
-### Singapore
-
-- Fully scaled EKS Auto Mode cluster
-- Aurora Primary
-- Redis Primary
-
-### US East
-
-- Minimal baseline EKS Auto Mode capacity
-- Aurora Secondary
-- Redis Replica
-
-
-During failover:
-
-- Traffic shifts
-- Auto Mode scales nodes automatically
-
-## 4️⃣ RTO / RPO
-
-| Metric | Target |
-| --- | --- |
-| RTO | < 5 Minutes |
-| RPO | < 1 Second |
-| Availability | 99.9-99.99% |
-
-## 5️⃣ Cost Profile
-
-Lower cost because:
-
-- Standby region runs minimal compute
-- Auto Mode scales only when needed
-
-
-Estimated 30-40% lower than Active-Active.
-
-# 📊 Strategic Comparison
-
-| Feature | Active-Passive | Active-Active |
+| Environment | Log retention | Source (defaults in `variables.tf`) |
 | --- | --- | --- |
-| Regions Serving Traffic | 1 | 2 |
-| Failover Downtime | Minutes | Near Zero |
-| Operational Complexity | Low | Moderate |
-| Infrastructure Cost | Medium | High |
-| Recommended For | Regional scale | Global scale |
+| Prestaging | 14 days | `cloudwatch_log_retention_days = 14` |
+| Staging | 30 days | `cloudwatch_log_retention_days = 30` |
+| Production | 90 days (when cut over) | `cloudwatch_log_retention_days = 90` |
 
-# 🎯 Final Business Recommendation
+The add-on uses a dedicated Pod Identity role per cluster (`CloudWatchAgentServerPolicy`); the `cloudwatch-agent` ServiceAccount is wired automatically by the add-on. Module: `modules/eks-multiregion-active-active/eks-cloudwatch-observability.tf`.
 
-For organizations planning:
+Tail logs from a workstation:
 
-- Global customer expansion
-- High SLA commitments
-- Revenue-critical uptime
-- Enterprise-grade resilience
+```bash
+aws logs tail /aws/containerinsights/crest-pet-prestaging-primary/application --follow --region ap-southeast-1
+aws logs tail /aws/containerinsights/crest-pet-prestaging-secondary/application --follow --region us-east-1
+```
 
+## Global Accelerator
 
-**Active-Active with EKS Auto Mode is recommended.**
+`enable_global_accelerator` is wired through the module and flow logs ship to S3 (`global_accelerator_flow_logs_s3_bucket` / `_s3_prefix`). Global Accelerator front-ends are attached to the primary and secondary ALBs (`primary_alb_arn`, `secondary_alb_arn`) when those values are populated in the environment. Verify which environments currently have Global Accelerator endpoints active before relying on this for routing -- the module exposes the toggle, but the ALB ARN inputs must be provided per environment.
 
-It combines:
+## High availability behavior
 
-- Infrastructure automation
-- Multi-region resilience
-- Simplified operations
-- High scalability
+### AZ failure (within a region)
 
+- Auto Mode reschedules pods onto healthy AZs.
+- Aurora Multi-AZ promotes a replica within the region.
+- Redis Multi-AZ fails over to a replica.
 
-Active-Passive remains a strong interim or cost-optimized model.
+### Region failure
 
+- Global Accelerator routes traffic to the healthy region (latency-based + health-based).
+- The healthy region's Auto Mode cluster scales up to absorb load.
+- Aurora secondary requires operator-initiated promotion (`MULTIREGION_DR_RUNBOOK.md`).
+- Redis Global Datastore requires operator-initiated promotion of the secondary cluster.
+
+These behaviors are validated against staging during scheduled DR drills. Run a drill before quoting RTO/RPO numbers externally.
+
+## Operational gotchas
+
+1. **CRC-60 (April 16, 2026):** never change `primary_vpc_cidr` or `secondary_vpc_cidr` on a live multiregion stack with Aurora Global / Redis Global. RDS-managed ENIs block VPC destroy. Drain the stack first or accept data loss; see the warning at the top of this page and `feedback_multiregion_vpc_replace_unsafe.md`.
+2. **SSM document ownership is split:** standalone RDS / Redis SSM port-forwarding documents live in the ECS stack (`environments/{env}/`); Aurora Global / Redis Global documents live in the multiregion stack. Decommissioning one stack does not break the other.
+3. **Aurora bastion needs VPC peering:** the bastion is in the ECS VPC (`10.2.0.0/16`), Aurora secondary is in the multiregion secondary VPC (`10.11.0.0/16`). VPC peering + security group rules are required for the bastion to reach Aurora -- already wired in `vpc-peering-bastion.tf`.
+4. **EKS endpoint is private:** `eks_endpoint_public_access = false`. Use Tailscale subnet routers (CI + operator workstations are in the tailnet) to reach the API. Do not flip this to public without restricted CIDRs.
+5. **Production deploys via GitHub Actions only:** the production multiregion directory exists and is wired up, but `terraform apply` from the CLI for production is forbidden. When production is cut over, deploys go through the `terraform-deploy.yml` workflow.
+6. **Pod Identity, not node role:** if API pods get `AccessDenied`, do not patch the node role. Verify the Pod Identity association and that the deployment sets `serviceAccountName: api-sa` in the `crest-pet-api` namespace.
+
+## References
+
+- Terraform: `infra/environments/multiregion/{prestaging,staging,production}/`
+- Module: `infra/modules/eks-multiregion-active-active/`
+- DR runbook: `infra/docs/MULTIREGION_DR_RUNBOOK.md`
+- Repo CLAUDE.md: `infra/CLAUDE.md` (Pod Identity, access entries, CloudWatch retention, bastion port mappings)
+- Post-mortem feedback: `feedback_multiregion_vpc_replace_unsafe.md` (CRC-60)
