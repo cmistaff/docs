@@ -1,0 +1,149 @@
+---
+title: "Workstation Setup"
+description: "First-time setup of your Crest dev EC2 box: AWS SSO, GitHub auth, secrets, Node 22, and repo clones."
+---
+
+<Note>
+This picks up after you've connected to your dev box over SSH (Cursor Remote-SSH or Termius). If you haven't connected yet, see the [Cursor SSH vs Tunnel](/infra/cursor-ssh-remote-vs-tunnel) page first. By the end of this page you'll be ready to [run CrestPetSystem locally](/onboarding/run-crestpetsystem-locally).
+</Note>
+
+You'll do these six steps in order. Each takes 2-5 minutes.
+
+1. AWS SSO
+2. GitHub authentication
+3. Pull secrets
+4. Node version
+5. Clone repos
+6. Verify your shell environment
+
+## 1. AWS SSO {#aws-sso}
+
+Your dev box needs AWS credentials so `secrets_sync.py` can decrypt the team `.env.enc` against KMS, and so you can read prestaging logs, ECS state, and CloudWatch.
+
+<Warning>
+Region is **`us-east-1`**, not `us-east-2`. The dev EC2 boxes themselves live in `us-east-2` (Ohio), but the application accounts, KMS keys, and Secrets Manager entries you'll touch are in `us-east-1`. This trips up almost every new hire.
+</Warning>
+
+Run the SSO configurator:
+
+```bash
+aws configure sso
+```
+
+You'll be prompted for:
+
+- **SSO session name:** `crest`
+- **SSO start URL:** ask in `#it-support` if you don't already have it (we don't print it here)
+- **SSO region:** `us-east-1`
+- **SSO registration scopes:** accept the default
+- **CLI default client Region:** `us-east-1`
+- **CLI default output format:** `json`
+- **Profile name:** `crest-prestaging` (or whichever environment you have access to)
+
+Browser opens, you approve the device, terminal continues. Confirm it worked:
+
+```bash
+aws sts get-caller-identity --profile crest-prestaging
+```
+
+You should see your SSO-assumed role ARN. If you get `Unable to locate credentials`, you need to log in for the session: `aws sso login --profile crest-prestaging`.
+
+For the deeper walkthrough (multi-environment profiles, group memberships, troubleshooting), see [AWS SSO Setup](/onboarding/aws-sso-setup).
+
+## 2. GitHub authentication {#github}
+
+The `gh` CLI is preinstalled on your dev box. Authenticate it:
+
+```bash
+gh auth login
+```
+
+When prompted:
+
+- **What account?** GitHub.com
+- **Preferred protocol?** HTTPS
+- **Authenticate Git with your GitHub credentials?** Yes
+- **How would you like to authenticate?** Login with a web browser (or paste a PAT if you've already created one)
+
+Confirm:
+
+```bash
+gh auth status
+gh repo list cmistaff --limit 5
+```
+
+Org access to `cmistaff` is granted at hire. If `gh repo list cmistaff` returns nothing, ping `#it-support`, your invite likely needs accepting.
+
+## 3. Pull secrets {#secrets}
+
+Crest uses a two-tier secret system, and you only ever read the lower tier:
+
+- **Admin keys** (org-level, locked to the ops box): you cannot access these. Don't try.
+- **App keys** (per-environment, e.g. `local/crest-pet/api`): pulled into your shell as env vars. These are what you need to run the app.
+
+Everything is **SOPS-encrypted with KMS**. There is no plaintext `.env` file on disk, ever. The loader decrypts in memory.
+
+Source the loader, then pull the app keys for prestaging into your local `.env.enc`:
+
+```bash
+source ~/management-tools/scripts/load-env.sh
+python3 ~/management-tools/scripts/secrets_sync.py pull-app prestaging
+```
+
+`load-env.sh` exports decrypted vars into your current shell. `pull-app prestaging` fills empty slots in the local store from `prestaging/crest-pet/api`. Run `secrets_sync.py status` any time to see sync state.
+
+Reference: [Environment Variables](/onboarding/environment-variables).
+
+## 4. Node version {#node}
+
+Node 22 is the team baseline. Your shell starts up with NVM hooked in, so:
+
+```bash
+nvm use 22
+node --version
+```
+
+You should see `v22.x.x`. If `nvm` isn't found, open a new shell, the global hook only attaches to fresh sessions.
+
+## 5. Clone repos {#clone-repos}
+
+All Crest repos live under `~/Crest/GitHub/` on your dev box, grouped by their parent system. Start with the main product:
+
+```bash
+mkdir -p ~/Crest/GitHub/crestsystem
+cd ~/Crest/GitHub/crestsystem
+gh repo clone cmistaff/crestpetsystem
+```
+
+Other repos you may need depending on your role:
+
+| Repo | Path | When you need it |
+|------|------|------------------|
+| `cmistaff/crestpetsystem` | `~/Crest/GitHub/crestsystem/crestpetsystem` | Main product. Everyone clones this. |
+| `cmistaff/infra` | `~/Crest/GitHub/crestsystem/infra` | Backend/DevOps. Production Terraform. |
+| `CrestLabsHQ/EC2DevsCrestPet` | `~/Crest/GitHub/EC2DevsCrestPet` | DevOps only. Manages the dev workstations. |
+| `CrestCorp/AppCrestPetConsumer` | `~/Crest/GitHub/AppCrestPetConsumer` | Mobile/Marcia work. Expo + Express. |
+
+Each repo has its own `CLAUDE.md` and `README.md` that explain local setup specifics.
+
+## 6. Verify your shell environment {#verify}
+
+Quick checklist. Run these in order. Every line should produce non-empty output.
+
+```bash
+aws sts get-caller-identity --profile crest-prestaging
+gh auth status
+node --version
+echo "$STRIPE_SECRET_KEY" | head -c 8
+```
+
+Expected results:
+
+- `aws sts get-caller-identity` returns your SSO-assumed role ARN.
+- `gh auth status` shows logged in to github.com as your username.
+- `node --version` shows `v22.x.x`.
+- `echo "$STRIPE_SECRET_KEY" | head -c 8` shows `sk_test_` (prestaging) or `sk_live_` (production, if you have access). If it's empty, re-source the loader: `source ~/management-tools/scripts/load-env.sh`.
+
+If all four pass, you're done. Next up: [Run CrestPetSystem Locally](/onboarding/run-crestpetsystem-locally).
+
+For Claude Code, Codex, and other AI tooling installed on your box, see [AI Tooling Stack](/onboarding/ai-tooling-stack).
