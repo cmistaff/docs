@@ -1,0 +1,71 @@
+---
+title: "Welcome to Crest"
+description: "Who we are, what we build, and what every Crest worker needs to know on day one."
+---
+
+Welcome to Crest. We are the team behind **MarciaOS**, **Marcia Code**, **Ask Marcia**, and **Crest Pet System**. This tab is the audience-first home for company-level policies that apply to anyone doing work with Crest, regardless of which product or repo you are touching.
+
+<Note>
+Before you write a single line of code, work your way through every page in **Required Setup**. The order matters. Skipping steps (especially SentinelOne EDR before Tailscale) will cost you a day of access provisioning.
+</Note>
+
+## What we build
+
+<CardGroup cols={2}>
+  <Card title="Crest Pet System" icon="paw" href="/architecture/overview">
+    Multi-tenant veterinary platform. Next.js 15 + NestJS 11 + Prisma + PostgreSQL. The flagship product and where most engineering time is spent.
+  </Card>
+  <Card title="Marcia (AI)" icon="robot" href="/features/marcia-ai-brd">
+    The AI capability that powers in-product assistance. Used across Crest Pet System, the consumer mobile app, and Ask Marcia.
+  </Card>
+  <Card title="Marcia Mobile" icon="mobile" href="/mobile/overview">
+    Consumer-facing pet health assistant mobile app. Expo React Native + Express.js backend.
+  </Card>
+  <Card title="Infrastructure" icon="server" href="/infra/overview">
+    The AWS, Tailscale, and dev workstation footprint that everything above runs on.
+  </Card>
+</CardGroup>
+
+## Onboarding video
+
+Watch the full onboarding walkthrough before your first standup. Every section maps to a docs page in this tab or the Get Started tab.
+
+<video
+  controls
+  className="w-full aspect-video rounded-md"
+  src="https://crest-video-previews.s3.us-east-2.amazonaws.com/crest-onboarding-v6-20260418.mp4"
+/>
+
+## Required Setup (do this first)
+
+<CardGroup cols={2}>
+  <Card title="Background Check" icon="shield-check" href="/crest-corp/background-check">
+    Non-negotiable. No background check, no access. No exceptions.
+  </Card>
+  <Card title="Deel Profile" icon="id-card" href="/crest-corp/deel-setup">
+    Complete your Deel.com profile so payments and tax forms are in place before week one.
+  </Card>
+  <Card title="Hubstaff" icon="clock" href="/crest-corp/hubstaff-policy">
+    Required for all paid work hours. Desktop app only.
+  </Card>
+  <Card title="VPN (Tailscale)" icon="lock" href="/crest-corp/vpn-tailscale">
+    SentinelOne EDR first, then Tailscale. Order matters.
+  </Card>
+</CardGroup>
+
+## Policies
+
+<CardGroup cols={2}>
+  <Card title="Engineering Rules" icon="book" href="/crest-corp/engineering-rules">
+    25 non-negotiable rules for every line of Crest code.
+  </Card>
+  <Card title="Code of Conduct" icon="users" href="/crest-corp/code-of-conduct">
+    How we work together: standups, meetings, decisions, recordings, and confidentiality.
+  </Card>
+</CardGroup>
+
+## Where to ask for help
+
+- **HR, Deel, payments, background check:** Bryant or Karen
+- **Dev box, Tailscale, AWS, repo access:** file a `CRC` ticket in Linear with a stated business reason
+- **Anything urgent:** DM Michael in Slack

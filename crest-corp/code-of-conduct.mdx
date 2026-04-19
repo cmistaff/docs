@@ -1,0 +1,65 @@
+---
+title: "Code of Conduct"
+description: "How we work together at Crest: meetings, standups, decisions in public, recording policy, and confidentiality."
+---
+
+Crest is a fully distributed team across multiple time zones. The behaviors on this page exist so that distributed work stays trustworthy, decisions stay auditable, and confidential information stays inside the company.
+
+## Meetings and standups
+
+- **Camera on for every Zoom meeting. No exceptions.** This includes one-on-ones, standups, design reviews, and incident calls. If your camera is broken, fix it before your next meeting; do not join with video off.
+- **Daily standup at 10 AM ET on Zoom.** Attendance is mandatory for engineers and project leads. If you cannot attend, post your update in the project Slack channel before standup starts.
+- **Be on time.** A 10 AM standup means you are on the call by 09:59. Repeated lateness affects the daily review.
+- **Use your real name.** Zoom display name should match the name on your Deel profile and your `@creststaff.com` account. No nicknames, no "iPhone."
+
+## Decisions in public
+
+- **Decisions are made in public Slack channels.** If a decision happens in a DM, in a 1:1, or in a private group, the person who made it is responsible for posting a summary to the relevant project channel within the same business day.
+- **No "shadow decisions" via DM.** If a teammate tries to get you to commit to scope, deadline, or architecture in a DM, redirect to the project channel. This is not optional; it is how distributed teams stay coordinated.
+- **Document architectural decisions.** Anything that affects more than one repo or more than one team should land in a Linear document or a docs page (this site), not in a Slack thread that scrolls away.
+
+## Recording and AI assistants
+
+<Warning>
+**Do not record meetings with personal note-takers, AI assistants, or third-party transcription tools.** This includes Otter, Fireflies, Read, Grain, personal Zoom AI Companion, and any other tool not explicitly sanctioned. Crest operates its own meeting recording and transcription pipeline; bringing your own creates an unmanaged data leak.
+</Warning>
+
+- The only sanctioned meeting recording is the official Crest Zoom recording, captured by the host or by Crest automation.
+- If you need a transcript for personal recall, use the official transcript that Crest generates from the sanctioned recording; ask Bryant for access.
+- Joining a Crest meeting with a third-party note-taker bot is a security event. The bot will be removed and the incident logged.
+
+## Confidentiality
+
+The confidentiality and IP rules are covered in the Engineering Rules. Two specific items worth highlighting on this page:
+
+- **Marcia substrate is trade secret.** Do not name underlying models, providers, or fine-tune sources in any external material. This applies to LinkedIn, conference talks, podcasts, blog posts, and DMs to people outside Crest. See [Engineering Rule 9](/onboarding/engineering-rules).
+- **All work product belongs to Crest.** Code, designs, research notes, and meeting recordings produced under your Crest contract are Crest's. See [Engineering Rule 10](/onboarding/engineering-rules).
+
+## Communication norms
+
+- **Slack is asynchronous by default.** Do not expect a reply within minutes outside business hours unless something is on fire.
+- **Use threads.** Channel-top messages should be a thread starter, not a 12-message stream-of-consciousness. Threads keep channels readable.
+- **Tag your project lead, not the channel,** unless the message genuinely needs everyone. `@channel` and `@here` are reserved for incidents.
+- **Be specific about what you need.** "Can someone help with the auth service?" is less useful than "Can someone with NestJS auth experience pair with me on `crestpetsystem` PR #4651 for 20 minutes?"
+
+## Escalation
+
+If something feels wrong (a teammate's behavior, a request you cannot reconcile with policy, a decision you think is unsafe), escalate. The order is:
+
+1. Talk to the person directly if you can do it respectfully
+2. If not, talk to your project lead
+3. If your project lead is the issue, DM Bryant
+4. If it is sensitive, DM Michael
+
+There is no penalty for raising a concern. There is a penalty for staying silent and watching something break.
+
+## Related policies
+
+<CardGroup cols={2}>
+  <Card title="Engineering Rules" icon="book" href="/onboarding/engineering-rules">
+    The 25 non-negotiable rules. Confidentiality, IP, secrets, access, AI usage.
+  </Card>
+  <Card title="Hubstaff Policy" icon="clock" href="/crest-corp/hubstaff-policy">
+    Time tracking rules and the daily review process.
+  </Card>
+</CardGroup>
