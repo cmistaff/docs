@@ -75,41 +75,6 @@
         ]
       },
       {
-        "tab": "Design System",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "design-system/overview",
-              "design-system/site-maps",
-              "design-system/user-personas",
-              "design-system/permission-matrix",
-              "design-system/plan-features"
-            ]
-          },
-          {
-            "group": "Visual Language",
-            "pages": [
-              "design-system/design-tokens",
-              "design-system/iconography",
-              "design-system/layout-spacing",
-              "design-system/data-visualization"
-            ]
-          },
-          {
-            "group": "Patterns",
-            "pages": [
-              "design-system/component-patterns",
-              "design-system/state-patterns",
-              "design-system/form-patterns",
-              "design-system/interaction-specs",
-              "design-system/microcopy-guide",
-              "design-system/user-flow-templates"
-            ]
-          }
-        ]
-      },
-      {
         "tab": "Features",
         "groups": [
           {
