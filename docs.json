@@ -14,17 +14,38 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "CrestPet Platform",
+        "tab": "Get Started",
         "groups": [
           {
-            "group": "Getting Started",
+            "group": "Start Here",
             "pages": [
               "index",
-              "guides/getting-started",
-              "guides/authentication",
-              "guides/multi-tenancy"
+              "onboarding/day-one-walkthrough",
+              "onboarding/welcome-video",
+              "onboarding/engineering-handbook"
             ]
           },
+          {
+            "group": "Working at Crest",
+            "pages": [
+              "onboarding/working-in-linear",
+              "onboarding/engineering-rules",
+              "onboarding/data-access"
+            ]
+          },
+          {
+            "group": "Code Quality and Reviews",
+            "pages": [
+              "onboarding/ai-review-pipeline",
+              "onboarding/sonarcloud-sonarlint",
+              "onboarding/argus-dev-scorecard"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Crest Pet System",
+        "groups": [
           {
             "group": "Architecture",
             "pages": [
@@ -36,61 +57,23 @@
             ]
           },
           {
-            "group": "Deployment",
+            "group": "Guides",
             "pages": [
-              "guides/deployment"
-            ]
-          },
-          {
-            "group": "API Reference",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Onboarding",
-        "groups": [
-          {
-            "group": "Engineering Onboarding",
-            "pages": [
-              "onboarding/day-one-walkthrough",
-              "onboarding/welcome-video",
-              "onboarding/engineering-handbook",
-              "onboarding/working-in-linear",
-              "onboarding/engineering-rules",
-              "onboarding/devbox-setup",
-              "onboarding/cicd-guide",
-              "onboarding/data-access",
+              "guides/getting-started",
+              "guides/authentication",
+              "guides/multi-tenancy",
+              "guides/deployment",
               "onboarding/environment-variables"
             ]
           },
-          {
-            "group": "Code Review and Quality",
-            "pages": [
-              "onboarding/ai-review-pipeline",
-              "onboarding/sonarcloud-sonarlint"
-            ]
-          },
-          {
-            "group": "Performance and Reviews",
-            "pages": [
-              "onboarding/argus-dev-scorecard"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Features",
-        "groups": [
           {
             "group": "Scheduling and Appointments",
             "pages": [
               "features/scheduler",
               "features/payment-appointment-booking",
               "features/payment-referral",
-              "features/payment-lockdown"
+              "features/payment-lockdown",
+              "operations/appointment-auto-confirm"
             ]
           },
           {
@@ -111,6 +94,28 @@
             ]
           },
           {
+            "group": "Platform",
+            "pages": [
+              "features/feature-toggles",
+              "features/dev-seeding"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/server-code-conventions",
+              "operations/database-migration-safety",
+              "operations/migration-integrity-audit",
+              "operations/s3-tenant-isolation",
+              "operations/owasp-audit"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Marcia",
+        "groups": [
+          {
             "group": "Marcia AI",
             "pages": [
               "features/marcia-ai-brd",
@@ -121,50 +126,9 @@
             ]
           },
           {
-            "group": "Platform",
+            "group": "Marcia Mobile",
             "pages": [
-              "features/feature-toggles",
-              "features/dev-seeding"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Operations",
-        "groups": [
-          {
-            "group": "Code Conventions",
-            "pages": [
-              "operations/server-code-conventions"
-            ]
-          },
-          {
-            "group": "Database and Migrations",
-            "pages": [
-              "operations/database-migration-safety",
-              "operations/migration-integrity-audit"
-            ]
-          },
-          {
-            "group": "Security and Storage",
-            "pages": [
-              "operations/s3-tenant-isolation",
-              "operations/owasp-audit"
-            ]
-          },
-          {
-            "group": "Infrastructure",
-            "pages": [
-              "operations/multi-region-architecture",
-              "operations/ecs-eks-migration",
-              "operations/cost-analysis"
-            ]
-          },
-          {
-            "group": "Systems",
-            "pages": [
-              "operations/autonomous-dev-system",
-              "operations/appointment-auto-confirm"
+              "mobile/overview"
             ]
           }
         ]
@@ -173,32 +137,48 @@
         "tab": "Infrastructure",
         "groups": [
           {
-            "group": "Infrastructure",
+            "group": "Overview",
             "pages": [
               "infra/overview",
               "infra/onboarding-portal"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Dev Workstations",
-        "groups": [
+          },
+          {
+            "group": "Multi-Region and Migration",
+            "pages": [
+              "operations/multi-region-architecture",
+              "operations/ecs-eks-migration",
+              "operations/cost-analysis"
+            ]
+          },
           {
             "group": "Dev Workstations",
             "pages": [
-              "devbox/overview"
+              "devbox/overview",
+              "onboarding/devbox-setup"
+            ]
+          },
+          {
+            "group": "CI/CD",
+            "pages": [
+              "onboarding/cicd-guide"
+            ]
+          },
+          {
+            "group": "Autonomous Dev System",
+            "pages": [
+              "operations/autonomous-dev-system"
             ]
           }
         ]
       },
       {
-        "tab": "Marcia Mobile",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "Marcia Mobile App",
+            "group": "API Reference",
             "pages": [
-              "mobile/overview"
+              "api-reference/introduction"
             ]
           }
         ]
