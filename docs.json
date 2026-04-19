@@ -55,6 +55,7 @@
           {
             "group": "Engineering Onboarding",
             "pages": [
+              "onboarding/day-one-walkthrough",
               "onboarding/welcome-video",
               "onboarding/engineering-handbook",
               "onboarding/working-in-linear",
