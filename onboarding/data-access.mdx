@@ -3,6 +3,11 @@ title: "Data Access Onboarding Guide (RDS/ElastiCache)"
 description: "Guide for accessing PostgreSQL and Redis data stores through AWS IAM Identity Center and Session Manager."
 ---
 
+<Note>
+  Originally authored by Serhii Sierov on Confluence (last updated 2026-04-09); migrated and synced 2026-04-19.
+  Future edits should land via PRs against `cmistaff/docs` (this repo) or upstream `crestsystem/infra/docs/DATA_ACCESS_ONBOARDING.md` — the Confluence page is being sunset.
+</Note>
+
 ## 🎯 Overview
 
 This guide covers everything a new developer needs to access PostgreSQL and Redis data stores in our AWS infrastructure. We use **AWS IAM Identity Center (SSO)** for authentication and **AWS Systems Manager Session Manager** for secure bastion access - no SSH keys required!
@@ -22,7 +27,7 @@ This guide covers everything a new developer needs to access PostgreSQL and Redi
 
 ### macOS Installation (Recommended)
 
-```
+```bash
 # 1. Install Homebrew (if not installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
@@ -49,7 +54,7 @@ jq --version # Should show: jq-1.x
 
 ### Windows Installation
 
-```
+```bash
 # 1. Install AWS CLI (PowerShell as Administrator)
 winget install Amazon.AWSCLI
 
@@ -70,7 +75,7 @@ winget install jqlang.jq
 
 ### Linux (Ubuntu/Debian) Installation
 
-```
+```bash
 # 1. Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
@@ -109,16 +114,16 @@ Contact your team lead or DevOps to be added to the appropriate SSO groups:
 
 Run the interactive setup:
 
-```
+```bash
 aws configure sso
 ```
 
 Enter the following when prompted:
 
 - **SSO session name:** `crest`
-- **SSO start URL:** `https://d-9067fc5810.awsapps.com/start` *(get from your admin)*
+- **SSO start URL:** `https://cammarata.awsapps.com/start`
 - **SSO region:** `us-east-1`
-- **SSO registration scopes:** (press Enter for default)
+- **SSO registration scopes:** `sso:account:access`
 
 
 Then complete the browser login flow.
@@ -127,7 +132,7 @@ Then complete the browser login flow.
 
 Add these profiles to `~/.aws/config`:
 
-```
+```ini
 # =============================================================================
 # AWS SSO Configuration for Crest Pet Health
 # =============================================================================
@@ -136,6 +141,7 @@ Add these profiles to `~/.aws/config`:
 [sso-session crest]
 sso_start_url = https://cammarata.awsapps.com/start
 sso_region = us-east-1
+sso_registration_scopes = sso:account:access
 
 # -----------------------------------------------------------------------------
 # PRESTAGING PROFILES
@@ -216,7 +222,7 @@ region = us-east-1
 
 ### Step 4: Test Your Access
 
-```
+```bash
 # Login to SSO (opens browser)
 aws sso login --sso-session crest
 
@@ -230,7 +236,7 @@ aws sts get-caller-identity --profile crest-staging-deployer
 
 ### Clone the Infrastructure Repository
 
-```
+```bash
 # Clone the infra repo (contains connection scripts)
 git clone git@github.com:cmistaff/infra.git
 cd infra
@@ -241,7 +247,7 @@ pnpm install
 
 ### Daily Workflow
 
-```
+```bash
 # 1. Login to AWS SSO (once per day)
 aws sso login --sso-session crest
 
@@ -263,27 +269,22 @@ pnpm bastion:redis:prestaging:sso -p crest-prestaging-data # Prestaging
 
 ### Available Commands (Quick Reference)
 
-```
+```bash
 # PostgreSQL connections (with SSO)
-pnpm bastion:postgres:prestaging:sso -p
-
-pnpm bastion:postgres:staging:sso -p
-
-pnpm bastion:postgres:production:sso -p
+pnpm bastion:postgres:prestaging:sso -p <profile>
+pnpm bastion:postgres:staging:sso    -p <profile>
+pnpm bastion:postgres:production:sso -p <profile>
 
 # Redis connections (with SSO)
-pnpm bastion:redis:prestaging:sso -p
-
-pnpm bastion:redis:staging:sso -p
-
-pnpm bastion:redis:production:sso -p
+pnpm bastion:redis:prestaging:sso -p <profile>
+pnpm bastion:redis:staging:sso    -p <profile>
+pnpm bastion:redis:production:sso -p <profile>
 
 # Read-only mode (viewer_iam user)
-pnpm bastion:postgres:staging:reader -p
+pnpm bastion:postgres:staging:reader -p <profile>
 
 # Read-write mode (developer_iam user)
-pnpm bastion:postgres:staging:writer -p
-
+pnpm bastion:postgres:staging:writer -p <profile>
 ```
 
 ## 🛠️ Database Client Configuration
@@ -292,23 +293,23 @@ pnpm bastion:postgres:staging:writer -p
 
 #### Step 1: Start the Tunnel
 
-```
+```bash
 # Keep this terminal open while using DBeaver
 pnpm bastion:postgres:staging:sso -p crest-staging-data
 ```
 
 You'll see output like:
 
-```
+```text
 ✓ IAM AUTH: DEVELOPER (READ/WRITE + BYPASS RLS)
 
 Connection:
- Host: localhost
- Port: 15432
- Database: crest_pet_staging
- Username: developer_iam
+  Host:     localhost
+  Port:     15432
+  Database: crest_pet_staging
+  Username: developer_iam
 
-IAM Token (valid 15 min):
+IAM Token (valid 15 min): <TOKEN>
 ```
 
 #### Step 2: Configure DBeaver Connection
@@ -336,7 +337,7 @@ IAM Token (valid 15 min):
 
 #### Step 1: Install Redis Insight
 
-```
+```bash
 # macOS
 brew install --cask redisinsight
 
@@ -347,7 +348,7 @@ brew install --cask redisinsight
 
 #### Step 2: Start the Tunnel
 
-```
+```bash
 # Keep this terminal open while using Redis Insight
 pnpm bastion:redis:staging:sso -p crest-staging-data
 ```
@@ -381,32 +382,32 @@ pnpm bastion:redis:staging:sso -p crest-staging-data
 
 #### PostgreSQL (psql)
 
-```
+```bash
 # Start tunnel in one terminal
 pnpm bastion:postgres:staging:sso -p crest-staging-data
 
 # In another terminal, connect with psql
-PGPASSWORD='' psql -h localhost -p 15432 -U developer_iam crest_pet_staging
+PGPASSWORD='<TOKEN_FROM_SCRIPT>' psql -h localhost -p 15432 -U developer_iam crest_pet_staging
 
 # Or using connection string
-psql "postgresql://developer_iam:@localhost:15432/crest_pet_staging"
+psql "postgresql://developer_iam:<TOKEN>@localhost:15432/crest_pet_staging"
 ```
 
 #### Redis (redis-cli)
 
-```
+```bash
 # Start tunnel in one terminal
 pnpm bastion:redis:staging:sso -p crest-staging-data
 
 # In another terminal, connect with redis-cli
 # Use the username and IAM token from the bastion script output
-redis-cli -h localhost -p 16379 --tls --insecure --user --pass ''
+redis-cli -h localhost -p 16379 --tls --insecure --user <USERNAME> --pass '<IAM_TOKEN>'
 
 # Example for DataManager in staging:
-redis-cli -h localhost -p 16379 --tls --insecure --user crest-pet-staging-developer --pass ''
+redis-cli -h localhost -p 16379 --tls --insecure --user crest-pet-staging-developer --pass '<IAM_TOKEN>'
 
 # Test connection
-redis-cli -h localhost -p 16379 --tls --insecure --user crest-pet-staging-developer --pass '' PING
+redis-cli -h localhost -p 16379 --tls --insecure --user crest-pet-staging-developer --pass '<IAM_TOKEN>' PING
 ```
 
 > ⚠️ **TLS Required:** Always use `--tls --insecure` flags. `--insecure` is needed because the cert is for `*.cache.amazonaws.com`, not `localhost`.
@@ -438,44 +439,43 @@ Redis uses **IAM authentication** with environment-specific users:
 
 Understanding the different expiration times:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ TOKEN/SESSION HIERARCHY │
+│                        TOKEN/SESSION HIERARCHY                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ │
-│ SSO Session (2-12 hours) │
-│ └── Your AWS CLI login session │
-│ └── Determines how long before you need to run `aws sso login` again │
-│ │
-│ SSM Port Forwarding Session (until you close the terminal) │
-│ └── The bastion tunnel (pnpm bastion:postgres:...) │
-│ └── Stays open as long as the script runs │
-│ │
-│ IAM Auth Token (15 minutes) │
-│ └── The password/token used to authenticate to PostgreSQL/Redis │
-│ └── Only needed for INITIAL connection │
-│ └── Once connected, your session stays active! │
-│ │
-│ Database Connection (until you disconnect) │
-│ └── Your actual PostgreSQL/Redis connection │
-│ └── Stays open even after IAM token expires │
-│ └── Only closes when YOU close it or network drops │
-│ │
+│                                                                             │
+│  SSO Session (2-12 hours)                                                   │
+│  └── Your AWS CLI login session                                             │
+│      └── Determines how long before you need to run `aws sso login` again   │
+│                                                                             │
+│  SSM Port Forwarding Session (until you close the terminal)                 │
+│  └── The bastion tunnel (pnpm bastion:postgres:...)                         │
+│      └── Stays open as long as the script runs                              │
+│                                                                             │
+│  IAM Auth Token (15 minutes)                                                │
+│  └── The password/token used to authenticate to PostgreSQL/Redis            │
+│      └── Only needed for INITIAL connection                                 │
+│      └── Once connected, your session stays active!                         │
+│                                                                             │
+│  Database Connection (until you disconnect)                                 │
+│  └── Your actual PostgreSQL/Redis connection                                │
+│      └── Stays open even after IAM token expires                            │
+│      └── Only closes when YOU close it or network drops                     │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 #### Example Timeline
 
-```
-0:00 - Run `aws sso login` → SSO session starts (4-12h depending on role)
-0:01 - Run `pnpm bastion:postgres:staging:sso` → tunnel opens + 15-min token generated
-0:02 - Connect DBeaver using the token → connection established ✅
-0:16 - IAM token expires (but connection STAYS ACTIVE!)
-2:00 - Still connected, running queries ✅
-3:00 - Close DBeaver connection
-3:01 - Need to reconnect? Run bastion script again for new token
-4:00 - SSO session expires → need to run `aws sso login` again
+```text
+0:00  - Run `aws sso login` → SSO session starts (4-12h depending on role)
+0:01  - Run `pnpm bastion:postgres:staging:sso` → tunnel opens + 15-min token generated
+0:02  - Connect DBeaver using the token → connection established ✅
+0:16  - IAM token expires (but connection STAYS ACTIVE!)
+2:00  - Still connected, running queries ✅
+3:00  - Close DBeaver connection
+3:01  - Need to reconnect? Run bastion script again for new token
+4:00  - SSO session expires → need to run `aws sso login` again
 ```
 
 #### SSO Session Durations (by Role)
@@ -508,7 +508,7 @@ Higher privilege = shorter session for security:
 
 #### "SSO session has expired"
 
-```
+```bash
 # Re-login to SSO
 aws sso login --sso-session crest
 ```
@@ -522,19 +522,19 @@ The bastion host may be stopped. Contact DevOps to start it.
 1. Verify you're in the correct SSO group
 2. Check you're using the right profile for the environment
 3. Try logging out and back in:
-```
+```bash
 rm -rf ~/.aws/sso/cache
 aws sso login --sso-session crest
 ```
 
 #### "Port already in use"
 
-```
+```bash
 # Find what's using the port
 lsof -i :15432
 
 # Kill the process
-kill -9
+kill -9 <PID>
 
 # Or use a different port
 pnpm bastion:postgres:staging:sso -p crest-staging-data -l 15433
@@ -565,18 +565,8 @@ To reconnect:
 
 ### Debug Commands
 
-```
+```bash
 # Check your current identity
-aws sts get-caller-identity --profile crest-staging-data
-
-# List available profiles
-aws configure list-profiles
-
-# Check SSO login status
-aws sts get-caller-identity --profile crest-staging-observer
-
-# Check if port is listening
-nc -z localhost 15432 && # Check your current identity
 aws sts get-caller-identity --profile crest-staging-data
 
 # List available profiles
@@ -589,17 +579,14 @@ aws sts get-caller-identity --profile crest-staging-observer
 nc -z localhost 15432 && echo "Port is open" || echo "Port is closed"
 
 # View active sessions
-ps aux | grep session-managerecho "Port is open" || echo "Port is closed"
-
-# View active sessions
 ps aux | grep session-manager
 ```
 
 ### Getting Help
 
-- **Slack:** #devops
+- **Slack:** `#devops`
 - **DevOps Team:** [devops@crest.pet](mailto:devops@crest.pet)
-- **Documentation:** [infra/docs/](https://github.com/cmistaff/infra/tree/main/docs)
+- **Documentation:** [`cmistaff/infra/docs/`](https://github.com/cmistaff/infra/tree/main/docs) — canonical source for `DATA_ACCESS_ONBOARDING.md`, `BASTION_GUIDE.md`, `SSO_ONBOARDING.md`
 
 ## 📚 Additional Resources
 
