@@ -1,54 +1,187 @@
 ---
 title: "Infrastructure Overview"
-description: "Production AWS infrastructure for CrestPet System, managed with Terraform."
+description: "AWS infrastructure for the Crest Pet System: 33 Terraform modules across two stack patterns (single-region ECS Fargate + active-active EKS multi-region)."
 ---
 
-# Infrastructure
+The Crest Pet System runs on AWS, fully managed by Terraform in [`cmistaff/infra`](https://github.com/cmistaff/infra). The platform spans two stack patterns: a single-region **ECS Fargate** stack (currently the production runtime in `us-east-1`) and an active-active **EKS multi-region** stack (Singapore primary + `us-east-1` secondary, deployed in prestaging and staging). Both stacks share the same module library, environment conventions, and IAM Identity Center access pattern.
 
-CrestPet's production infrastructure runs on AWS, managed entirely through Terraform. The `cmistaff/infra` repository contains all infrastructure-as-code definitions.
+<Warning>
+  **Never run `terraform apply` against production from the CLI.** Production deploys go through GitHub Actions `workflow_dispatch` with required approvals. CLI applies bypass change review and have caused outages.
+</Warning>
 
-## Environments
+<Warning>
+  **Never change `primary_vpc_cidr` or `secondary_vpc_cidr` on a live multiregion stack** with Aurora Global or Redis Global Datastore attached. RDS-managed ENIs block VPC destroy and the apply will hang. CRC-60 PR #267 hit this on 2026-04-16 and had to be reverted in #268. Pivot to ACL-scoped tailnet routing instead.
+</Warning>
 
-| Environment | Purpose | Branch |
-|-------------|---------|--------|
-| Prestaging | Development and integration testing | `prestaging` |
-| Staging | QA and pre-release validation | `staging` |
-| Production | Live customer traffic | `production` |
-
-## Core Services
+## Two-stack model
 
 <CardGroup cols={2}>
-  <Card title="Compute" icon="server">
-    ECS Fargate clusters running the Next.js frontend and NestJS backend as containerized services.
+  <Card title="ECS Fargate (single-region)" icon="server" href="/architecture/infrastructure">
+    Mature production runtime. Web (Next.js, port 3000) + API (NestJS, port 3001) on Fargate behind ALB+WAF, RDS Postgres, ElastiCache Redis, CloudFront, all in `us-east-1`. Container definitions and `desired_count` are managed by GitHub Actions, not Terraform.
   </Card>
-  <Card title="Database" icon="database">
-    RDS PostgreSQL with automated backups, point-in-time recovery, and read replicas.
-  </Card>
-  <Card title="Caching" icon="bolt">
-    ElastiCache Redis for session storage, rate limiting, and application caching.
-  </Card>
-  <Card title="Networking" icon="network-wired">
-    ALB with WAF rules, CloudFront CDN for static assets, and VPC with private subnets.
+  <Card title="EKS multi-region active-active" icon="globe" href="/operations/multi-region-architecture">
+    Active-active EKS Auto Mode clusters in `ap-southeast-1` (primary) and `us-east-1` (secondary), fronted by AWS Global Accelerator. Aurora Global Database + ElastiCache Global Datastore replicate state across regions. Pod Identity (not IRSA) provides workload IAM.
   </Card>
 </CardGroup>
 
-## Architecture Diagram
+### When to operate which
 
-```
-Internet
-  |
-CloudFront (CDN)
-  |
-ALB + WAF
-  |
-ECS Fargate
-  ├── Frontend (Next.js)
-  └── Backend (NestJS)
-        ├── RDS PostgreSQL
-        ├── ElastiCache Redis
-        └── S3 (file storage)
-```
+<Tabs>
+  <Tab title="ECS stack">
+    - Production customer traffic (today)
+    - Hotfix deploys via existing CI/CD
+    - Workloads that don't need multi-region failover
+    - Lives under `environments/{prestaging,staging,production}/`
+  </Tab>
+  <Tab title="EKS multiregion stack">
+    - Active-active validation in prestaging / staging
+    - Workloads requiring sub-second cross-region failover
+    - New services targeting Pod Identity workload IAM
+    - Lives under `environments/multiregion/{prestaging,staging,production}/`
+  </Tab>
+</Tabs>
 
-<Note>
-  This is a placeholder page. Detailed infrastructure documentation will be pulled from the `cmistaff/infra` repository once a `docs/` folder is added there.
-</Note>
+## Module catalog
+
+All 33 modules live under [`infra/modules/`](https://github.com/cmistaff/infra/tree/main/modules). Each environment composes a subset.
+
+### Core (single-region ECS stack)
+
+| Module | Purpose |
+| --- | --- |
+| `ecs` | ECS Fargate service with target-tracking auto-scaling (CPU 70%, memory 80%, RPS 500-2000/task). |
+| `rds` | RDS PostgreSQL with encryption, IAM auth, automated backups (35-day retention in production). |
+| `redis` | ElastiCache Redis cluster with IAM auth, encryption in transit + at rest. |
+| `alb` | Application Load Balancer with HTTP/HTTPS listeners. |
+| `alb-routing` | Host-based listener rules routing API vs Web traffic. |
+| `alb-access-logs` | S3 bucket + lifecycle for ALB access logs. |
+| `cloudfront` | CloudFront S3 CDN with Origin Access Control for private buckets. |
+| `waf` | Regional WAFv2 Web ACL attached to the ALB. |
+| `s3` | Multi-bucket S3 module with encryption, versioning, lifecycle policies. |
+| `container-env` | Centralized container environment variable management. |
+| `cron-jobs` | EventBridge + Lambda scheduled jobs that call API endpoints. |
+| `eventbridge` | Custom EventBridge bus for application events. |
+| `lambda` | Generic Lambda function module. |
+| `backup` | AWS Backup plans for RDS, EFS, and EBS resources. |
+| `ses` | SESv2 domain identity, DKIM signing, and optional MAIL FROM domain. |
+
+### Multi-region (EKS Auto Mode stack)
+
+| Module | Purpose |
+| --- | --- |
+| `eks-multiregion-active-active` | EKS Auto Mode clusters + Aurora Global Database + ElastiCache Global Datastore + AWS Global Accelerator + Pod Identity associations + access entries + CloudWatch Observability add-on. |
+
+### Security
+
+| Module | Purpose |
+| --- | --- |
+| `identity-center` | IAM Identity Center capability-based permission sets (replaces legacy IAM groups). |
+| `guardduty` | Account-level GuardDuty detector with S3 Protection (one per region via provider aliases). |
+| `guardduty-s3-malware` | Per-bucket malware scanning of new uploads, results exposed via object tags. |
+| `kms` | Customer-managed KMS keys for sensitive data encryption. |
+| `secrets-manager` | Application secrets in Secrets Manager (separate from `admin-tools/*` keys). |
+| `data-secrets` | RDS / Redis credential management and rotation. |
+| `github-actions-roles` | OIDC-trusted IAM roles for GitHub Actions deploys (least-privilege). |
+| `roles` | Legacy IAM bastion access roles. **DEPRECATED** in favor of Identity Center. |
+| `developer-access` | Legacy IAM developer groups. **DEPRECATED** in favor of Identity Center. |
+
+### Networking
+
+| Module | Purpose |
+| --- | --- |
+| `vpc` | VPC with public/private/database subnets, NAT, internet gateway, security groups. |
+| `tailscale-subnet-router` | Fargate task that advertises VPC CIDRs into the Tailscale tailnet for VPN access. |
+| `route53-domains` | Route53 hosted zones and DNS records. |
+| `multi-domain-certificates` | ACM certificates for multiple domains with wildcard SANs and DNS validation. |
+
+### Observability
+
+| Module | Purpose |
+| --- | --- |
+| `ses-observability` | CloudWatch metrics, alarms, and SNS notifications for SES bounce/complaint/reject events. |
+
+### Other
+
+| Module | Purpose |
+| --- | --- |
+| `bastion` | Hardened bastion host for accessing private RDS/Redis instances. |
+| `bedrock` | Amazon Bedrock Knowledge Base + OpenSearch Serverless vector store (used by Marcia). |
+| `mcp` | Self-contained MCP server stack: dedicated VPC, ECS Fargate, RDS, ALB. |
+
+## Environments
+
+<Tabs>
+  <Tab title="prestaging">
+    Pre-production validation environment. 1-3 ECS task scaling, 14-day EKS log retention, 60s/180s scale cooldowns. Lives under `environments/prestaging/` (ECS) and `environments/multiregion/prestaging/` (EKS).
+  </Tab>
+  <Tab title="staging">
+    QA and pre-release validation. 2-6 ECS task scaling, 30-day EKS log retention, 60s/300s scale cooldowns. Lives under `environments/staging/` (ECS) and `environments/multiregion/staging/` (EKS).
+  </Tab>
+  <Tab title="production">
+    Live customer traffic. 2-15 ECS task scaling, 90-day EKS log retention, 60s/600s scale cooldowns, 35-day RDS backups, stricter deletion protection. Lives under `environments/production/` (ECS) and `environments/multiregion/production/` (EKS, currently inactive — multiregion is prestaging/staging only today).
+  </Tab>
+  <Tab title="shared">
+    Account-level resources shared across environments: SES domain identity, Cloudflare DNS records, AWS Chatbot Slack channel configurations. Lives under `environments/shared/`.
+  </Tab>
+</Tabs>
+
+Each environment composes modules in per-resource `.tf` files (`alb.tf`, `rds.tf`, `redis.tf`, `containers.tf`, etc.) and parameterizes them through `terraform.tfvars`.
+
+## Operational reminders
+
+<Accordion title="Production deploy path">
+  Production changes go through GitHub Actions `workflow_dispatch` with required approvals. The CLI is reserved for prestaging and staging. Container `desired_count` and `container_definitions` are ignored by Terraform — those are managed by the application CI/CD pipeline.
+</Accordion>
+
+<Accordion title="EKS Pod Identity (not IRSA)">
+  EKS Auto Mode ships with the Pod Identity Agent pre-installed and restricts IMDS, so pods cannot inherit node IAM credentials. The API workload uses ServiceAccount `api-sa` in namespace `crest-pet-api`, wired to a per-cluster IAM role via `aws_eks_pod_identity_association`. Web pods do not get workload IAM (they reach S3 through the API).
+</Accordion>
+
+<Accordion title="EKS access entries">
+  Cluster API authentication mode requires explicit access entries. The module auto-discovers the InfraAdmin SSO role and grants `AmazonEKSAdminPolicy` (logs, exec, describe, restart deployments, namespace RBAC). No manual configuration needed once Identity Center provisions InfraAdmin to the account.
+</Accordion>
+
+<Accordion title="ECS auto-scaling">
+  Target-tracking policies on CPU (70%), memory (80%), and ALB requests per target (500-2000). Production scales 2-15 tasks. CloudWatch alarms publish to SNS topic `{project}-{env}-ecs-alerts`, which AWS Chatbot forwards to `#crest-alerts`. Mutating commands require typing `yes-production` to confirm.
+</Accordion>
+
+<Accordion title="SES sending">
+  Domain `mycrestemail.com` is verified in the shared environment. Per-environment configuration sets (`crest-pet-{env}`) feed CloudWatch metrics with bounce >1%, complaint >0.1%, or any reject triggering alarms. EKS API pods must use the same `SES_CONFIGURATION_SET` as ECS so metrics roll up together.
+</Accordion>
+
+## Dashboards and runbooks
+
+<CardGroup cols={2}>
+  <Card title="AWS Console" icon="aws" href="https://console.aws.amazon.com/">
+    Sign in via IAM Identity Center. ECS, RDS, EKS, CloudWatch, GuardDuty.
+  </Card>
+  <Card title="Sentry" icon="bug" href="https://sentry.io/organizations/crest-advisory-group/">
+    Application error tracking and release health.
+  </Card>
+  <Card title="PagerDuty" icon="bell" href="https://crestadvisorygroup.pagerduty.com/">
+    On-call rotation and incident escalation.
+  </Card>
+  <Card title="Cloudflare" icon="cloud" href="https://dash.cloudflare.com/">
+    DNS for `mycrestemail.com` and customer-facing domains.
+  </Card>
+</CardGroup>
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Architecture: Infrastructure" icon="diagram-project" href="/architecture/infrastructure">
+    Single-region ECS architecture diagrams and component breakdown.
+  </Card>
+  <Card title="Multi-region architecture" icon="globe" href="/operations/multi-region-architecture">
+    Active-active EKS topology, failover behavior, Global Accelerator routing.
+  </Card>
+  <Card title="Dev box overview" icon="laptop-code" href="/devbox/overview">
+    The 20-box dev workstation fleet (Ohio + Mumbai + Frankfurt) on Tailscale.
+  </Card>
+  <Card title="Onboarding portal" icon="user-plus" href="/infra/onboarding-portal">
+    IAM Identity Center setup and developer access provisioning.
+  </Card>
+  <Card title="Deployment guide" icon="rocket" href="/guides/deployment">
+    End-to-end deployment workflow across environments.
+  </Card>
+</CardGroup>
