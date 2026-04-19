@@ -1,0 +1,83 @@
+---
+title: "Tailscale Troubleshooting"
+description: "Common Tailscale failure modes on Crest dev workstations and the verified fixes for each. Covers ACL access, DERP routing, macOS DNS, exit nodes, and Mullvad."
+---
+
+This page collects the recurring Tailscale problems we have actually hit on Crest dev workstations, the symptom that surfaced each one, and the fix that resolved it. If your symptom is not listed here, run `tailscale netcheck` and `tailscale status` first, capture the output, and DM Michael before changing anything.
+
+<Note>
+Tailnet: `cmistaff.com` (display name: `creststaff`). MagicDNS suffix: `birman-opah.ts.net`. ACL administration is API-driven, not console-driven. See the [Infrastructure Overview](/infra/overview) for tailnet structure.
+</Note>
+
+## Symptom to Fix Reference
+
+| Symptom | Root cause | Fix |
+| --- | --- | --- |
+| `tailnet policy does not permit you to SSH as the requested user` | Your account is in `group:devs` but the per-device `tag:dev-<yourname>` ACL or SSH rule is missing or scoped to the wrong identity. | DM Michael with your `tag:dev-<yourname>` and the exact identity your client is logged in with (`@creststaff.com`, `@cmistaff.com`, or `@github`). The ACL needs all three identity formats. |
+| Routed through Mumbai DERP instead of nearest relay | Stale DERP map cached on the client; client picked a region during a previous network change and never re-evaluated. | `sudo tailscale down && sudo tailscale up --accept-routes --accept-dns`. Verify with `tailscale netcheck` (the `*` marks the preferred DERP). |
+| Tailscale connects but no traffic flows on macOS | macOS Stealth Mode is enabled. Tailscale needs to receive UDP from peers; Stealth Mode silently drops them. | System Settings → Network → Firewall → Options → turn **Stealth Mode OFF**. Restart Tailscale. |
+| Cannot resolve `*.birman-opah.ts.net` or large downloads hang on macOS | "Override local DNS" was enabled in the Tailscale admin console. macOS promotes the `utun` interface to the default route for **all** traffic; without an exit node, internet packets enter the tunnel with nowhere to leave. | In the Tailscale admin console, **disable "Override local DNS"** and remove `1.1.1.1` from the global nameservers list. This was the production fix on 2026-02-26. Do not re-enable. |
+| DERP map looks correct but client still routes wrong | Tailscale GUI on macOS does not always reload the DERP map after edits to the admin console. `down`/`up` is not enough. | Fully **quit** Tailscale (menu bar → Quit Tailscale) and reopen. Then re-run `tailscale netcheck`. |
+| Connection works on the LAN but not over the internet | App connector or relay routing issue, or your home ISP/CGNAT is blocking UDP 41641. | Run `tailscale netcheck` and check the "UDP" line. If it reports `false`, you will be relayed through DERP — slower but working. If `tailscale status` shows `relay "ohi"` or `relay "mum"`, you are on a Crest-operated DERP and traffic is flowing correctly. |
+| New laptop or new account: cannot reach any tailnet device | Your user is in `needs-approval` state. Devices on a `needs-approval` user are invisible to all peers, including DERP relays, even if SSH and ACL rules look correct. | Ask Michael to approve via the Tailscale admin API (`POST /api/v2/users/{userId}/approve`). Once approved, your devices become visible to peers within ~30s. |
+
+## Verifying With `tailscale netcheck`
+
+`tailscale netcheck` is the single most useful diagnostic. Run it before reporting any connectivity issue.
+
+```bash
+tailscale netcheck
+```
+
+What to look for:
+
+- **DERP latency table** with a `*` marker on the lowest-latency relay. Crest-operated relays appear as `Crest Ohio` (region 900), `Crest Mumbai` (region 901), and `Crest Frankfurt` (region 902).
+- **UDP: true** means peer-to-peer is possible. **UDP: false** forces DERP relay.
+- **HairPinning, IPv6, PortMapping** are informational; failures are usually upstream router/CGNAT and not actionable from the client.
+
+If your nearest Crest relay is more than 50 ms higher than expected for your physical location, your DERP map is stale. Quit and reopen the Tailscale app.
+
+## Mullvad VPN
+
+Mullvad VPN is integrated into the tailnet and available to every member of `group:devs`. Forty device licenses are pooled across the team.
+
+<Note>
+Mullvad is **optional**. The connectivity issue it was originally enabled to mask was rooted in macOS DNS routing and was fixed at the source on 2026-02-26 (see the DNS row in the table above). You do not need Mullvad to use Tailscale.
+</Note>
+
+To enable an exit node on macOS or iOS:
+
+1. Open the Tailscale app menu.
+2. Choose **Exit node** → pick a Mullvad region.
+3. Verify with `curl https://am.i.mullvad.net/connected` — you should see `You are connected to Mullvad`.
+
+When **not** to use a Mullvad exit node:
+
+- During incident response or live debugging — adds a hop and can mask DNS or routing issues.
+- When working with services that geofence (some payment sandboxes, regional Stripe test endpoints, US-only AWS console features).
+- On video calls — Mullvad exit nodes vary in throughput; latency to the call SFU can degrade.
+
+When **to** use one:
+
+- Travel on hostile networks (hotel WiFi, conference WiFi, café hotspots).
+- Privacy-sensitive personal browsing.
+
+## Exit Nodes (Non-Mullvad)
+
+Crest does not run a custom exit node. The dev EC2 boxes are **not** exit nodes — do not advertise yours as one. Routing all your laptop traffic through a private subnet EC2 with a single NAT Gateway is slow, expensive, and visible in CloudTrail. Use Mullvad if you need an exit node.
+
+## Common Misconfigurations to Avoid
+
+- **Do not** add custom DNS servers in the Tailscale admin console. The `Override local DNS` regression on macOS taught us this the hard way (2026-02-26 incident).
+- **Do not** enable App Connector advertising on a node that does not have IP forwarding enabled at the kernel. The control plane will accept the route, the kernel will drop the packets, and you will get silent timeouts. The Frankfurt DERP hit this on 2026-03-19. Verify with `cat /proc/sys/net/ipv4/ip_forward` (must return `1`).
+- **Do not** create or rotate your own auth keys. Auth keys are managed centrally and tagged per-developer. A key without your `tag:dev-<name>` will fail with `requested tags are invalid or not permitted`.
+
+## Escalation
+
+If none of the above resolves your issue:
+
+1. Capture `tailscale status`, `tailscale netcheck`, and the exact identity you are logged in as (visible in the GUI account menu).
+2. DM Michael with the captures and your `tag:dev-<name>`.
+3. Do **not** open a public Slack thread — tailnet identity and device names are sensitive.
+
+For ACL-level changes (new device, identity change, region move), file a CRC ticket so the change is tracked alongside the next ACL push.

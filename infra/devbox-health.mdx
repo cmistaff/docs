@@ -1,0 +1,143 @@
+---
+title: "Devbox Health and Resource Limits"
+description: "Memory caps, swap behavior, and recovery procedures for Crest dev EC2 workstations. Covers Node heap sizing, Docker mem_limit headroom, and reboot paths when the box becomes unreachable."
+---
+
+This page is the operational reference for keeping a Crest dev workstation healthy. Every dev box is an `m6i.4xlarge` (16 vCPU, 64 GB RAM, 8 GB swap) running Ubuntu Pro in a private subnet. They are not laptops; they are shared infrastructure. Misconfigured local processes can deadlock the entire box and lock everyone out of their own dev environment.
+
+<Warning>
+A single uncapped Docker container or a Node process with the wrong heap settings can pin all 64 GB of RAM and exhaust swap in under five minutes. The box then enters a soft-lock where SSH, Tailscale, and SSM all stop responding. Always set explicit memory limits on containers and follow the heap sizing rule below.
+</Warning>
+
+## The Apr 14 to 15 dev-hamza Soft-Lock
+
+On 2026-04-14, a dev box entered a memory-pressure deadlock that lasted approximately 3.5 hours. The proximate cause was a Docker container running a Node service where `mem_limit` was set equal to the V8 `--max-old-space-size`. Under load, the container OOM-killer (cgroup level) raced with V8's own heap manager. The kernel kept restarting the process before V8 could release memory, kswapd pinned a CPU, and eventually `sshd`, `tailscaled`, and `amazon-ssm-agent` all failed to schedule. The box was unreachable on every channel until an AWS console reboot was issued.
+
+What we changed after the incident:
+
+- All Docker `mem_limit` values raised so they exceed the documented Node heap by at least 1.5–2 GB.
+- Swap policy reviewed across the fleet (8 GB swap is enough only when containers are properly capped — it does not save you from an uncapped runaway).
+- A fleet-wide audit of `docker-compose.yml` files in dev workspaces to flag any missing `mem_limit`.
+- This documentation page.
+
+## The Heap Sizing Rule (Read This Before Touching `mem_limit`)
+
+When a Docker container runs Node.js, the container memory limit must always exceed Node's V8 old-generation heap ceiling by at least 1.5 to 2 GB.
+
+```
+mem_limit  >=  --max-old-space-size  +  2 GB
+```
+
+Why: Node total RSS always exceeds the old-gen heap because of V8 new-space, code-space, native C++ allocations, libuv thread-pool buffers, and OS-level buffers. This non-heap overhead is typically 1 to 2 GB.
+
+If `mem_limit == --max-old-space-size`, Docker SIGKILLs the process (exit code 137) the instant RSS crosses the cap, **before** V8 can throw a JavaScript heap out of memory error. You see a bare `Killed` with no stack trace and no signal about what went wrong.
+
+Exit code 137 with no JS stack means the container was OOM-killed from outside. It does **not** mean a memory leak in the app. The fix is almost always to raise the container cap, not to chase a leak.
+
+### Crestpetsystem Specifics
+
+The crestpetsystem server sets:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=8192
+```
+
+So the matching Docker compose entry must be at least:
+
+```yaml
+services:
+  server:
+    mem_limit: 10g     # 8 GB heap + 2 GB headroom
+```
+
+PR #4650 on `cmistaff/crestpetsystem` codified this fix after the dev-hamza post-mortem. Any time you bump `--max-old-space-size`, bump `mem_limit` in the same change. Lowering the heap is a valid alternative for smaller workloads but stay above ~4 GB for the NestJS + TypeScript watchers used in development.
+
+### Quick Audit Command
+
+Before bringing up an unfamiliar compose stack:
+
+```bash
+# Find every Node heap setting in your repo
+grep -RIn "max-old-space-size" .
+
+# Find every container memory cap
+grep -RIn "mem_limit\|mem_reservation" .
+```
+
+If a Node service has a heap setting but no container cap, fix it before `docker compose up`.
+
+## Why 64 GB Plus 8 GB Swap Is Not Enough On Its Own
+
+A dev box has plenty of RAM for normal work — typically 1 to 3 dev stacks, an editor, a browser, and Claude Code. But the buffer disappears fast when:
+
+- A container has no `mem_limit` and the application has a memory leak.
+- Multiple watchers (Next.js dev server, NestJS Nest watch, Prisma generate, TypeScript `tsc --watch`) recompile concurrently after a large branch switch.
+- A `pnpm install` runs while a stack is already up.
+- Test suites with heavy fixtures run in parallel.
+
+When swap is exhausted, the kernel triggers OOM-killer at the host level. It does not always pick the runaway process — it picks based on `oom_score`, which can include `sshd` or `tailscaled` if they have grown over time. Once those die, the box is unreachable.
+
+**Always cap your containers.** Headroom on the host is your safety margin for everything else (your editor, your shell, the kernel). It is not free capacity for any one service to consume.
+
+## Monitoring Tools
+
+Run these on the box to spot trouble before it becomes a soft-lock.
+
+| Tool | What to look at |
+| --- | --- |
+| `htop` | Top processes by RES (resident memory). Anything above 4 GB is worth a glance; anything climbing steadily is worth investigating. |
+| `btop` | Same idea as `htop`, plus disk and network. Easier to read at a glance. Install with `sudo apt install btop`. |
+| `df -h /` | Disk usage on the root volume. Each box has 150 GB EBS. Stay under 80% — Docker images, node_modules, and logs eat space fast. |
+| `free -h` | Total RAM and swap. If `Swap: used` is non-zero and `available` is below 4 GB, something is wrong. |
+| `docker stats` | Live per-container CPU and memory. Run this when bringing up a new compose stack to confirm caps are honored. |
+
+## Recovery When the Box Is Unresponsive
+
+If the box stops responding to SSH, Tailscale SSH, **and** SSM Session Manager, all three channels are down. That means the kernel is in trouble — userspace cannot recover.
+
+The recovery path is the AWS Console:
+
+1. Open the [EC2 Console](https://us-east-2.console.aws.amazon.com/ec2/home) in the box's region (Ohio: `us-east-2`, Mumbai: `ap-south-1`, Frankfurt: `eu-central-1`).
+2. Filter instances by tag `Developer` matching your name, or by your instance ID.
+3. Select your instance → **Instance state** → **Reboot instance**. Confirm.
+4. Wait ~60 seconds. SSH should respond again.
+5. If reboot does not work, **stop** then **start** the instance. This forces a hardware-level power cycle. The EBS root volume persists (`delete_on_termination = false`), so no data is lost, but the public DERP routing and Tailscale registration will refresh.
+
+<Warning>
+Do **not** terminate the instance to recover. Termination is permanent. The EBS volume persists, but the instance ID, Tailscale registration, and per-developer Terraform configuration all need to be rebuilt. Use **Reboot** or **Stop/Start** only.
+</Warning>
+
+If you do not have AWS Console access, DM Michael with your dev box name and the time the deadlock started. Console access is gated by IAM Identity Center; access is granted on request.
+
+## When To File a CRC Ticket vs Just Reboot
+
+**Reboot and move on:**
+
+- One-off lockup after a heavy build.
+- Recovered fully on first reboot.
+- No reproducible trigger.
+
+**File a CRC ticket:**
+
+- Lockup repeats within a week.
+- Lockup happened during normal work (not a known stress test).
+- You can identify a specific compose stack or service that triggered it.
+- You needed Stop/Start because Reboot did not respond — this is a kernel-level event and the volume needs to be inspected.
+- The box was unreachable for more than 30 minutes and other devs were affected.
+
+Include in the ticket: instance ID, region, approximate time of lockup, what you were running (compose stacks, branches, parallel jobs), the recovery method that worked, and any `dmesg` output you can recover after reboot (`sudo dmesg -T | tail -200`).
+
+## Fleet Hardening Applied After Apr 15
+
+The following are now in effect across the fleet — you do not need to do anything, but be aware:
+
+- **Container caps audited.** All known shared compose stacks have explicit `mem_limit` set with the +2 GB headroom rule.
+- **Swap policy.** 8 GB swap retained, but treated as a safety margin only — not as expandable RAM.
+- **Documentation.** This page and the related [Tailscale Troubleshooting](/infra/tailscale-troubleshooting) page exist so that operational gaps surface as docs, not Slack threads.
+- **PR convention.** Any PR that changes `NODE_OPTIONS=--max-old-space-size` must also update the matching `mem_limit` in the same change set. Reviewers should bounce PRs that violate this.
+
+## Related Pages
+
+- [Devbox Setup](/onboarding/devbox-setup) — first-time Tailscale and SSH setup.
+- [Tailscale Troubleshooting](/infra/tailscale-troubleshooting) — connectivity issues.
+- [Infrastructure Overview](/infra/overview) — broader infra context.
