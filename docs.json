@@ -48,6 +48,33 @@
         ]
       },
       {
+        "tab": "Crest Corp",
+        "groups": [
+          {
+            "group": "Welcome",
+            "pages": [
+              "crest-corp/welcome"
+            ]
+          },
+          {
+            "group": "Required Setup",
+            "pages": [
+              "crest-corp/background-check",
+              "crest-corp/deel-setup",
+              "crest-corp/hubstaff-policy",
+              "crest-corp/vpn-tailscale"
+            ]
+          },
+          {
+            "group": "Policies",
+            "pages": [
+              "crest-corp/engineering-rules",
+              "crest-corp/code-of-conduct"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Crest Pet System",
         "groups": [
           {

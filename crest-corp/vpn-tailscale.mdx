@@ -1,0 +1,69 @@
+---
+title: "VPN Setup (Tailscale)"
+description: "Tailscale is how Crest workers reach dev boxes and internal services. SentinelOne EDR must be installed FIRST. Order matters."
+---
+
+Tailscale is the VPN every Crest worker uses to reach their dev box, internal services, and the production bastion. It is also what enforces Mullvad VPN exit-node coverage so all browsing traffic from a dev session leaves Crest's exit infrastructure.
+
+<Warning>
+**SentinelOne EDR must be installed and active BEFORE you join the Tailscale tailnet.** This is per [Engineering Rule 3](/onboarding/engineering-rules). A device without SentinelOne will be denied tailnet access, and re-onboarding after a denial costs a half day.
+</Warning>
+
+## Order of operations
+
+<Steps>
+  <Step title="Install SentinelOne EDR">
+    Bryant will provide the agent package and the site token from the SentinelOne console (`usea1-021`). Install it on the dev box (or laptop, if your role uses one) and confirm the agent is reporting in by checking with Bryant.
+  </Step>
+  <Step title="Wait for SentinelOne to clear">
+    The console must show your device as healthy and reporting before Tailscale is provisioned. Do not skip this step. The Tailscale ACL has device posture rules that will reject you otherwise.
+  </Step>
+  <Step title="Install Tailscale">
+    Use the official installer from `tailscale.com/download`. Linux dev boxes already have it pre-installed via Packer; you only need to log in.
+  </Step>
+  <Step title="Sign in with @creststaff.com Google account">
+    **Do not** sign in with GitHub, personal Google, or any other identity. The Crest tailnet (`cmistaff.com`) only recognizes `@creststaff.com` Google identities for ACL membership.
+  </Step>
+  <Step title="Wait for approval">
+    New users land in `needs-approval` state. Devices on `needs-approval` are invisible to all peers, including DERP relays. Ask Michael to approve via the Tailscale admin API.
+  </Step>
+  <Step title="Verify connectivity">
+    Run `tailscale netcheck` and `tailscale status`. You should see your device, your peers, and a DERP region. From your dev box, `ssh ubuntu@dev-<yourname>` should work via Tailscale MagicDNS.
+  </Step>
+</Steps>
+
+## Mullvad VPN
+
+Crest holds 40 Mullvad VPN licenses, integrated into Tailscale as exit nodes. Once you are on the tailnet, you can route browsing traffic through a Mullvad exit node:
+
+```bash
+tailscale up --exit-node=<mullvad-node-name> --exit-node-allow-lan-access
+```
+
+Use a Mullvad exit node any time you are doing work that should leave Crest's IP space (research, vendor portals, anything that should not be tied to your home ISP). Your project lead will tell you when this is required.
+
+## Common issues
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `tailnet policy does not permit you to SSH as the requested user` | Per-device tag `tag:dev-<yourname>` missing or scoped to wrong identity | DM Michael with your tag and the exact identity your client is logged in with. See [Tailscale Troubleshooting](/infra/tailscale-troubleshooting) |
+| Tailscale connects but no traffic flows on macOS | macOS Stealth Mode is on; UDP from peers is silently dropped | System Settings → Network → Firewall → Options → Stealth Mode OFF. Restart Tailscale |
+| Cannot resolve `*.birman-opah.ts.net` or large downloads hang on macOS | "Override local DNS" enabled in admin console | Disable "Override local DNS" in the Tailscale admin console. Production fix from 2026-02-26 — do not re-enable |
+| Routed through Mumbai DERP instead of your nearest relay | Stale DERP map cached on the client | `sudo tailscale down && sudo tailscale up --accept-routes --accept-dns`. Verify with `tailscale netcheck` |
+| New laptop or new account: cannot reach any tailnet device | User is in `needs-approval` state | Ask Michael to approve via the Tailscale admin API |
+
+For the full troubleshooting matrix (DERP routing, exit nodes, Stealth Mode, DNS overrides, ACL identity formats), see [Tailscale Troubleshooting](/infra/tailscale-troubleshooting).
+
+## What not to do
+
+- **Do not bring your own VPN.** Mullvad is the only sanctioned exit-node provider; running Nord, Express, or anything else on top of Tailscale will break routing and trigger SentinelOne alerts.
+- **Do not share your Tailscale auth keys.** They are tied to your identity and your device tag.
+- **Do not disable SentinelOne to "test something."** It is monitored. Disabling it will revoke your tailnet access automatically.
+- **Do not sign in with GitHub or personal Google.** The ACL will silently exclude you and you will spend an afternoon wondering why nothing works.
+
+## Who to contact
+
+- **SentinelOne install or agent issues:** Bryant
+- **Tailscale account approval, ACL identity issues:** Michael (DM)
+- **Routing, DERP, DNS, exit nodes:** start with [Tailscale Troubleshooting](/infra/tailscale-troubleshooting), then DM Michael with `tailscale netcheck` output
+- **Anything else:** DM Michael in Slack
