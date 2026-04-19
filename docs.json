@@ -62,7 +62,7 @@
           {
             "group": "Code Review and Quality",
             "pages": [
-              "onboarding/cursor-bot-pr-review",
+              "onboarding/ai-review-pipeline",
               "onboarding/sonarcloud-sonarlint"
             ]
           }
