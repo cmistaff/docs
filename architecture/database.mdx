@@ -1,11 +1,11 @@
 ---
 title: "Database Architecture"
-description: "Prisma 6 schema design, multi-tenancy model, and data organization across 88 schema files."
+description: "Prisma 6 schema design, multi-tenancy model, and data organization across 90+ schema files."
 ---
 
 # Database Architecture
 
-CrestPet uses PostgreSQL as its primary database, accessed through Prisma 6 ORM. The schema is split across 88 files totaling approximately 11,300 lines, organized by feature domain.
+CrestPet uses PostgreSQL as its primary database, accessed through Prisma 6 ORM. The schema is split across 90+ files totaling roughly 12,000 lines and ~325 models, organized by feature domain.
 
 ## Schema Organization
 
@@ -171,11 +171,11 @@ model TenantRolePermission {
 }
 ```
 
-The `Permission` enum contains approximately 60+ hierarchical values using double-underscore naming (e.g., `CLINIC__APPOINTMENTS`, `CLINIC__PAYMENTS`, `CLINIC__INVENTORY`). Each permission has four independent boolean flags for granular CRUD control rather than a single access level.
+The `Permission` enum contains ~70 hierarchical values using double-underscore naming (e.g., `CLINIC__APPOINTMENTS`, `CLINIC__PAYMENTS`, `CLINIC__INVENTORY`). Each permission has four independent boolean flags for granular CRUD control rather than a single access level.
 
 ## Tenant Settings (Dedicated Tables)
 
-Tenant configuration has been migrated from a monolithic JSON `settings` field to dedicated tables:
+Tenant configuration has been migrated from a monolithic JSON `settings` field to dedicated tables (11 total):
 
 | Table | Configuration Area |
 |-------|-------------------|
@@ -187,6 +187,8 @@ Tenant configuration has been migrated from a monolithic JSON `settings` field t
 | `TenantPaymentSettings` | Payment configuration |
 | `TenantPortalSettings` | Portal-specific settings |
 | `TenantBackupSettings` | Backup and data retention configuration |
+| `TenantCreditSettings` | Tenant-level prepaid credit balance and clinic credit configuration |
+| `TenantVideoConsultationProviderSettings` | Per-tenant video consultation provider routing (LiveKit / Daily) |
 | `TenantMiscSettings` | Miscellaneous settings (JSON value field) |
 
 The legacy `settings` JSON field is retained for backward compatibility but new features must use dedicated tables.
