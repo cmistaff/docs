@@ -7,6 +7,8 @@ description: "High-level architecture of the CrestPet System -- monorepo structu
 
 CrestPet System is a monorepo containing a Next.js 15 frontend, a NestJS 11 backend, and shared packages. It uses a multi-tenant architecture where each veterinary clinic, enterprise, and consumer operates within an isolated tenant context.
 
+The product surfaces **8 frontend portals** (api, clinic, consumer, enterprise, marcia, platform, referral, vendor) backed by **7 backend portal namespaces** (clinic, consumer, enterprise, marcia, platform, referral, shared).
+
 ## Monorepo Structure
 
 The project uses pnpm workspaces to manage three workspace packages:
@@ -15,12 +17,13 @@ The project uses pnpm workspaces to manage three workspace packages:
 crestpetsystem/
 ├── client/                          # Next.js 15 frontend (App Router)
 │   └── src/app/
+│       ├── api/                     # API tooling and reference surface
 │       ├── clinic/                  # Clinic portal pages
 │       ├── consumer/                # Consumer portal pages
 │       ├── enterprise/              # Enterprise portal pages
+│       ├── marcia/                  # Marcia AI assistant interface
 │       ├── platform/                # Platform admin pages
 │       ├── referral/                # Referral portal pages
-│       ├── marcia/                  # Marcia AI assistant interface
 │       └── vendor/                  # Vendor purchase order confirmation
 ├── client/src/common/api/openapi/   # Auto-generated API client (Orval)
 ├── server/                          # NestJS 11 backend
@@ -28,13 +31,13 @@ crestpetsystem/
 │       ├── app/                     # Bootstrap, health checks, filters
 │       ├── common/                  # Infrastructure (DB, email, SMS, AI, S3, Stripe)
 │       └── portals/                 # Business logic organized by portal
-│           ├── clinic/              # ~75 modules (appointments, billing, inventory, etc.)
-│           ├── consumer/            # ~38 modules (pet health, booking, wellness, etc.)
-│           ├── enterprise/          # ~19 modules (analytics, staff, subscriptions, etc.)
-│           ├── platform/            # ~18 modules (tenants, users, feature policies, etc.)
-│           ├── referral/            # ~5 modules (referrals, availability, etc.)
-│           ├── marcia/              # ~5 modules (chatbot, elevenlabs, sms, whatsapp)
-│           └── shared/              # ~76 modules (auth, payments, services, repositories)
+│           ├── clinic/              # 81 modules (appointments, billing, inventory, etc.)
+│           ├── consumer/            # 39 modules (pet health, booking, wellness, etc.)
+│           ├── enterprise/          # 20 modules (analytics, staff, subscriptions, etc.)
+│           ├── marcia/              # 5 modules (chatbot, elevenlabs, sms, whatsapp)
+│           ├── platform/            # 25 modules (tenants, users, feature policies, etc.)
+│           ├── referral/            # 5 modules (referrals, availability, etc.)
+│           └── shared/              # 87 modules (auth, payments, services, repositories)
 ├── packages/
 │   └── common/                      # Shared package (@repo/common)
 │       └── prisma/schema/           # Multi-file Prisma schema (88 files, ~11,300 lines)
@@ -46,17 +49,26 @@ crestpetsystem/
 
 ## Portal Architecture
 
+The product surfaces **8 frontend portals** (api, clinic, consumer, enterprise, marcia, platform, referral, vendor) backed by **7 backend portal namespaces** (clinic, consumer, enterprise, marcia, platform, referral, shared). The `shared` namespace is backend-only and contains cross-portal services rather than user-facing pages; `api` and `vendor` are frontend-only surfaces that consume modules from the other backend portals.
+
 Each portal maps to a subdomain and serves a distinct user role:
 
 | Portal | Subdomain (local) | Backend Modules | Frontend Pages |
 |--------|-------------------|-----------------|----------------|
-| Clinic | `clinic.localhost:3000` | 75 | 47+ dashboard sections |
-| Consumer | `consumer.localhost:3000` | 38 | Dashboard, payments, referrals |
-| Enterprise | `enterprise.localhost:3000` | 19 | Analytics, clinic management |
-| Platform | `taylor.localhost:3000` | 18 | Tenants, users, policies |
+| API | `api.localhost:3000` | (consumes shared + per-portal) | API tooling and reference surface |
+| Clinic | `clinic.localhost:3000` | 81 | 47+ dashboard sections |
+| Consumer | `consumer.localhost:3000` | 39 | Dashboard, payments, referrals |
+| Enterprise | `enterprise.localhost:3000` | 20 | Analytics, clinic management |
+| Marcia | `marcia.localhost:3000` | 5 | AI assistant interface (chatbot, voice, SMS) |
+| Platform | `taylor.localhost:3000` | 25 | Tenants, users, policies |
 | Referral | `referral.localhost:3000` | 5 | Referrals, availability |
+| Vendor | `vendor.localhost:3000` | (consumes shared) | Vendor purchase order confirmation |
 
-The **shared** portal layer (76 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories.
+The **shared** portal layer (87 modules) contains cross-cutting concerns: authentication, payments (Stripe), availability, tenant management, roles/permissions, AI services, document processing, and auto-generated repositories. It is backend-only and not surfaced as its own subdomain.
+
+<Note>
+Module counts above are the source of truth as of 2026-04-18. The `docs-ops` weekly drift cron re-verifies them by running, for example, `ls server/src/modules/portals/clinic/*/ | wc -l` against the live monorepo. If the docs drift from the runtime count, the cron opens a follow-up PR.
+</Note>
 
 ## Request Flow
 
