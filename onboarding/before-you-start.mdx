@@ -1,0 +1,76 @@
+---
+title: "Before You Start"
+description: "Accounts, paperwork, and access prerequisites to handle on Day 0 — before your first Day 1 SSH into a Crest dev box."
+---
+
+Day 0 is the day before your first day. Take care of the items below so Day 1 is about writing code, not clicking through invites.
+
+<Note>
+Your hiring manager + HR will send most of the invites and paperwork referenced here. If something isn't showing up 48 hours before your start date, DM them on Slack (or email if you don't have Slack access yet) — don't wait until Day 1 to unblock an invite.
+</Note>
+
+## 1. Paperwork
+
+Everything routes through DocuSign (for the legal docs) and Deel (for contractor-specific agreements + payroll).
+
+- **IP assignment + NDA** — signed via DocuSign. Your GitHub org invite, Google Workspace account, and dev-box provisioning are all gated on these being complete. Return them the same day you receive them if you can.
+- **Contractor agreement** — if you're joining as a contractor (most Crest engineering roles), you'll sign this in Deel. Confirm your payment method (wire, ACH, local rails depending on region) before the first monthly invoice window.
+- **Direct deposit setup** — if you're joining as an employee, the HR portal handles this.
+
+## 2. Email — Google Workspace
+
+You'll get a `firstname@creststaff.com` account with a temporary password sent to your personal email.
+
+Within 24 hours of receiving it:
+
+1. Sign in at [mail.google.com](https://mail.google.com) with the temp password
+2. Set a strong permanent password (any reputable password manager is fine)
+3. Enable 2FA — any TOTP-compatible authenticator works (1Password, Authy, Google Authenticator)
+4. Optionally add the Gmail app on your phone for faster response on invites
+
+## 3. GitHub
+
+Your code work happens in the `cmistaff` GitHub org. Before Day 1:
+
+1. Confirm your personal GitHub account has **2FA enabled** — the org enforces it, so invites bounce without 2FA on your side.
+2. Add your `@creststaff.com` email as a verified secondary email on your GitHub account (Settings → Emails). This is what the org invite gets routed to.
+3. Once your Crest email is live, Michael will send the `cmistaff` org invite — accept it as soon as it lands.
+
+## 4. Slack
+
+You'll get an invite to the Crest Advisory workspace. Install both the **desktop app** and **mobile app** on Day 0 — many ops channels (`#project-crestpetsystem`, `#crest-alerts`) are low-noise but time-sensitive, and Day 1 will use both.
+
+## 5. Tailscale
+
+Tailscale is how you reach Crest dev boxes. Every Crest-internal URL (dev boxes, internal dashboards, API gateways) is reachable only from inside the tailnet.
+
+1. Accept the Tailscale invite sent to your `@creststaff.com` address
+2. Install the Tailscale client on your laptop
+3. Optionally install on your phone — occasionally useful for quick network verification
+
+The first time you connect, you'll be tagged into the `group:devs` group automatically. If you're not, DM Michael.
+
+## 6. Hardware
+
+You can use any recent **macOS**, **Linux**, or **Windows** machine as your local device. Specs don't matter much — all real work happens on your dev box (see [Engineering Rule 14](/onboarding/engineering-rules)). Your laptop is just the thin client + SSH host.
+
+<Note>
+If you're bringing a personal machine, make sure your **FileVault / BitLocker disk encryption** is enabled. Crest source code is covered by the IP assignment, and encryption-at-rest is a baseline expectation.
+</Note>
+
+## 7. What's next
+
+Once the list above is green, you're ready for Day 1.
+
+<CardGroup cols={2}>
+  <Card title="Connect to Your Dev Box" icon="terminal" href="/onboarding/connect-to-devbox">
+    SSH config, Tailscale IPs, and your first shell on a Crest dev box.
+  </Card>
+  <Card title="Day One Walkthrough" icon="list-check" href="/onboarding/day-one-walkthrough">
+    Full first-day checklist — shell setup, AI tools, cloning repos, running CrestPet locally.
+  </Card>
+</CardGroup>
+
+<Note>
+Stuck on a Day 0 step? DM Michael or your hiring manager on Slack. The paperwork + invite step is the most common blocker — don't wait silently, it almost always resolves within an hour once flagged.
+</Note>
