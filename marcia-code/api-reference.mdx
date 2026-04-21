@@ -1,0 +1,189 @@
+---
+title: "API Reference"
+description: "OpenAI-compatible endpoints on `api.marciacode.com` — chat completions, models listing, streaming, error codes."
+---
+
+The Marcia Code API is OpenAI-compatible. Any library that speaks the OpenAI Chat Completions schema works by changing two things:
+
+1. Base URL → `https://api.marciacode.com/v1`
+2. API key → `sk-marcia-<you>-...`
+
+## Base URL
+
+```
+https://api.marciacode.com/v1
+```
+
+No regional endpoints; traffic terminates at the nearest Cloudflare edge and routes server-side from there.
+
+## Authentication
+
+```
+Authorization: Bearer sk-marcia-<you>-<random>
+```
+
+Your key is in the KV keyring managed by Michael. On dev boxes, it's pre-seeded — check with `marcia auth status`. Keys are per-user, audited at request level (every call is attributed to `user=<name>` in usage logs), and individually revocable.
+
+Calls without a valid `sk-marcia-` prefix bearer return HTTP 401.
+
+## Endpoints
+
+### `POST /v1/chat/completions`
+
+OpenAI-compatible chat completions. Supports streaming, function/tool calling, and extended fields like `thinking.type` + `reasoning_effort`.
+
+**Request:**
+
+```bash
+curl https://api.marciacode.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-marcia-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "marcia-code-preview",
+    "messages": [
+      {"role": "system", "content": "You are a concise TypeScript expert."},
+      {"role": "user", "content": "Write a type for a paginated API response."}
+    ],
+    "max_tokens": 500,
+    "temperature": 0.3,
+    "stream": false
+  }'
+```
+
+**Required fields:**
+
+- `model` — `marcia-code`, `marcia-code-preview`, or `marcia-code-fast`
+- `messages` — array of `{role, content}` objects
+
+**Optional fields** (common):
+
+| Field | Type | Notes |
+|---|---|---|
+| `max_tokens` | int | Token cap on the completion |
+| `temperature` | float | 0.0–2.0. Pass `0.3` for code, `0.7` for prose, higher for creative |
+| `top_p` | float | Nucleus sampling |
+| `stream` | bool | If `true`, response is SSE (see below) |
+| `stream_options` | object | `{include_usage: true}` to get token counts on streamed responses |
+| `thinking` | object | `{type: "enabled", budget_tokens: N}` to enable deep reasoning (model-dependent) |
+| `reasoning_effort` | string | `"low" | "medium" | "high"` where supported |
+| `tools` | array | Function/tool calling (OpenAI schema) |
+| `tool_choice` | string/object | `"auto" | "none" | {"type":"function","function":{"name":"..."}}` |
+
+**Response (non-streaming):**
+
+```json
+{
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "created": 1776742200,
+  "model": "marcia-code-preview",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "type PaginatedResponse<T> = { ... }" },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 42, "completion_tokens": 150, "total_tokens": 192 }
+}
+```
+
+**Response (streaming):** standard OpenAI SSE format — `data: {...}` chunks terminated by `data: [DONE]`.
+
+### `GET /v1/models`
+
+Lists available models on the current hostname.
+
+```bash
+curl https://api.marciacode.com/v1/models \
+  -H "Authorization: Bearer sk-marcia-..."
+```
+
+**Response:**
+
+```json
+{
+  "object": "list",
+  "data": [
+    {"id": "marcia-code", "object": "model", "created": 1711000000, "owned_by": "crest-advisory-group"},
+    {"id": "marcia-code-preview", "object": "model", "created": 1711000000, "owned_by": "crest-advisory-group"},
+    {"id": "marcia-code-fast", "object": "model", "created": 1711000000, "owned_by": "crest-advisory-group"}
+  ]
+}
+```
+
+### `GET /health`
+
+Unauthenticated liveness probe.
+
+```bash
+curl https://api.marciacode.com/health
+# => {"status":"ok","product":"marcia-code","version":"2.0.0"}
+```
+
+### `GET /docs`
+
+In-gateway HTML reference. Rendered inline by the Worker; useful as an embedded doc fallback.
+
+### `GET /robots.txt`, `GET /sitemap.xml`, `GET /llms.txt`
+
+Agent-readiness endpoints. `api.marciacode.com` is an API, not a crawlable page — these handlers return Content-Signal-deny responses instructing AI bots and search crawlers to skip the API surface.
+
+## Streaming
+
+Pass `"stream": true`. Server-Sent Events chunks arrive as `data: {...}`. Add `"stream_options": {"include_usage": true}` to get token counts in the final chunk.
+
+```python
+import openai
+client = openai.OpenAI(api_key="sk-marcia-...", base_url="https://api.marciacode.com/v1")
+stream = client.chat.completions.create(
+    model="marcia-code-preview",
+    messages=[{"role": "user", "content": "Count to 5"}],
+    stream=True,
+    stream_options={"include_usage": True},
+)
+for chunk in stream:
+    if chunk.choices:
+        print(chunk.choices[0].delta.content or "", end="")
+```
+
+## Error codes
+
+| Status | Meaning |
+|---|---|
+| `401` | Missing or invalid `sk-marcia-` key |
+| `403` | Key is deactivated or (for unverified accounts) email not yet confirmed |
+| `400` | Invalid JSON body or malformed request |
+| `429` | Rate limit exceeded (retry with backoff; primary providers have burst allowances) |
+| `503` | All providers in the tier's fallback chain are unavailable. The gateway never silently downgrades — a 503 means the specific tier you requested couldn't be served, not that we fell back to a different tier |
+| `500` | Unexpected gateway-side error |
+
+## Rate limits
+
+Rate limits are enforced at the KV key level. Per-tier and per-user limits are set when the key is issued. `marcia auth status` shows the active key; Michael manages limits.
+
+Current defaults: no hard per-minute cap for internal keys (`tier: internal`), but abusive patterns trigger manual review. Don't run unbounded agent loops without understanding the cost model.
+
+## Usage logs
+
+Every call is logged to a D1 database with: timestamp, user, hostname (product), model, provider, input/output tokens, cost, latency, status, error. Self-service access to your own usage is on the roadmap; in the interim, ask Michael for a cost snapshot.
+
+## Client libraries
+
+Anything OpenAI-compatible works. Confirmed: `openai` (Python), `@openai/sdk` (TypeScript), `llm` CLI, LiteLLM, `curl`.
+
+```ts
+import OpenAI from "openai";
+const marcia = new OpenAI({
+  apiKey: process.env.MARCIA_API_KEY,
+  baseURL: "https://api.marciacode.com/v1",
+});
+const res = await marcia.chat.completions.create({
+  model: "marcia-code-preview",
+  messages: [{ role: "user", content: "Hello Marcia" }],
+});
+```
+
+<Note>
+**Engineering Rule 20.** Responses from this API contain no substrate identifying information — the `model` field echoes `marcia-code`, `marcia-code-preview`, or `marcia-code-fast`, never the underlying provider's model ID. Do not reverse-engineer or speculate publicly about what's behind the tiers.
+</Note>

@@ -1,0 +1,151 @@
+---
+title: "CLI Reference"
+description: "Flags, keybindings, session management, auth, and health checks for the `marcia` command."
+---
+
+The `marcia` command ships with every Crest dev box. This page is the flag-by-flag reference.
+
+## Synopsis
+
+```
+marcia [flags] [prompt]
+marcia <command> [args]
+```
+
+If you pass `[prompt]` positionally or no prompt at all, `marcia` launches the interactive TUI. Pass `--print / -p` to get one-shot output.
+
+## Flags
+
+| Flag | Short | Description |
+|---|---|---|
+| `--version` | `-v` | Print version and exit |
+| `--help` | `-h` | Show help |
+| `--print` | `-p` | Run a single query and print the result to stdout. No TUI. |
+| `--model <name>` | `-m` | Override the default model (see [Tiers](/marcia-code/tiers)) |
+| `--continue` | `-c` | Resume the most recent session for the current project (within 4h) |
+| `--resume <id>` | | Resume a specific session by ID |
+| `--bare` | | Hermetic mode — no implicit config, sets `MCODE_SIMPLE=1` |
+| `--verbose` | | Verbose logging |
+| `--dump-system-prompt` | | Dump the rendered system prompt and exit (debug) |
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `marcia auth login [--key sk-marcia-...]` | Authenticate. Interactive prompt if `--key` is omitted. |
+| `marcia auth logout` | Remove stored credentials from `~/.marcia/`. |
+| `marcia auth status` | Show which key is active (prefix only — full value not printed). |
+| `marcia config` | View and modify settings. |
+| `marcia mcp` | Manage MCP servers. |
+| `marcia doctor` | System health check (Go version, marcia version, credentials, provider reachability, CLAUDE.md, MCP servers, disk, git). |
+| `marcia version` | Print version information. |
+
+## Keybindings (interactive)
+
+| Key | Action |
+|---|---|
+| `ctrl+c` | Cancel current turn (double-tap to exit) |
+| `shift+tab` | Cycle permission mode (normal → accept-edits → plan) |
+| `ctrl+o` | Expand/collapse last tool output |
+| `ctrl+g` | Open current prompt in `$EDITOR` |
+| `ctrl+l` | Redraw screen |
+
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `MCODE_API_KEY` | API key (canonical) |
+| `MARCIA_API_KEY` | API key (compatibility alias) |
+| `MCODE_ENDPOINT` | Custom API endpoint (default `https://api.marciacode.com/v1`) |
+| `MCODE_MODEL` | Override default model |
+| `MCODE_SEARCH_API_KEY` | Search API key (for the WebSearch tool) |
+| `MCODE_SIMPLE` | Disable rich UI (set automatically for non-tty) |
+| `MCODE_DEBUG` | Enable debug logging |
+| `MARCIA_ENDPOINT` | Marcia platform endpoint |
+
+The credential from `marcia auth login` takes precedence over env vars for normal use. Env vars are useful for CI, non-interactive scripts, or hermetic `--bare` runs.
+
+## Session management
+
+### Storage layout
+
+```
+~/.marcia/
+  settings.json        — user overrides
+  plans/               — plan-mode session artifacts
+  projects/<hash>/     — per-project event log + metadata
+  credentials          — API key (managed by `marcia auth login`)
+```
+
+Marcia owns `~/.marcia/` as its canonical root. `~/.claude/` is read-only inherited — marcia reads `~/.claude/CLAUDE.md`, `~/.claude/skills/`, project `.claude/rules/*.md`, project `.claude/.mcp.json`, and project `.claude/settings.json` at session start, but never writes there.
+
+### Resume behavior
+
+- `marcia --continue` resumes the newest session for the current working directory (within 4 hours of last turn).
+- `marcia --resume <id>` picks a specific session; the session ID is shown in the footer during interactive use and in the per-project metadata under `~/.marcia/projects/<hash>/`.
+- Starting `marcia` with no resume flag always begins a fresh session with empty context.
+
+## Doctor output
+
+`marcia doctor` is the fastest way to verify the install is healthy. Sample output:
+
+```
+marcia doctor
+--------------------------------------------------
+  [OK]    Go version                    go1.26.1
+  [OK]    marcia version                v0.0.1
+  [OK]    Auth credentials              found in keyring
+  [OK]    Provider reachability         https://api.marciacode.com/v1 reachable (HTTP 404)
+  [OK]    Config validity               settings files parse OK
+  [OK]    CLAUDE.md                     found at CLAUDE.md
+  [OK]    MCP servers                   1 configured: remotion-documentation(user)
+  [OK]    Disk space                    857001 MB free / 992243 MB total
+  [OK]    Git                           git version 2.34.1
+--------------------------------------------------
+```
+
+<Note>
+**`Provider reachability HTTP 404` is expected.** The doctor check probes the root of `api.marciacode.com/v1/`, which isn't a valid endpoint — only `/v1/chat/completions` and `/v1/models` are. A 404 means the server is alive and responding; it doesn't mean anything is broken.
+</Note>
+
+## Settings file
+
+The repo-level `settings.json` is committed at `~/Crest/GitHub/marcia-cli/settings.json` on dev boxes. It uses snake_case keys matching the Go struct tags:
+
+```json
+{
+  "provider": { "endpoint": "https://api.marciacode.com/v1" },
+  "permissions": {
+    "allow": ["Bash*", "Edit*", "Write*", "Read*", "Grep*", "Glob*", "Agent*"]
+  },
+  "auto_summarise_agents": true,
+  "max_concurrent_tools": 256
+}
+```
+
+Keep it minimal. Unknown keys are silently ignored. User-level overrides go in `~/.marcia/settings.json`.
+
+## Permission modes
+
+Cycled via `shift+tab` during an interactive session:
+
+- **normal** — every state-changing tool call asks the user for approval. Read-only tools (Read, Grep, Glob, WebSearch) auto-allow.
+- **accept-edits** — auto-accepts first-party tools (Edit, NotebookEdit, Bash, WebFetch, Agent, Grep, Glob, Read, WebSearch). `Write` stays gated to the project root. `dangerouslyDisableSandbox=true` forces a prompt regardless.
+- **plan** — only read-only tools and writes to the session plan file are allowed. The model must call `ExitPlanMode` with the plan text to request approval before implementing.
+
+## Agent tool
+
+Marcia's `Agent` tool can launch subagents. Caps and defaults:
+
+- **Up to 100 parallel agent calls per assistant turn**
+- **Max nesting depth 10**
+- **Agent-output auto-summarization** at 8,000 tokens combined — oversized results condense to bullets with a `TaskOutput` pointer to the full transcript
+- **Per-tool output caps:** 256 KB default, 16 KB for Agent tool results, each subagent's final message capped at 8 KB
+
+The parent only sees the final message from each subagent, not the full transcript — matches Claude Code's `TaskTool` behavior.
+
+## Troubleshooting
+
+`MCODE_DEBUG=1` enables structured debug logging. Bug reports go to @bparchinski via Slack (CLI is alpha — breakage is expected).
+
+`CLAUDE_CODE_*` environment variables (e.g. `CLAUDE_CODE_DEBUG`, `CLAUDE_CODE_ACCESSIBILITY`, `CLAUDE_CODE_TMUX_TRUECOLOR`) are intentional substrate controls and supported — they're not upstream-brand leaks and won't be renamed.

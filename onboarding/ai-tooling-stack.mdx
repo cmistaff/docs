@@ -65,15 +65,26 @@ If you have a workflow that genuinely cannot be done in Composer/Auto or Marcia 
 
 Codex CLI is installed on the dev box and authenticated during Day 1. Use it as a fallback when Claude Code is degraded, rate-limited, or down. It is not your daily driver.
 
-## Marcia Code API: how it fits
+## Marcia Code: how it fits
 
-Marcia Code is Crest's developer AI, exposed as an OpenAI-compatible HTTP endpoint at `https://api.marciacode.com/v1`. You access it three ways:
+Marcia Code is Crest's developer AI, available two ways:
 
-1. **From the `marcia` CLI on the dev box.** Pre-installed and authenticated during Day 1.
-2. **From inside Cursor** as a custom model. Add it under Settings -> Models -> Add Custom Model. Full configuration (base URL, API key format, model name) is in the [Day 1 walkthrough](/onboarding/day-one-walkthrough), under "Day one: configure Cursor to call Marcia Code".
-3. **Programmatically** from any code that speaks the OpenAI Chat Completions schema. Useful for batch jobs, evals, and tool-using agents.
+1. **The `marcia` CLI** — pre-installed and pre-authenticated on every Crest dev box as of 2026-04-21. Just type `marcia` to open an interactive coding session. Full reference at [Marcia Code → CLI](/marcia-code/cli).
+2. **The HTTP API** at `https://api.marciacode.com/v1` — OpenAI-compatible endpoint. Drop-in for Cursor custom model, batch jobs, evals, CI hooks, or anything that speaks OpenAI Chat Completions. See [Marcia Code → API Reference](/marcia-code/api-reference).
 
-Your `MARCIA_API_KEY` (format `sk-marcia-<user>-<random>`) is issued by Michael. If you do not have one, DM him.
+### Three tiers
+
+Pick a tier with `marcia --model <name>` or the `model` field in the HTTP request:
+
+- `marcia-code-preview` *(default)* — Early Access. Newest model, most aggressive reasoning.
+- `marcia-code` — Stable. Broadest provider fallback chain. Use for production workloads.
+- `marcia-code-fast` — Fast. Speed + cost optimized for autocomplete, small refactors, agentic loops.
+
+Details and per-task guidance at [Marcia Code → Tiers](/marcia-code/tiers).
+
+### Credentials
+
+Your `sk-marcia-<you>-<random>` key is pre-seeded in `~/.marcia/` on your dev box. Check with `marcia auth status` (shows the prefix, never the full value). If you change dev boxes or clear the keyring, `marcia auth login --key sk-marcia-...` re-auths — DM Michael to look up your key if you've lost track of it.
 
 <Note>
 **Engineering Rule 20: do not disclose the substrate.** Marcia Code is Crest's product. The underlying model providers and model names are trade secret. When discussing Marcia Code with clients, prospects, candidates, in public posts, in client-facing docs, or in any external material, refer to it only as "Marcia" or "Marcia Code". Do not name the providers, do not name the model families, do not paste provider model names into customer-visible artifacts. See [Engineering Rules](/onboarding/engineering-rules) for the full rule.
