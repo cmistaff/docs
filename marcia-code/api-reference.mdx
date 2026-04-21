@@ -63,11 +63,11 @@ curl https://api.marciacode.com/v1/chat/completions \
 | `temperature` | float | 0.0–2.0. Pass `0.3` for code, `0.7` for prose, higher for creative |
 | `top_p` | float | Nucleus sampling |
 | `stream` | bool | If `true`, response is SSE (see below) |
-| `stream_options` | object | `{include_usage: true}` to get token counts on streamed responses |
-| `thinking` | object | `{type: "enabled", budget_tokens: N}` to enable deep reasoning (model-dependent) |
-| `reasoning_effort` | string | `"low" | "medium" | "high"` where supported |
+| `stream_options` | object | Pass `include_usage: true` to get token counts on streamed responses |
+| `thinking` | object | Enable deep reasoning with `type: "enabled"` and optionally `budget_tokens: N` (model-dependent) |
+| `reasoning_effort` | string | One of `"low"`, `"medium"`, or `"high"` where supported |
 | `tools` | array | Function/tool calling (OpenAI schema) |
-| `tool_choice` | string/object | `"auto" | "none" | {"type":"function","function":{"name":"..."}}` |
+| `tool_choice` | string/object | `"auto"`, `"none"`, or an explicit tool selector object |
 
 **Response (non-streaming):**
 
