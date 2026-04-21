@@ -1,0 +1,131 @@
+---
+title: "How We Work"
+description: "Crest is a flexible, output-driven shop. You control when and how you work. What we measure is 160 hours of quality work per month, shipped tickets, and good judgment."
+---
+
+<Note>
+**Read this before your first week.** This page is the cultural and operational frame for everything else in the Onboarding tab. The pages that follow (environment variables, AWS SSO, AI tooling, PR protocol) tell you *how* to do the work. This page tells you *when, how, and on what terms*.
+</Note>
+
+## The short version
+
+Crest is flexible by design. You are an adult, you are an expert, and you are responsible for your output. We do not measure butts in seats. We measure:
+
+1. **160 hours of quality work per month.**
+2. **Tickets shipped and PRs merged.**
+3. **Good judgment about when to ask for help, reassignment, or time off.**
+
+Everything below is the mechanism that makes that work.
+
+## Your hours are your own
+
+You control when you work. There is no core block you have to be online. Time zones do not matter. Our team sits across North America, Europe, South Asia, and the Middle East, and everything important is async-first.
+
+The only hard target is **160 hours per month**. How you distribute them across days, weeks, mornings, or late nights is your call. If you want to do four ten-hour days and take Fridays off, do that. If you want to work split shifts around a school pickup, do that. If you want to batch a heavy week and take a light one, do that.
+
+Track your hours in Hubstaff as usual (see [Engineering Handbook](/onboarding/engineering-handbook) for the tracking mechanics). The 160 target is a monthly number, not a weekly one.
+
+<Tip>
+If a month is looking light (travel, family event, holidays in your region), flag it to your PM or team lead early so staffing can rebalance. Nobody is going to be surprised by a dip if you give a week of notice.
+</Tip>
+
+## What you work on is your call
+
+Tickets get assigned by PMs and team leads, but you are not stuck with them.
+
+If a ticket lands on you and it is not your expertise, say so. Ask the team lead on that project, or the PM, to reassign it. This is a feature of the process, not a failure.
+
+<Note>
+**Do not take on what you are not skilled in.** Shipping a shaky feature because you felt you could not say no hurts the product, hurts the customer, and hurts you on review. We would much rather you hand a ticket back on day one than spend a week wrestling with it and land something fragile. Asking for reassignment is the professional move.
+</Note>
+
+The flip side: if you see a ticket in your wheelhouse that has been sitting unassigned, grab it or ask for it. Ownership is welcomed.
+
+## Time off
+
+Two flavors: short (a day here and there) and extended (vacation, family leave, conference week, anything longer than a couple of days).
+
+### Short time off
+
+Taking a Friday off, a personal day, a dentist appointment, a half-day for a move:
+
+1. **Post a notice in `#crest-office-notice` Slack channel.** One line is enough. "Out Friday, back Monday morning EST." This keeps the team from pinging you expecting a same-day answer.
+2. **File the time-off request in [Deel](https://deel.com).** This is the system of record for payroll and PTO accounting.
+
+Do both. The Slack post is the human signal. The Deel request is the accounting record.
+
+### Extended time off
+
+If you are going to be away for more than a couple of days (vacation, conference, family leave, a heavy travel stretch), the rules tighten a bit because other people have to pick up the slack.
+
+Before you go dark:
+
+1. **DM your PM and/or project lead.** Give them enough notice that they can plan. A week or more is ideal for a vacation. Emergencies obviously do not wait.
+2. **Hand off open work.** Review your Linear queue together. Anything actively in flight gets reassigned. Any draft PRs you are blocking get flagged so someone else can drive them to merge or close them.
+3. **File in Deel** the same way you would for short time off.
+4. **Post in `#crest-office-notice`** with dates + who is covering.
+
+The point is not bureaucracy. The point is that a draft PR sitting untouched for two weeks because you forgot to mention you were away blocks a release and burns goodwill. A five-minute handoff message prevents that.
+
+<Tip>
+Coming back from an extended stretch, check in with your PM before picking tickets up. Priorities shift, and the ticket that was hot when you left may not be hot anymore.
+</Tip>
+
+## Tools: we give you what you need
+
+The other half of flexibility is making sure you are not bottlenecked on tooling. We invest heavily in AI tooling and dev environments so you can move fast.
+
+<CardGroup cols={2}>
+  <Card title="Marcia Code" icon="sparkles" href="/marcia-code/overview">
+    Crest's developer AI. Three tiers covering the newest model, a stable production tier, and a speed tier. Available as a CLI on every dev box and as an OpenAI-compatible API.
+  </Card>
+  <Card title="AI Tooling Stack" icon="toolbox" href="/onboarding/ai-tooling-stack">
+    Claude Code CLI is primary, Cursor runs in Composer/Auto with Marcia wired in, Codex is the fallback. Cost rules and recommended global settings live here.
+  </Card>
+  <Card title="Dev Workstations" icon="server" href="/onboarding/connect-to-devbox">
+    Every engineer gets a dedicated EC2 dev box reachable over Tailscale. All real work happens on the box, per Engineering Rule 14.
+  </Card>
+  <Card title="PR Review Protocol" icon="code-pull-request" href="/onboarding/pr-review-protocol">
+    Six-bot automated review pipeline plus human review. Fast feedback loops so you are never blocked waiting on a reviewer for long.
+  </Card>
+</CardGroup>
+
+The substrate behind Marcia Code (model families, providers, fallback chains) is trade secret. On external materials, refer to it only as Marcia, marcia-code, marcia-code-preview, or marcia-code-fast. See [Engineering Rules](/onboarding/engineering-rules), Rule 20.
+
+## Have an idea? File a CRC ticket
+
+If there is a tool we should buy, a workflow that should change, a bottleneck that is slowing you down, or an integration that would save the team time, tell us. We will look into it as fast as we can.
+
+Two ways to file:
+
+1. **From Linear.** Open a ticket in the **CRC team** in the `crest-usa` workspace. Describe the tool or workflow adjustment and the problem it solves. A screenshot or one-line example goes a long way.
+2. **From Slack (lower friction).** In any shared channel (for example `#project-crestpetsystem`), type `@linear` and follow the prompts. Linear's Slack integration kicks off a ticket-creation flow right there. You do not have to open the web UI.
+
+<Note>
+**The @linear Slack shortcut is the fastest path from "I have an idea" to "there is a ticket."** Use it. Half-formed ideas captured in a ticket are more useful than polished ideas you never get around to filing. We would rather have a short, rough CRC ticket than no ticket at all.
+</Note>
+
+If the idea is urgent or sensitive (security concerns, cost spikes you noticed, a vendor you want us to cut), DM your PM or Michael directly instead of filing a ticket.
+
+## The philosophy
+
+To restate the frame at the top, now that you have the mechanics:
+
+- **We measure output, not presence.** Ship good work. Hit 160 hours. Use good judgment.
+- **You choose your hours.** Work when you are sharp. Rest when you are not.
+- **You choose your scope.** Do not take on what you are not skilled in. Ask for reassignment when a ticket is outside your expertise.
+- **You own communication.** Short time off gets a Slack post and a Deel request. Extended time off gets a PM handoff before you go dark.
+- **We back you with tools.** Marcia Code, Claude Code, dedicated dev boxes, and a review pipeline designed to keep you unblocked.
+- **Your ideas move the tooling forward.** File CRC tickets. Use `@linear` in Slack for speed.
+
+Flexibility is not a perk. It is how we think work should happen. The tradeoff is that you own your output, your communication, and your judgment. If that frame sounds right to you, you are in the right place.
+
+## Related pages
+
+- [Welcome to Crest](/onboarding/welcome), orientation video and first-week checklist
+- [Before You Start](/onboarding/before-you-start), Day 0 accounts and paperwork
+- [Engineering Handbook](/onboarding/engineering-handbook), Hubstaff tracking mechanics and team workflows
+- [Engineering Rules](/onboarding/engineering-rules), Rule 14 (work on the dev box) and Rule 20 (Marcia substrate is confidential)
+- [AI Tooling Stack](/onboarding/ai-tooling-stack), Claude Code, Cursor, Marcia Code, Codex
+- [Marcia Code](/marcia-code/overview), Crest's developer AI, CLI and API
+- [Slack Channels](/crest-corp/slack-channels), full channel list including `#crest-office-notice`
