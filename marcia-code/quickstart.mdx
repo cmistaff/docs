@@ -1,0 +1,133 @@
+---
+title: "Quickstart"
+description: "Install state, first call, and a minimal interactive session."
+---
+
+If you're on a Crest dev box, `marcia` is already installed and your API key is already in the keyring. Skip to [Your first call](#your-first-call).
+
+If you're setting up a fresh environment or running off a dev box, see [Manual install](#manual-install) at the bottom.
+
+## Install state on Crest dev boxes
+
+Every active Crest dev box has marcia-cli pre-installed as of 2026-04-21:
+
+| Component | Location |
+|---|---|
+| Binary wrapper | `~/.local/bin/marcia` |
+| Runtime assets | `~/Crest/GitHub/marcia-cli/` |
+| Credential store | `~/.marcia/` |
+| Settings | `~/Crest/GitHub/marcia-cli/settings.json` |
+
+The wrapper is on `$PATH` via `~/.zshrc` (bun toolchain + `~/.local/bin` prepended). A new SSH session should have `marcia` directly callable.
+
+To confirm:
+
+```bash
+marcia --version
+marcia doctor
+marcia auth status
+```
+
+<Note>
+If you get `command not found: marcia`, open a fresh shell to pick up the `PATH` addition, or run `source ~/.zshrc`. If it still fails, DM Bryant.
+</Note>
+
+## Your first call
+
+### Interactive TUI
+
+```bash
+marcia
+```
+
+This opens a terminal UI in your current window. Type a prompt, hit enter. The model streams reasoning and output inline. `ctrl+c` twice exits.
+
+### One-shot
+
+```bash
+marcia -p "write a TypeScript type for a 2D point"
+```
+
+Prints the answer to stdout and exits. Good for scripts and `xargs`-style pipelines.
+
+### Resume a session
+
+```bash
+marcia --continue       # resume the most recent session for this project (within 4h)
+marcia --resume <id>    # resume a specific session by id
+```
+
+Session IDs are shown in the footer during interactive use and in `~/.marcia/projects/<hash>/`.
+
+## Pick a tier
+
+```bash
+marcia --model marcia-code-preview   # Early Access (default; latest model)
+marcia --model marcia-code            # Stable (broadest fallback chain)
+marcia --model marcia-code-fast       # Fast (speed + cost optimized)
+```
+
+Without `--model`, you get Early Access. See [Tiers](/marcia-code/tiers) for when to pick each.
+
+## A minimal interactive session
+
+```
+$ marcia
+> read src/users/service.ts and suggest 3 improvements without editing yet
+
+[marcia reads the file, streams reasoning, responds with suggestions]
+
+> apply improvement 2
+
+[marcia uses the Edit tool, shows the diff, prompts for approval]
+[y to accept, n to reject, shift+tab to cycle permission modes]
+
+> /clear
+
+[transcript reset; fresh context]
+
+> ^C ^C
+
+[exits]
+```
+
+### Permission modes
+
+`shift+tab` cycles through:
+
+- **normal** — every state-changing tool call asks approval. Read-only tools (Read, Grep, Glob, WebSearch) auto-allow.
+- **accept-edits** — auto-accepts first-party tools (Edit, NotebookEdit, Bash, WebFetch, Agent, Grep, Glob, Read, WebSearch). `Write` stays gated to the project root.
+- **plan** — read-only tools + session plan file only. The model must call `ExitPlanMode` to ask for approval before implementing.
+
+## API usage (curl)
+
+For anything not using the CLI — scripts, CI, tool integrations — hit the HTTP endpoint directly.
+
+```bash
+curl https://api.marciacode.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-marcia-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "marcia-code-preview",
+    "messages": [{"role": "user", "content": "Explain this stack trace: ..."}],
+    "max_tokens": 500
+  }'
+```
+
+Full request/response reference at [API Reference](/marcia-code/api-reference).
+
+## Manual install
+
+If you're setting up outside of a Crest dev box (e.g., a test environment), see the source repo at [`CrestLabsHQ/marcia-cli`](https://github.com/CrestLabsHQ/marcia-cli). A prebuilt-binary distribution is tracked in [issue #1](https://github.com/CrestLabsHQ/marcia-cli/issues/1). Until that ships, manual install requires Go 1.26.1 + Bun and the `install.sh` flow from the repo.
+
+Once installed:
+
+```bash
+marcia auth login --key sk-marcia-<you>-...
+marcia doctor
+marcia
+```
+
+<Note>
+Marcia-CLI is **alpha software**. APIs, storage paths, and protocol fields may change before the stable release. Bug reports to @bparchinski via Slack.
+</Note>

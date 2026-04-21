@@ -1,0 +1,81 @@
+---
+title: "Overview"
+description: "Marcia Code is Crest's developer AI — a coding agent exposed as an OpenAI-compatible API and a first-class CLI."
+---
+
+Marcia Code is Crest's developer-facing AI. It's accessed two ways:
+
+1. **`marcia` CLI** — a terminal-native coding assistant installed on every Crest dev box. Interactive TUI for sessions, one-shot mode for quick prompts, agentic tool loops for multi-step work.
+2. **`https://api.marciacode.com/v1`** — an OpenAI-compatible HTTP endpoint. Drop-in for anything that speaks OpenAI Chat Completions (Cursor custom model, scripts, CI jobs, evals).
+
+Same backend, same auth, same model tiers. Pick the interface that fits the task.
+
+<Note>
+**Engineering Rule 20: do not disclose the substrate.** Marcia Code is Crest's product. The underlying model providers and model names are trade secret. When discussing Marcia Code with clients, prospects, candidates, in public posts, in client-facing docs, or in any external material, refer to it only as "Marcia" or "Marcia Code". Do not name the providers, do not name the model families, do not paste provider model names into customer-visible artifacts. See [Engineering Rules](/onboarding/engineering-rules) for the full rule.
+</Note>
+
+## Three tiers
+
+Pick a tier by passing it as the `model` field in requests or with `marcia --model <name>`.
+
+| Tier | Model ID | When to pick it |
+|---|---|---|
+| **Early Access** *(default)* | `marcia-code-preview` | Our newest model. Latest capabilities, most aggressive reasoning. What you get if you don't pass anything. |
+| **Stable** | `marcia-code` | Broadest provider fallback chain. Best for jobs that need reliability over bleeding-edge. |
+| **Fast** | `marcia-code-fast` | Speed and cost optimized. Sub-second time-to-first-token for autocomplete, small refactors, commit messages, and agentic loops that fire many quick calls. |
+
+See [Tiers](/marcia-code/tiers) for a detailed comparison with routing characteristics, fallback behavior, and pricing notes.
+
+## First call in 60 seconds
+
+If you're on a Crest dev box, `marcia` is already installed and authenticated. Just run:
+
+```bash
+marcia
+```
+
+Or one-shot:
+
+```bash
+marcia -p "write a TypeScript type for a paginated API response"
+```
+
+For the HTTP API:
+
+```bash
+curl https://api.marciacode.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-marcia-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "marcia-code-preview",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+Your `sk-marcia-<you>-*` key is pre-seeded on your dev box. `marcia auth status` shows the active key without printing the full value.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/marcia-code/quickstart">
+    Install state, first call, a minimal interactive session.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/marcia-code/cli">
+    Flags, keybindings, session management, auth, `marcia doctor`.
+  </Card>
+  <Card title="Tiers" icon="layer-group" href="/marcia-code/tiers">
+    When to use `marcia-code`, `marcia-code-preview`, `marcia-code-fast`.
+  </Card>
+  <Card title="API Reference" icon="code" href="/marcia-code/api-reference">
+    `/v1/chat/completions`, `/v1/models`, streaming, error codes.
+  </Card>
+</CardGroup>
+
+## How Marcia Code fits the AI tooling stack
+
+Alongside Claude Code and Codex CLI — see the [AI Tooling Stack](/onboarding/ai-tooling-stack) page for when each tool is the right choice. In short:
+
+- **Claude Code** is the primary for general coding work on dev boxes.
+- **Marcia Code CLI** (`marcia`) is the primary for work that should run on Crest's own substrate — our benchmarks, our tier routing, our key-level audit trail.
+- **Codex CLI** is fallback for Claude Code outages.
+- **Cursor** is restricted to Composer/Auto + the Marcia Code custom-model slot (see [Day 1 walkthrough](/onboarding/day-one-walkthrough)).

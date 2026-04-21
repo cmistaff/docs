@@ -1,0 +1,113 @@
+---
+title: "Tiers"
+description: "When to reach for Early Access, Stable, or Fast — and the routing semantics behind each."
+---
+
+Marcia Code offers three model tiers. Pick by task — not by habit.
+
+## At a glance
+
+| Tier | Model ID | Best for | Routing |
+|---|---|---|---|
+| **Early Access** | `marcia-code-preview` | Hard debugging, architectural decisions, deep reasoning, long-horizon work | Primary + 1 peer fallback (same model on a different provider) |
+| **Stable** | `marcia-code` | Production workloads, reliability-critical jobs, anything you don't want to break mid-request | Full fallback chain across multiple providers |
+| **Fast** | `marcia-code-fast` | Autocomplete, commit messages, doc generation, small refactors, multi-call agentic loops | Primary + 1 peer fallback (same model family on a different provider) |
+
+`marcia-code-preview` is the default. No `--model` flag means Early Access.
+
+## Early Access — `marcia-code-preview`
+
+**When to use:** You want the newest capabilities. You're doing something the model might fail on. You'd rather have the best answer than the fastest answer.
+
+**Characteristics:**
+- Latest model available to Crest
+- Two-provider fallback — if the primary provider degrades, the same model is served from a peer provider (not a different model)
+- Subject to breaking changes — model behavior may shift as we rotate to newer snapshots
+- Slightly higher cost per token than Stable
+
+**Failure mode:** 503 "All providers unavailable" if both of the two K2.6-class providers are down simultaneously. Never downgrades silently to the Stable tier.
+
+<Note>
+**"Early Access" is a rolling slot, not a fixed model.** As new base models ship and we validate them, this slot rotates to whatever's newest. Pin to `marcia-code` if you need reproducibility across time.
+</Note>
+
+## Stable — `marcia-code`
+
+**When to use:** You care more about not-breaking than about shiny. Long-running jobs, scheduled tasks, CI hooks, production agents.
+
+**Characteristics:**
+- Broadest fallback chain across multiple providers
+- Model family chosen for reliability + mature vendor support
+- Lowest error rate in our last 30 days of production logs
+- Full set of provider body transforms (e.g., Fireworks-specific payload sanitization) to handle every provider's quirks
+
+**Failure mode:** Extremely rare end-user-visible 503. The fallback chain absorbs provider-level transient failures (400s, 429s, 503s) before they reach your client.
+
+## Fast — `marcia-code-fast`
+
+**When to use:** You need the answer in under a second. You're firing many LLM calls in an agent loop. You're writing a commit message, a doc string, a rename suggestion. You don't need the largest model.
+
+**Characteristics:**
+- Smaller model family with very low time-to-first-token (sub-second typical)
+- ~5x cheaper input / ~4x cheaper output vs. Early Access
+- Same 256K context window as the other tiers — no context sacrifice
+- Two-provider redundancy (primary + peer fallback in the same family)
+
+**Failure mode:** 503 if both Fast-tier providers are down. Never silently routes to Stable or Early Access — keeping the tier distinct protects your cost + latency expectations.
+
+<Note>
+**Fast tier is for speed, not for hard problems.** If you find the Fast tier giving shallow answers on a complex debug session, switch to Early Access (`--model marcia-code-preview`) or Stable (`--model marcia-code`). That's the right signal.
+</Note>
+
+## Choosing per task
+
+| Task | Reach for |
+|---|---|
+| Inline autocomplete in your editor | Fast |
+| Commit message generation | Fast |
+| Batch doc generation across many files | Fast |
+| Rename a variable / small refactor | Fast |
+| Explain this stack trace | Stable or Early Access |
+| Write a full implementation of X | Early Access |
+| "Where in the codebase is the bug?" | Early Access |
+| Production agent firing 50 tool calls | Fast |
+| Production batch job that must not fail | Stable |
+| Novel algorithm design | Early Access |
+| "Read the repo, understand, refactor" | Early Access |
+
+## How tier selection works
+
+The `marcia-code` CLI defaults to Early Access (`marcia-code-preview`). Override with `--model`:
+
+```bash
+marcia --model marcia-code-fast -p "write a commit message for: $(git diff --cached | head -60)"
+```
+
+The HTTP API picks the tier from the `model` field:
+
+```bash
+curl https://api.marciacode.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-marcia-..." \
+  -H "Content-Type: application/json" \
+  -d '{"model": "marcia-code-fast", "messages": [...]}'
+```
+
+All three tiers share the same authentication (your `sk-marcia-<you>-*` key) and the same endpoint. Tier selection is purely which model field you pass.
+
+## Substrate — the part we don't talk about
+
+<Note>
+**Engineering Rule 20.** The underlying model providers, model names, and provider-chain configuration are trade secret. When discussing Marcia Code with clients, prospects, candidates, in public posts, in client-facing docs, or in any external material, refer only to "Early Access", "Stable", "Fast", and `marcia-code-*` model IDs. Do not name the providers. Do not name the model families. Do not paste provider model names into customer-visible artifacts.
+</Note>
+
+This is load-bearing. Marcia Code is Crest's product; the substrate we route to is an implementation detail that changes over time. The three tiers above are the vocabulary.
+
+## Benchmarks
+
+Latency and reliability numbers are measured continuously via the gateway's internal `/admin/benchmark` endpoint (admin-only). Current snapshot:
+
+- **Stable tier primary:** ~1.5s median for 100-token output
+- **Early Access primary:** ~1.0s median for 100-token output (recently improved ~5x after a primary-provider flip)
+- **Fast tier primary:** ~400ms median for short completions
+
+These are indicative — actual latency depends on payload size, reasoning depth, and provider-side load.

@@ -243,7 +243,11 @@
           {
             "group": "Marcia Code",
             "pages": [
-              "marcia-code/coming-soon"
+              "marcia-code/overview",
+              "marcia-code/quickstart",
+              "marcia-code/tiers",
+              "marcia-code/cli",
+              "marcia-code/api-reference"
             ]
           }
         ]
