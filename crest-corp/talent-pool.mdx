@@ -3,7 +3,7 @@ title: "Talent Pool"
 description: "Internal resource-request intake. Scope a project, get a body assigned, ship it, roll off. How to submit a request and how to fulfill one."
 ---
 
-The **Talent Pool** is a Linear team that coordinates scoped, time-bound help across Crest. When a dev, lead, or PM needs extra hands on a deliverable — a one-week feature push, a QA pass, an infra cleanup — they submit a project here. Michael triages, one person is allocated, they complete the work, and roll off to the next request.
+The **Talent Pool** is a Linear team that coordinates scoped, time-bound help across Crest. When a dev, lead, or PM needs extra hands on a deliverable, they submit a project here. Michael reviews, approves, and allocates talent; the talent delivers the scoped work; they roll off to the next request.
 
 This replaces ad-hoc "can someone pick this up?" pings in Slack.
 
@@ -11,36 +11,62 @@ This replaces ad-hoc "can someone pick this up?" pings in Slack.
 Linear team: **Talent Pool (`TP`)**. Open Linear, switch workspace to Crest USA, pick the team from the sidebar. If you cannot see it, DM Michael to be added.
 </Note>
 
+## Timeline — plan ahead
+
+This is **not** a "next week" service. The end-to-end timeline is 6 to 8 weeks from submission to delivered:
+
+| Phase | Duration | What's happening |
+| --- | --- | --- |
+| Submission → Approval | **1 to 2 weeks** | Michael reviews scope, validates estimate, confirms fit. Requests missing scope or sub-issues get bounced back. |
+| Approval → Staffed | **~3 weeks** | Vendor outreach, Deel contracting, background check, tool/access provisioning, context ramp. |
+| Staffed → Delivered | **2+ weeks** | One full cycle minimum of actual work. |
+| Delivered → Rolled Off | 1 to 2 days | Acceptance by requester + rolloff retro by Michael. |
+
+**If your deadline is less than 6 weeks from today, Talent Pool is the wrong tool.** Escalate to your own team's lead instead.
+
+## Minimum bar for a request
+
+Every request must meet these at intake. They are enforced at approval — requests that don't clear the bar are rejected with comments explaining what to fix.
+
+- **At least 2 weeks (1 cycle, ~80 hours) of scoped work.** Anything smaller should stay on the requesting team.
+- **At least 4 sub-issues** inside the project covering the work breakdown. If you can't find 4 discrete pieces of work, the scope isn't decomposed enough yet.
+- **A concrete deliverable** — specific artifacts, not vague outcomes. "Stripe webhook coverage for 4 event types with integration tests" is concrete; "improve billing" is not.
+- **A hard deadline** (or "none" with a target start date). Deadlines under 6 weeks will be rejected — see the timeline above.
+
 ## When to use the Talent Pool
 
 Use it when all of these are true:
 
-- The work is **scoped** — there is a clear deliverable, not an open-ended investigation
-- The work is **time-bound** — typically less than two weeks of one person's time
+- The work is **scoped** with a clear deliverable
+- The work is **at least 2 weeks** of one person's time
+- Your **deadline is 6+ weeks out** (or there is no hard deadline)
+- You can **break it into 4+ sub-issues** at intake
 - You need **someone other than yourself** to do it
-- It is **not** a product roadmap item your team already owns
+- It is **not** product roadmap work your team already owns
 
 Do NOT use it for:
 
-- Product roadmap work on your own team (stay on your team's board)
+- Deadlines under 6 weeks from today — wrong tool, escalate to your lead
+- Work shorter than 2 weeks — stay on your own team
+- Scope you can't decompose into 4+ sub-issues — scope it more first
+- Product roadmap work on your team (stay on your team's board)
 - Infra incidents or outages (use the Infrastructure team)
 - Access requests, onboarding, offboarding, IAM changes (use CrestCorp team)
 - General support questions (use the Support team)
-- Design work that your team would own anyway (use the Design team)
 
 ## The lifecycle, at a glance
 
 <Steps>
   <Step title="Requester submits">
-    Create a Linear project on the Talent Pool team with scope, estimate, and deadline. Status: `Requested`.
+    Create a Linear project on the Talent Pool team with scope, estimate, deadline, **and at least 4 sub-issues**. Status: `Requested`.
   </Step>
-  <Step title="Triage validates scope">
-    Michael reviews within 1 business day. If scope is clear, status moves to `Triaged`. If unclear, you'll get comments asking for detail.
+  <Step title="Triage + approval (1-2 weeks)">
+    Michael reviews scope, validates estimate, confirms minimum bar is met. If approved, status moves to `Triaged`. If not, you'll get comments asking for scope, more sub-issues, or a bump back to your own team.
   </Step>
-  <Step title="Talent is allocated">
-    Michael assigns from internal bench, external vendors, Deel-contracted talent, or a new hire. Status moves to `Staffed` and a `Talent Source` label is applied.
+  <Step title="Allocation (3 weeks)">
+    Michael sources talent from internal bench, external vendors, or Deel-contracted talent. Vendor outreach, contracting, background checks, and access provisioning all happen in this window. Status moves to `Staffed` with a `Talent Source` label applied.
   </Step>
-  <Step title="Work happens">
+  <Step title="Work happens (2+ weeks)">
     Talent moves the project to `In Progress`. Sub-issues cover the task breakdown. Requester stays reachable for clarifications.
   </Step>
   <Step title="Deliverables go to review">
@@ -54,14 +80,17 @@ Do NOT use it for:
 ## How to submit a request (requesters)
 
 <Steps>
+  <Step title="Check the timeline first">
+    Work out: is your deadline 6+ weeks away? Is the work 2+ weeks? Can you break it into 4+ sub-issues? If any answer is no, Talent Pool is not the right tool.
+  </Step>
   <Step title="Open Linear and switch to Talent Pool">
     Sidebar → workspace: Crest USA → team: **Talent Pool**.
   </Step>
   <Step title="Create a new project">
-    Click **+ New Project**. Give it a name that starts with your team name, then a short scope phrase. Example: `CrestPet — Stripe webhooks coverage pass` or `Infra — Tailscale ACL refactor`.
+    Click **+ New Project**. Name format: `<your team> — <short scope phrase>`. Example: `CrestPet — Stripe webhooks coverage pass` or `Infra — Tailscale ACL refactor`.
   </Step>
   <Step title="Fill in the intake template">
-    Paste the template below into the project description and fill every section. Requests missing scope or estimates get bounced back at triage.
+    Paste the template below into the project description and fill every section. Incomplete requests get bounced back at approval.
 
     ```markdown
     ## Scope
@@ -78,10 +107,17 @@ Do NOT use it for:
 
     ## Estimate
     - Skill: <one of: fullstack, frontend-dev, backend-dev, devops-skill, qa, data>
-    - Hours: <raw estimate>
-    - Size label: <S/M/L>
-    - Hard deadline (EST): <YYYY-MM-DD or "none">
-    - Target start: <YYYY-MM-DD>
+    - Hours: <raw estimate, minimum ~80>
+    - Size label: <M (1 cycle / ~80h), L (2 cycles / ~160h), or XL (3+ cycles)>
+    - Hard deadline (EST): <YYYY-MM-DD — must be 6+ weeks out, or "none">
+    - Target start: <YYYY-MM-DD — allow 4-5 weeks from submission>
+
+    ## Sub-issue Breakdown (minimum 4)
+    Create at least 4 sub-issues inside this project covering the work. List them here:
+    1. <Sub-issue 1 title>
+    2. <Sub-issue 2 title>
+    3. <Sub-issue 3 title>
+    4. <Sub-issue 4 title>
 
     ## Acceptance Criteria
     - [ ] <Checklist item 1>
@@ -93,11 +129,14 @@ Do NOT use it for:
     <What is explicitly OUT of scope — prevents drift.>
     ```
   </Step>
+  <Step title="Create the sub-issues in Linear">
+    Inside the new project, create at least 4 Linear issues covering the breakdown. Without these, the request will not be approved.
+  </Step>
   <Step title="Set status to Requested">
-    New projects default to `Backlog` — change it to `Requested`.
+    New projects default to `Backlog` — change to `Requested`.
   </Step>
   <Step title="Apply labels">
-    Required: `resource-request` + one **Skill** label + one **Size** label. Michael adds the **Talent Source** label after allocation.
+    Required: `resource-request` + one **Skill** label + one **Size** label (M, L, or XL). Michael adds the **Talent Source** label after allocation.
   </Step>
   <Step title="Optionally dual-home the project">
     If you want the project to also appear on your own team's board, add your team under **Project settings → Teams**. The project shows in both places without duplication.
@@ -105,7 +144,7 @@ Do NOT use it for:
 </Steps>
 
 <Note>
-Triage SLA is **1 business day** from `Requested` to `Triaged`. Allocation typically takes **2 to 3 additional business days** depending on bench availability.
+After submission, expect **1 to 2 weeks** for approval and another **~3 weeks** before an allocated resource starts work. Build that into your project plan.
 </Note>
 
 ## How to fulfill a request (talent)
@@ -115,13 +154,13 @@ Triage SLA is **1 business day** from `Requested` to `Triaged`. Allocation typic
     Michael adds you to the project and assigns you to the root issues when the status moves to `Staffed`. You will get a Linear notification.
   </Step>
   <Step title="Read before you start">
-    Read the scope, deliverable, and acceptance criteria in full. Ask clarifying questions in a project comment tagging the requester. Do not start implementation until ambiguity is resolved — starting half-clear creates rework and scope drift.
+    Read the scope, deliverable, sub-issues, and acceptance criteria in full. Ask clarifying questions in a project comment tagging the requester. Do not start implementation until ambiguity is resolved.
   </Step>
   <Step title="Move to In Progress">
     Change the project status when you actually start. This signals to the requester that work has begun.
   </Step>
-  <Step title="Break down into sub-issues as needed">
-    If the intake did not break the work into tasks, create sub-issues yourself. One issue per logical chunk. Assign yourself.
+  <Step title="Work the sub-issues">
+    Assign each of the 4+ sub-issues to yourself. Move them through status as you complete them. Create additional sub-issues if the breakdown surfaces more work during execution.
   </Step>
   <Step title="Submit for review">
     When PRs or deliverables are ready, move the project to `In Review` and tag the requester in a comment with links to the artifacts.
@@ -135,12 +174,12 @@ Triage SLA is **1 business day** from `Requested` to `Triaged`. Allocation typic
 
 Every resource request is tagged across four dimensions. Requesters fill in the first three, Michael adds the fourth after allocation.
 
-| Group              | Options                                                                      | Who applies        |
-| ------------------ | ---------------------------------------------------------------------------- | ------------------ |
-| `resource-request` | (single label, always applied)                                                | Requester          |
-| **Skill**          | `fullstack`, `frontend-dev`, `backend-dev`, `devops-skill`, `qa`, `data`      | Requester          |
-| **Size**           | `S (<20h)`, `M (20-80h)`, `L (80h+)`                                           | Requester          |
-| **Talent Source**  | `internal`, `vendor`, `deel`, `new-hire`                                       | Triage (post-staff) |
+| Group              | Options                                                                                   | Who applies          |
+| ------------------ | ----------------------------------------------------------------------------------------- | -------------------- |
+| `resource-request` | (single label, always applied)                                                             | Requester            |
+| **Skill**          | `fullstack`, `frontend-dev`, `backend-dev`, `devops-skill`, `qa`, `data`                   | Requester            |
+| **Size**           | `M (1 cycle / ~80h)`, `L (2 cycles / ~160h)`, `XL (3+ cycles)`                              | Requester            |
+| **Talent Source**  | `internal`, `vendor`, `deel`, `new-hire`                                                   | Triage (post-staff)  |
 
 **Talent Source semantics:**
 
@@ -153,17 +192,20 @@ Every resource request is tagged across four dimensions. Requesters fill in the 
 
 ## Rules of the road
 
-- **One active project per talent.** You stay focused; requesters get dedicated attention. Exceptions require Michael's sign-off.
+- **2-week work minimum.** One cycle or more. Anything smaller stays on your own team.
+- **4-subissue minimum at intake.** No 4 sub-issues, no approval.
+- **6-week deadline floor.** If you need it in less than 6 weeks, escalate to your lead, don't submit here.
+- **One active project per talent.** They stay focused; requesters get dedicated attention. Exceptions require Michael's sign-off.
 - **Two open projects per requester.** Prevents one team from hoarding all the bench capacity. A third submission has to wait until one closes.
-- **`Blocked` does not count as active work.** If your project is blocked on an external dependency, you can pick up a second one while the first sits.
+- **`Blocked` does not count as active work.** If your project is blocked on an external dependency, the allocated talent can pick up a second one while the first sits.
 - **Scope drift spawns a new ticket.** If something new surfaces mid-project that is not in scope, it becomes a new issue on the appropriate team (not an expansion of your Talent Pool project).
 
-## Triage SLAs
+## SLAs
 
 | Transition              | Target              |
 | ----------------------- | ------------------- |
-| Requested → Triaged     | 1 business day      |
-| Triaged → Staffed       | 3 business days     |
+| Requested → Triaged (approved) | 1 to 2 weeks |
+| Triaged → Staffed       | ~3 weeks            |
 | In Review → Delivered   | 2 business days     |
 | Delivered → Rolled Off  | 1 business day      |
 
@@ -183,14 +225,26 @@ Three requests in a row from the same requester with more than ±50% variance tr
 
 ## FAQ
 
+**Why is the approval step 1 to 2 weeks?**
+Scope review + estimate validation is real work. Most requests need at least one round of back-and-forth to tighten scope, confirm the sub-issue breakdown, or re-scope once Michael asks what "done" looks like. Rushing approval produces under-scoped projects that blow up mid-engagement.
+
+**Why is there a 3-week lead time after approval?**
+Sourcing, vendor outreach, Deel contracting, background check (if needed), access provisioning (GitHub, Tailscale, AWS, repos), and 2-3 days of context ramp so the talent can actually hit the ground running. You cannot compress this to days without ending up with someone who spends their first week confused.
+
+**Why the 4-subtask minimum?**
+It is the cheapest filter for under-scoped requests. If a requester can't identify 4 discrete pieces of work, they don't understand the scope well enough for someone else to execute it. Rejecting under-scoped requests at intake saves 2-4 weeks of rework later.
+
 **Can I request a specific person?**
 You can ask in the project description, but Michael may allocate differently based on capacity and fit. If the ask requires specific domain knowledge, flag that explicitly.
 
 **What if I have unused hours in someone's Deel contract?**
-Mention it in the request. Matching existing contracted capacity to scoped requests is part of how Michael triages.
+Mention it in the request. Matching existing contracted capacity to scoped requests is part of how Michael triages — and it may cut the 3-week lead time if the person already has access.
 
-**My request is bigger than 80 hours. Should I still submit?**
-Yes, but expect Michael to either split it into multiple Talent Pool projects tied to milestones, or push it back to your team's roadmap. Size `L (80h+)` is a signal that the request should be reconsidered, not a hard block.
+**My request is bigger than 3 cycles. Should I still submit?**
+Yes, but expect Michael to split it into multiple Talent Pool projects tied to milestones, or push it back to your team's roadmap. `XL (3+ cycles)` is a signal to reconsider, not a hard block.
+
+**My deadline is in 4 weeks. Can you rush it?**
+No. The 6-week floor is not a soft guideline — it reflects how long vendor sourcing and onboarding actually take. If your deadline is 4 weeks out, escalate to your own team's lead, not Talent Pool.
 
 **Can external contractors watch the Talent Pool board?**
 Yes. Contractors are added to the team as Linear guests or members depending on their engagement. Confidential scope goes in a private project; the default is open so capacity visibility stays shared.
@@ -207,6 +261,6 @@ Default projects are team-visible. If a request touches legal, security, or M&A,
 
 ## Who to contact
 
-- **Submitting a request, triage, allocation:** Michael (Slack DM or tag him in the project)
+- **Submitting a request, approval, allocation:** Michael (Slack DM or tag him in the project)
 - **Contractor onboarding through Deel:** Bryant or Karen
 - **Scope or domain questions:** the requester listed on the specific project
