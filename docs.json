@@ -90,6 +90,13 @@
                 "pages": [
                   "crest-corp/slack-channels"
                 ]
+              },
+              {
+                "group": "Resourcing",
+                "expanded": false,
+                "pages": [
+                  "crest-corp/talent-pool"
+                ]
               }
             ]
           }

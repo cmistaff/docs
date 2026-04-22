@@ -1,0 +1,212 @@
+---
+title: "Talent Pool"
+description: "Internal resource-request intake. Scope a project, get a body assigned, ship it, roll off. How to submit a request and how to fulfill one."
+---
+
+The **Talent Pool** is a Linear team that coordinates scoped, time-bound help across Crest. When a dev, lead, or PM needs extra hands on a deliverable — a one-week feature push, a QA pass, an infra cleanup — they submit a project here. Michael triages, one person is allocated, they complete the work, and roll off to the next request.
+
+This replaces ad-hoc "can someone pick this up?" pings in Slack.
+
+<Note>
+Linear team: **Talent Pool (`TP`)**. Open Linear, switch workspace to Crest USA, pick the team from the sidebar. If you cannot see it, DM Michael to be added.
+</Note>
+
+## When to use the Talent Pool
+
+Use it when all of these are true:
+
+- The work is **scoped** — there is a clear deliverable, not an open-ended investigation
+- The work is **time-bound** — typically less than two weeks of one person's time
+- You need **someone other than yourself** to do it
+- It is **not** a product roadmap item your team already owns
+
+Do NOT use it for:
+
+- Product roadmap work on your own team (stay on your team's board)
+- Infra incidents or outages (use the Infrastructure team)
+- Access requests, onboarding, offboarding, IAM changes (use CrestCorp team)
+- General support questions (use the Support team)
+- Design work that your team would own anyway (use the Design team)
+
+## The lifecycle, at a glance
+
+<Steps>
+  <Step title="Requester submits">
+    Create a Linear project on the Talent Pool team with scope, estimate, and deadline. Status: `Requested`.
+  </Step>
+  <Step title="Triage validates scope">
+    Michael reviews within 1 business day. If scope is clear, status moves to `Triaged`. If unclear, you'll get comments asking for detail.
+  </Step>
+  <Step title="Talent is allocated">
+    Michael assigns from internal bench, external vendors, Deel-contracted talent, or a new hire. Status moves to `Staffed` and a `Talent Source` label is applied.
+  </Step>
+  <Step title="Work happens">
+    Talent moves the project to `In Progress`. Sub-issues cover the task breakdown. Requester stays reachable for clarifications.
+  </Step>
+  <Step title="Deliverables go to review">
+    Talent moves to `In Review` when PRs or artifacts are ready. Requester reviews and accepts.
+  </Step>
+  <Step title="Delivered and rolled off">
+    On acceptance, status moves to `Delivered`. Michael closes out with a rolloff retrospective (hours reconciliation, learnings) and moves to `Rolled Off`.
+  </Step>
+</Steps>
+
+## How to submit a request (requesters)
+
+<Steps>
+  <Step title="Open Linear and switch to Talent Pool">
+    Sidebar → workspace: Crest USA → team: **Talent Pool**.
+  </Step>
+  <Step title="Create a new project">
+    Click **+ New Project**. Give it a name that starts with your team name, then a short scope phrase. Example: `CrestPet — Stripe webhooks coverage pass` or `Infra — Tailscale ACL refactor`.
+  </Step>
+  <Step title="Fill in the intake template">
+    Paste the template below into the project description and fill every section. Requests missing scope or estimates get bounced back at triage.
+
+    ```markdown
+    ## Scope
+    <One paragraph: what needs to be built, fixed, or reviewed.>
+
+    ## Deliverable
+    <What "done" looks like. Specific artifacts, not vague outcomes.>
+
+    ## Constraints / Links
+    - Repo: <e.g., crestpetsystem>
+    - Related Linear: <CPE-123, INF-456>
+    - Docs / specs: <Figma, Notion, design doc>
+    - Who to ask for clarification: <requester name + Slack handle>
+
+    ## Estimate
+    - Skill: <one of: fullstack, frontend-dev, backend-dev, devops-skill, qa, data>
+    - Hours: <raw estimate>
+    - Size label: <S/M/L>
+    - Hard deadline (EST): <YYYY-MM-DD or "none">
+    - Target start: <YYYY-MM-DD>
+
+    ## Acceptance Criteria
+    - [ ] <Checklist item 1>
+    - [ ] <Checklist item 2>
+    - [ ] Code review passed
+    - [ ] Requester signs off
+
+    ## Non-goals (scope guard)
+    <What is explicitly OUT of scope — prevents drift.>
+    ```
+  </Step>
+  <Step title="Set status to Requested">
+    New projects default to `Backlog` — change it to `Requested`.
+  </Step>
+  <Step title="Apply labels">
+    Required: `resource-request` + one **Skill** label + one **Size** label. Michael adds the **Talent Source** label after allocation.
+  </Step>
+  <Step title="Optionally dual-home the project">
+    If you want the project to also appear on your own team's board, add your team under **Project settings → Teams**. The project shows in both places without duplication.
+  </Step>
+</Steps>
+
+<Note>
+Triage SLA is **1 business day** from `Requested` to `Triaged`. Allocation typically takes **2 to 3 additional business days** depending on bench availability.
+</Note>
+
+## How to fulfill a request (talent)
+
+<Steps>
+  <Step title="You get assigned">
+    Michael adds you to the project and assigns you to the root issues when the status moves to `Staffed`. You will get a Linear notification.
+  </Step>
+  <Step title="Read before you start">
+    Read the scope, deliverable, and acceptance criteria in full. Ask clarifying questions in a project comment tagging the requester. Do not start implementation until ambiguity is resolved — starting half-clear creates rework and scope drift.
+  </Step>
+  <Step title="Move to In Progress">
+    Change the project status when you actually start. This signals to the requester that work has begun.
+  </Step>
+  <Step title="Break down into sub-issues as needed">
+    If the intake did not break the work into tasks, create sub-issues yourself. One issue per logical chunk. Assign yourself.
+  </Step>
+  <Step title="Submit for review">
+    When PRs or deliverables are ready, move the project to `In Review` and tag the requester in a comment with links to the artifacts.
+  </Step>
+  <Step title="Wait for acceptance, then roll off">
+    Requester accepts and moves to `Delivered`. Michael runs the rolloff retro and moves to `Rolled Off`. You are now available for the next request.
+  </Step>
+</Steps>
+
+## Labels reference
+
+Every resource request is tagged across four dimensions. Requesters fill in the first three, Michael adds the fourth after allocation.
+
+| Group              | Options                                                                      | Who applies        |
+| ------------------ | ---------------------------------------------------------------------------- | ------------------ |
+| `resource-request` | (single label, always applied)                                                | Requester          |
+| **Skill**          | `fullstack`, `frontend-dev`, `backend-dev`, `devops-skill`, `qa`, `data`      | Requester          |
+| **Size**           | `S (<20h)`, `M (20-80h)`, `L (80h+)`                                           | Requester          |
+| **Talent Source**  | `internal`, `vendor`, `deel`, `new-hire`                                       | Triage (post-staff) |
+
+**Talent Source semantics:**
+
+- `internal` — existing Crest staff with bench capacity
+- `vendor` — sourced through an external staffing vendor or agency
+- `deel` — contract and payment run through [Deel](/crest-corp/deel-setup) (Crest's primary contracting rail for external talent)
+- `new-hire` — net-new person brought in specifically for this engagement
+
+`vendor` and `deel` frequently stack on the same request — someone sourced through an agency whose contract also runs on Deel.
+
+## Rules of the road
+
+- **One active project per talent.** You stay focused; requesters get dedicated attention. Exceptions require Michael's sign-off.
+- **Two open projects per requester.** Prevents one team from hoarding all the bench capacity. A third submission has to wait until one closes.
+- **`Blocked` does not count as active work.** If your project is blocked on an external dependency, you can pick up a second one while the first sits.
+- **Scope drift spawns a new ticket.** If something new surfaces mid-project that is not in scope, it becomes a new issue on the appropriate team (not an expansion of your Talent Pool project).
+
+## Triage SLAs
+
+| Transition              | Target              |
+| ----------------------- | ------------------- |
+| Requested → Triaged     | 1 business day      |
+| Triaged → Staffed       | 3 business days     |
+| In Review → Delivered   | 2 business days     |
+| Delivered → Rolled Off  | 1 business day      |
+
+If any of these slips for your request, ping Michael directly.
+
+## Rolloff retrospective
+
+Every completed project gets a short retro comment from Michael when it moves to `Rolled Off`. It covers:
+
+- Estimated hours vs actual hours (variance percentage)
+- Whether scope held, expanded, or shrank
+- Review quality (merged first try, or rounds of rework)
+- Who did the work and whether Crest would reuse them
+- One paragraph of learnings for future estimation
+
+Three requests in a row from the same requester with more than ±50% variance triggers a conversation about estimate calibration.
+
+## FAQ
+
+**Can I request a specific person?**
+You can ask in the project description, but Michael may allocate differently based on capacity and fit. If the ask requires specific domain knowledge, flag that explicitly.
+
+**What if I have unused hours in someone's Deel contract?**
+Mention it in the request. Matching existing contracted capacity to scoped requests is part of how Michael triages.
+
+**My request is bigger than 80 hours. Should I still submit?**
+Yes, but expect Michael to either split it into multiple Talent Pool projects tied to milestones, or push it back to your team's roadmap. Size `L (80h+)` is a signal that the request should be reconsidered, not a hard block.
+
+**Can external contractors watch the Talent Pool board?**
+Yes. Contractors are added to the team as Linear guests or members depending on their engagement. Confidential scope goes in a private project; the default is open so capacity visibility stays shared.
+
+**What about confidentiality?**
+Default projects are team-visible. If a request touches legal, security, or M&A, mark the project private and restrict the member list. Michael can help set that up.
+
+## Related
+
+- [Deel Profile Setup](/crest-corp/deel-setup) — how contractors land on Crest's payment rail
+- [Hubstaff Policy](/crest-corp/hubstaff-policy) — time tracking used in rolloff reconciliation
+- [Working in Linear](/onboarding/working-in-linear) — general Linear conventions at Crest
+- [Engineering Rules](/crest-corp/engineering-rules) — broader engineering policy
+
+## Who to contact
+
+- **Submitting a request, triage, allocation:** Michael (Slack DM or tag him in the project)
+- **Contractor onboarding through Deel:** Bryant or Karen
+- **Scope or domain questions:** the requester listed on the specific project
