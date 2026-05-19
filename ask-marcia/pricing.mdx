@@ -1,0 +1,65 @@
+---
+title: "Pricing"
+description: "Per-token rates for the Ask Marcia API — domain-tuned vet and consumer models."
+---
+
+The Ask Marcia API exposes Crest's domain-tuned vet and consumer AI models. Billing is per million tokens, with a free monthly allowance.
+
+<Note>
+**All prices below are subject to change.** Crest may revise rates as the underlying substrate, infrastructure capacity, or commercial terms evolve. The constants used by Crest's own internal systems and the values published on this page are kept in sync on every change. See the bottom of this page for the non-binding notice.
+</Note>
+
+## Rate card
+
+| Model | Model ID | Best for | Input ($ / 1M tokens) | Output ($ / 1M tokens) |
+|---|---|---|---|---|
+| **Marcia Vet** | `marcia-vet-v1` | Flagship vet reasoning, multi-step clinical workflows, treatment planning | **$2.50** | **$7.50** |
+| **Marcia Vet Mini** | `marcia-vet-mini` | High-volume vet chat, autocomplete, in-app helpers, consumer pet-owner Q&A | **$0.50** | **$2.00** |
+
+Both models share the same authentication, endpoint, and request shape — pick the model by passing it in the `model` field of the request.
+
+## Free tier
+
+Every Ask Marcia account includes a **free monthly allowance of 500,000 tokens combined across both models**. No credit card required to start. The allowance resets at the start of each calendar month (UTC).
+
+Once you exceed the free allowance, usage is billed at the per-token rates above. Add a payment method to unlock paid usage; otherwise additional requests return `402 Payment Required` until the next reset.
+
+## How billing works
+
+- **Token counting:** Input and output tokens are counted separately and at the rate of the model the request was served on.
+- **Model is final:** The `marcia-vet-*` models do not silently downgrade or upgrade. If you request `marcia-vet-v1` you are billed at the `marcia-vet-v1` rate even if a fallback provider serves the response.
+- **Failed requests are not billed:** Requests that error before generating any output are not charged.
+- **Streaming requests:** Billed identically to non-streaming on the same model — token count is final at stream completion.
+
+## Worked example
+
+A vet clinic using Marcia Vet Mini for in-app pet-owner Q&A and Marcia Vet for treatment-planning reviews:
+
+| Workload | Model | Input tokens | Output tokens | Cost |
+|---|---|---|---|---|
+| Pet-owner Q&A | `marcia-vet-mini` | 6,000,000 | 1,500,000 | (6 × $0.50) + (1.5 × $2.00) = **$6.00** |
+| Treatment-plan reviews | `marcia-vet-v1` | 800,000 | 250,000 | (0.8 × $2.50) + (0.25 × $7.50) = **$3.88** |
+| **Total** | | **6.8M in, 1.75M out** | | **$9.88** |
+
+The first 500,000 tokens combined are free, so the actual invoice would be **$9.88 minus the free-tier value** (computed at the blended rate of the models consumed inside the free allowance).
+
+## Coming soon — Marcia Vet Pro bundle
+
+A subscription bundle is on the roadmap for clinics with predictable monthly volume:
+
+- **$99 / month** flat fee
+- **Bundled:** 5,000,000 `marcia-vet-mini` tokens + 500,000 `marcia-vet-v1` tokens / month
+- **Overage:** at the per-token rates above
+- Annual prepay discount available
+
+This bundle is **not yet live**. The information above is illustrative and may change before launch.
+
+## Enterprise
+
+Veterinary networks, group practices, and consumer-facing apps with high monthly volume can negotiate a custom rate card, SLA, volume commit, dedicated-capacity deployment, or fine-tuning on your own data. [Contact sales](mailto:sales@crestadvisorygroup.com) for a private quote governed by an MSA.
+
+---
+
+### Non-binding pricing notice
+
+The rates published on this page reflect Crest's current public price card for the Ask Marcia API and are **non-binding, indicative, and subject to change at Crest's sole discretion**. They do not constitute an offer or a contract. Pricing in effect for any given billable period is the price card published on this page at the time of usage. For binding pricing terms (custom rate, SLA, volume commit), see your signed agreement with Crest Advisory Group LLC or [contact sales](mailto:sales@crestadvisorygroup.com).

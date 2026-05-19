@@ -254,6 +254,7 @@
               "marcia-code/overview",
               "marcia-code/quickstart",
               "marcia-code/tiers",
+              "marcia-code/pricing",
               "marcia-code/cli",
               "marcia-code/api-reference"
             ]
@@ -266,7 +267,8 @@
           {
             "group": "Ask Marcia",
             "pages": [
-              "ask-marcia/coming-soon"
+              "ask-marcia/coming-soon",
+              "ask-marcia/pricing"
             ]
           }
         ]

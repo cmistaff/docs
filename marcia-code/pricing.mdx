@@ -1,0 +1,64 @@
+---
+title: "Pricing"
+description: "Per-token rates for Marcia Code — Early Access, Stable, and Fast — plus the free tier."
+---
+
+Marcia Code is billed per million tokens (per-token). Pick a tier, pay only for what you use, and a free tier is included on every account.
+
+<Note>
+**All prices below are subject to change.** Crest may revise rates as the underlying substrate, infrastructure capacity, or commercial terms evolve. The constants used by Crest's own internal systems and the values published on this page are kept in sync on every change. See the bottom of this page for the non-binding notice.
+</Note>
+
+## Rate card
+
+| Tier | Model ID | Input ($ / 1M tokens) | Output ($ / 1M tokens) |
+|---|---|---|---|
+| **Early Access** | `marcia-code-preview` | **$2.50** | **$8.00** |
+| **Stable** | `marcia-code` | **$2.00** | **$6.00** |
+| **Fast** | `marcia-code-fast` | **$0.50** | **$2.00** |
+
+The three tiers and how to pick between them are documented in [Tiers](/marcia-code/tiers). Briefly:
+
+- **Early Access** — newest capability, slightly higher cost, two-provider redundancy.
+- **Stable** — production reliability, broadest fallback chain, lowest error rate.
+- **Fast** — sub-second time-to-first-token, ~5× cheaper input and ~4× cheaper output than Early Access. Same 256K context.
+
+## Free tier
+
+Every Marcia Code account includes a **free monthly allowance of 1,000,000 tokens combined across all three tiers**. No credit card required to start. The allowance resets at the start of each calendar month (UTC).
+
+Once you exceed the free allowance, usage is billed at the per-token rates above. Add a payment method to unlock paid usage; otherwise additional requests return `402 Payment Required` until the next reset.
+
+## How billing works
+
+- **Token counting:** Input and output tokens are counted separately and at the rate of the tier the request was served on. Tier is determined by the `model` field of the request — see [API reference](/marcia-code/api-reference).
+- **Fallbacks stay on tier:** If your request fails over from a primary provider to a peer provider, you are still billed at the tier you requested. Fallbacks do not silently downgrade or upgrade.
+- **Failed requests are not billed:** Requests that error before generating any output (4xx from validation, 5xx from "all providers unavailable") are not charged.
+- **Streaming requests:** Billed identically to non-streaming requests on the same tier — token count is final at stream completion.
+
+## Worked example
+
+A team using `marcia-code-fast` for inline autocomplete and `marcia-code-preview` for hard debugging in the same month:
+
+| Workload | Tier | Input tokens | Output tokens | Cost |
+|---|---|---|---|---|
+| Inline autocomplete (Fast) | `marcia-code-fast` | 8,000,000 | 2,000,000 | (8 × $0.50) + (2 × $2.00) = **$8.00** |
+| Hard debugging sessions (Early Access) | `marcia-code-preview` | 1,500,000 | 400,000 | (1.5 × $2.50) + (0.4 × $8.00) = **$6.95** |
+| **Total** | | **9.5M in, 2.4M out** | | **$14.95** |
+
+The first 1M tokens combined are free, so the actual invoice would be **$14.95 minus the free-tier value** (computed at the blended rate of the tiers consumed inside the free allowance).
+
+## Enterprise
+
+For volume commits, custom rate cards, SLA, on-prem / VPC-peered deployments, or domain-tuned fine-tunes, [contact sales](mailto:sales@crestadvisorygroup.com). Enterprise customers receive a private rate card with terms governed by an MSA.
+
+## What's coming
+
+- **Subscription bundles** with monthly fixed price + bundled tokens, including a "Marcia Code Pro" tier for individual developers and a per-seat team plan. Roadmap; not yet live.
+- **Cached-input pricing** — repeated context will be billed at a reduced rate once the gateway's response cache is generally available.
+
+---
+
+### Non-binding pricing notice
+
+The rates published on this page reflect Crest's current public price card for the Marcia Code API and are **non-binding, indicative, and subject to change at Crest's sole discretion**. They do not constitute an offer or a contract. Pricing in effect for any given billable period is the price card published on this page at the time of usage. For binding pricing terms (custom rate, SLA, volume commit), see your signed agreement with Crest Advisory Group LLC or [contact sales](mailto:sales@crestadvisorygroup.com).
