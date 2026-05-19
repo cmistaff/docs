@@ -96,8 +96,8 @@ The full set of available profiles (DataViewer, DataManager, AppDeployer, Secret
 ## Step 4: Verify access
 
 ```bash
-# Login (browser flow, lasts 1-12 hours depending on role)
-aws sso login --sso-session crest
+# Login (use --use-device-code on headless dev boxes; lasts 1-12 hours depending on role)
+aws sso login --profile crest-prestaging-app-tester --use-device-code
 
 # Check identity for the app-tester profile
 aws sts get-caller-identity --profile crest-prestaging-app-tester
@@ -105,6 +105,10 @@ aws sts get-caller-identity --profile crest-prestaging-app-tester
 # Should print account 908027379030 and an ARN ending in
 # AppTester-Prestaging/<your-name>@creststaff.com
 ```
+
+<Note>
+**Device-code flow vs browser flow.** On a remote dev box there is no browser, so `aws sso login` cannot open one for you. Always pass `--use-device-code` from the dev box — the CLI prints a URL and short code; open the URL on your laptop, paste the code, approve the device, and the dev-box terminal continues automatically. On a workstation with a real browser, the flag is optional.
+</Note>
 
 ## Step 5: Fetch dev secrets
 
