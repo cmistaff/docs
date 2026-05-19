@@ -40,36 +40,41 @@ You have two options. Prefer Option A because it gives you working dev credentia
 
 #### Option A: Pull from AWS Secrets Manager (recommended)
 
-Centralized local-dev secrets live in AWS Secrets Manager. INF-156 (April 9, 2026) moved every shared API key, token, and third-party credential into two secrets, so a single SSO-authenticated pull populates both `.env` files.
+Centralized local-dev secrets live in AWS Secrets Manager. INF-156 (April 9, 2026) moved every shared API key, token, and third-party credential into two secrets — `local/crest-pet/api` and `local/crest-pet/web` — so a single `pnpm env:sync` populates both `.env` files end-to-end.
 
 Once your AWS SSO is configured (see [AWS SSO Setup](/onboarding/aws-sso-setup)):
 
 ```bash
-# Login (once per session)
-aws sso login --sso-session crest
+# Login (once per session — device-code flow because the dev box is headless)
+aws sso login --profile crest-prestaging-app-tester --use-device-code
 
-# Fetch the API/server secrets bundle
-AWS_PROFILE=crest-prestaging-app-tester \
-  aws secretsmanager get-secret-value \
-  --secret-id local/crest-pet/api \
-  --region us-east-1 \
-  --query SecretString --output text \
-  | jq -r 'to_entries[] | "\(.key)=\(.value)"' > server/.env
-
-# Fetch the web/client secrets bundle
-AWS_PROFILE=crest-prestaging-app-tester \
-  aws secretsmanager get-secret-value \
-  --secret-id local/crest-pet/web \
-  --region us-east-1 \
-  --query SecretString --output text \
-  | jq -r 'to_entries[] | "\(.key)=\(.value)"' > client/.env
+# Pull both secret bundles and write them into client/.env + server/.env
+cd ~/Crest/GitHub/crestsystem/crestpetsystem
+AWS_PROFILE=crest-prestaging-app-tester pnpm env:sync:force --copy-to-env
 ```
 
-This overwrites your local `.env` files with the team's shared dev values for every populated key.
+`pnpm env:sync:force --copy-to-env` is the canonical command. It:
+
+- Reads both secret bundles in one pass.
+- Writes them to `client/.env.local` + `server/.env.local`, then copies into `client/.env` + `server/.env` (which the app actually reads).
+- Backs up your previous `.env` files to `.env.bak` — **safe to re-run** every time secrets rotate.
+- Preserves your personal `.env.user` overlay (NGROK token, personal API keys) — those always win over Secrets Manager values per `env-sync-patterns.md`.
+
+Variant scripts:
+
+| Command | When to use |
+|---|---|
+| `pnpm env:sync` | Standard pull. Only overwrites empty / unmanaged keys. |
+| `pnpm env:sync:force --copy-to-env` | **Recommended** — replaces existing values and writes both `.env.local` and `.env`. |
+| `pnpm env:sync:server` / `pnpm env:sync:client` | Pull just one workspace. |
 
 <Warning>
-The two secrets only carry shared **third-party** credentials (API keys, webhook secrets, tokens). Local-only values that depend on your own dev box (`/etc/hosts` portal mappings, `APP_URL`, `PRIMARY_TENANT_ID` from your seeded DB, etc.) still come from `.env.example` defaults or your local setup. Re-apply those after the pull, or merge selectively rather than overwriting.
+The two secret bundles only carry shared **third-party** credentials (API keys, webhook secrets, tokens). Local-only values that depend on your own dev box (`/etc/hosts` portal mappings, `APP_URL`, `PRIMARY_TENANT_ID` from your seeded DB, etc.) come from `.env.example` defaults — `pnpm env:sync` merges intelligently rather than blanket-overwriting, so these survive each pull. See `env-sync-patterns.md` in the crestpetsystem repo for the full precedence rules.
 </Warning>
+
+<Note>
+**Old method (deprecated).** The legacy raw `aws secretsmanager get-secret-value | jq` flow has been replaced by `pnpm env:sync`. Use the `pnpm` command above — it is what the rest of the team runs and what the env-sync rule documents as canonical.
+</Note>
 
 #### Option B: Ask in `#crestpet-onboarding`
 
